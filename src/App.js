@@ -1,15 +1,7 @@
-import MarketAnalysisForm from "./components/MarketAnalysisForm";
-import AnalysisList from "./components/AnalysisList";
+import TradeTypeSection from '../src/components/HomePage/TradesSection'
 
-function App() {
-    return (
-        <div>
-            <h1>Trading Journal</h1>
-            <MarketAnalysisForm refreshanalysis={() => window.location.reload()} />
-            <br />
-            <AnalysisList />
-        </div>
-    );
+function App(){
+    return TradeTypeSection()
 }
 
 export default App;

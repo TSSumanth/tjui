@@ -64,23 +64,20 @@ main h2 {
 .container {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: center; 
 }
-
-#trades-section {
+#core-concepts {
   padding: 1rem;
   border-radius: 6px;
   background-color: #040107;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-#trades-section h2 {
-  color: #dddbe4;
+#core-concepts h2{
   text-align: center;
-  font-size: 3rem;
 }
 
-#trades-section ul {
+#core-concepts ul {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -90,40 +87,25 @@ main h2 {
   justify-content: center;
 }
 
-#trades-section li {
+#core-concepts li {
   width: 15rem;
   height: 20rem;
   text-align: center;
-  background-color: #261c48;
+  background-color:#f0f0f0; ;
 }
 
-#trades-section li:hover {
-  background-color: rgb(79, 49, 134);
-  cursor: pointer;
-  width: 16rem;
-  height: 21rem;
-}
-
-#trades-section li img {
-  height: 10rem;
-  width: 10rem;
+#core-concepts li img {
+  height: 6rem;
+  width: 6rem;
   object-fit: cover;
 }
 
-#trades-section li img:hover {
-  height: 11rem;
-  width: 11rem;
-  cursor: pointer;
-}
-
-#trades-section li h3 {
+#core-concepts li h3 {
   margin: 0.5rem 0;
-  color: #dddbe4;
 }
 
-#trades-section li p {
-  font-size: 1.4rem;
-  color: #dddbe4;
+#core-concepts li p {
+  font-size: 1rem;
 }
 
 #examples {
@@ -177,66 +159,4 @@ main h2 {
 
 #tab-content code {
   font-size: 1rem;
-}
-
-.trades-table-container {
-  max-width: 100%;
-  overflow-x: auto;
-  margin: 20px auto;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(227, 224, 224, 0.1);
-}
-
-.trades-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-}
-
-.trades-header {
-  background-color: #007bff;
-  color: white;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-tr {
-  padding: 15px;
-  text-align: center;
-  border-bottom: 1px solid #ddd;
-  min-width: 120px;  /* Ensures columns have enough width */
-}
-
-th {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid #ddd;
-  min-width: 120px;  /* Ensures columns have enough width */
-}
-
-tbody .trades-row:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-tbody .trades-row:hover {
-  background-color: #f1f1f1;
-  transition: background 0.3s ease-in-out;
-}
-
-.trades-value {
-  cursor: pointer;
-  user-select: none;
-}
-
-.trades-value:hover {
-  background-color: #0056b3;
-}
-
-@media (max-width: 768px) {
-
-  .trades-value,
-  .trades-row {
-    padding: 10px;
-  }
 }
