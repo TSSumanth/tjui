@@ -1,6 +1,6 @@
-import TradeTypeSection from '../src/components/HomePage/TradesSection'
+import TradeTypeSection from './components/Trades/TradesSection'
 
-function App(){
+function App() {
     return TradeTypeSection()
 }
 
