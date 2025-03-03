@@ -4,7 +4,7 @@ import losstradesimage from '../../images/Loss_Trades.png'
 import profitabletradesimage from '../../images/profitable_trades.png'
 import TradesTable from '../Generic/Table'
 import React, { useState } from "react";
-
+import { Outlet, Link } from "react-router-dom";
 let content = [
     {
         "title": "Open Trades",

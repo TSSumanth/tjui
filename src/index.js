@@ -2,14 +2,34 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import Trades from '../src/pages/Trades'
+import Report from '../src/pages/ProfitLossReport'
 import reportWebVitals from './reportWebVitals';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+
+export default function MyApp() {
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<Trades />} />
+                <Route path="trades" element={<Trades />} />
+                <Route path="profitlossreport" element={<Report />} />
+                <Route path="*" element={<Trades />} />
+            </Routes>
+        </BrowserRouter>
+    );
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
-);
+root.render(<MyApp />);
+
+// const root = ReactDOM.createRoot(document.getElementById('root'));
+// root.render(
+//     <React.StrictMode>
+//         <Trades />
+//     </React.StrictMode>
+// );
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
