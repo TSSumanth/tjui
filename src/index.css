@@ -205,14 +205,16 @@ tr {
   padding: 15px;
   text-align: center;
   border-bottom: 1px solid #ddd;
-  min-width: 120px;  /* Ensures columns have enough width */
+  min-width: 120px;
+  /* Ensures columns have enough width */
 }
 
 th {
   padding: 12px;
   text-align: center;
   border-bottom: 1px solid #ddd;
-  min-width: 120px;  /* Ensures columns have enough width */
+  min-width: 120px;
+  /* Ensures columns have enough width */
 }
 
 tbody .trades-row:nth-child(even) {
@@ -239,4 +241,75 @@ tbody .trades-row:hover {
   .trades-row {
     padding: 10px;
   }
+}
+
+
+#multi-button {
+  border-radius: 3px;
+  text-transform: capitalize;
+  height: 30px;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 20px;
+  color: #eae7e7;
+  background-color: #0067e2;
+}
+
+.multi-button-contained-primary {
+  border-radius: 3px;
+  text-transform: capitalize;
+  height: 20;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 10px;
+  color: #130e0e;
+  background-color: #0067e2;
+}
+
+#search-section {
+  padding: 1rem;
+  border-radius: 6px;
+  border-width: 2px;
+  border-color: #0056b3;
+  background-color: #f2f2f2;
+  box-shadow: 0 2px 8px rgba(228, 224, 224, 0.4);
+}
+
+#search-section-label {
+  padding: 17.384px 8px 8px 12px;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 20px;
+  color: #0067e2;
+}
+
+#date-picker {
+  padding: 15.384px 5px 5px 10px;
+}
+
+form {
+  width: 100%;
+  max-width: 1190px;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+  -webkit-margin-start: 0;
+  -webkit-margin-end: 0;
+  -webkit-padding-before: 0;
+  -webkit-padding-start: 0;
+  -webkit-padding-end: 0;
+  -webkit-padding-after: 0;
+  border: 0;
+}
+
+legend {
+  margin: 0;
+  margin-bottom: 0px;
+  padding: 0;
+  display: block;
+  -webkit-padding-start: 0;
+  -webkit-padding-end: 0;
+  color: #0067e2;
 }

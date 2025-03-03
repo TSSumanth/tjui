@@ -1,80 +1,98 @@
-import opentradesimage from '../../images/open_trades_image.png'
-import closedtradesimage from '../..//images/closed_trades_image.png'
-import losstradesimage from '../../images/Loss_Trades.png'
-import profitabletradesimage from '../../images/profitable_trades.png'
-import TradesTable from '../Generic/Table'
-import React, { useState } from "react";
-import { Outlet, Link } from "react-router-dom";
-let content = [
-    {
-        "title": "Open Trades",
-        "image": opentradesimage,
-        "description": "Click here to view list of Open Trades"
-    },
-    {
-        "title": "Closed Trades",
-        "image": closedtradesimage,
-        "description": "Click here to view list of Closed Trades"
-    },
-    {
-        "title": "Loss Trades",
-        "image": losstradesimage,
-        "description": "Click here to view list of Loss Trades"
-    },
-    {
-        "title": "Profitable Trades",
-        "image": profitabletradesimage,
-        "description": "Click here to view list of Profitable Trades"
-    }
-]
-
-const tradeData1 = [
-    { id: 1, stockprofit: 1000, stockloss: 2000, overallstockpl: -1000},
-    { id: 2, stockprofit: 5000, stockloss: 2000, overallstockpl: 3000 },
-    { id: 3, stockprofit: 1000, stockloss: 6000, overallstockpl: -5000}
-];
-
-const tradeData2 = [
-    { id: 1, optionprofit: 1000, optionloss: 2000, overalloptionpl: -1000},
-    { id: 2, optionprofit: 5000, optionloss: 2000, overalloptionpl: 3000 },
-    { id: 3, optionprofit: 1000, optionloss: 6000, overalloptionpl: -5000}
+import { getReportByDateRange } from "../../services/profitlossreport";
+import PagenationTable from '../Generic/PagenationTable'
+import React, { useState, useEffect } from "react";
+import { subDays, format } from "date-fns";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+const reportColumns = [
+    { accessorKey: "date", header: "Report Date" },
+    { accessorKey: "stocks_realised", header: "Stocks Realized (₹)" },
+    { accessorKey: "stocks_unrealised", header: "Stocks Unrealized (₹)" },
+    { accessorKey: "stock_pl", header: "Stocks P/L (₹)" },
+    { accessorKey: "fo_realised", header: "F&O Realized (₹)" },
+    { accessorKey: "fo_unrealised", header: "F&O Unrealized (₹)" },
+    { accessorKey: "fo_pl", header: "F&O P/L (₹)" },
+    { accessorKey: "total_pl", header: "Total P/L (₹)" },
 ];
 
 
 function ReportSection() {
-    const [selectedData, setSelectedData] = useState(null);
+    const [currentReportData, setLatestcurrentReportData] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [startDate, setStartDate] = useState(subDays(new Date(), 90)); // Default: 30 days ago
+    const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
-    function handleClickOnCard(props) {
-        console.log(props)
-        if (props === "Open Trades")
-            setSelectedData(tradeData1)
-        else if (props === "Closed Trades")
-            setSelectedData(tradeData2)
-        else
-            setSelectedData(null)
-    }
+    // useEffect(() => {
+    const fetchReport = async () => {
+        setLoading(true);
+        setError(null);
+        const formattedStartDate = format(startDate, "yyyy-MM-dd");
+        const formattedEndDate = format(endDate, "yyyy-MM-dd");
+        try {
+            const data = await getReportByDateRange(formattedStartDate, formattedEndDate);
+            setLatestcurrentReportData(data);
+        }
+        catch (err) {
+            console.error("Error fetching data:", err);
+            setError("Failed to load report data.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-
-    function TradeTypes(props) {
-        return (
-            <li onClick={() => handleClickOnCard(props.title)}>
-                <img src={props.image} alt={props.title} />
-                <p>{props.description}</p>
-            </li>
-        )
-    }
+    // Trigger fetch when component mounts to load the last 30 days of data
+    useEffect(() => {
+        fetchReport(); // Automatically fetch data when the page loads
+    }, []); // Empty dependency array means this runs once when the component mounts
 
     return (
-        <div>
-            <div className="profit-loss-report-container">
-                <section id='profit-loss-report-section'>
-                    <h2>Last Month Report</h2>
-                    <ul>
-                        {content.map((item) => <TradeTypes {...item} />)}
-                    </ul>
-                </section>
-            </div>
-            {selectedData && <TradesTable data={selectedData} />}
+        <div className="p-6">
+            <h1 className="text-2xl font-bold mb-4">Profit & Loss Report</h1>
+
+            {/* Date Filters & Get Report Button */}
+            <section id="search-section">
+
+                <legend>SEARCH REPORT</legend>
+
+                <div className="input-field first-wrap">
+                    <div>
+                        <label id="search-section-label">Start Date: </label>
+                        <DatePicker selected={startDate} onChange={setStartDate} dateFormat="yyyy-MM-dd" id="date-picker" placeholderText="Start Date" />
+                    </div>
+                    <div>
+                        <label id="search-section-label">End Date: </label>
+                        <DatePicker selected={endDate} onChange={setEndDate} dateFormat="yyyy-MM-dd" id="date-picker" placeholderText="End Date" />
+                    </div>
+                    <button onClick={fetchReport} id="multi-button" disabled={loading} >
+                        <span id="multi-button-contained-primary">
+                            {loading ? "Loading..." : "Get Report"}
+                        </span>
+                    </button>
+                </div>
+                {/* <div className="flex items-center space-x-4 mb-4">
+                    <div>
+                        <label id="search-section-label">Start Date: </label>
+                        <DatePicker selected={startDate} onChange={setStartDate} dateFormat="yyyy-MM-dd" id="date-picker" />
+                    </div>
+                    <div>
+                        <label id="search-section-label">End Date: </label>
+                        <DatePicker selected={endDate} onChange={setEndDate} dateFormat="yyyy-MM-dd" id="date-picker" />
+                    </div>
+                    <button onClick={fetchReport} id="multi-button" disabled={loading} >
+                        {loading ? "Loading..." : "Get Report"}
+                    </button>
+                </div> */}
+            </section>
+            {/* Error Message */}
+            {error && <p className="text-red-500 mb-4">{error}</p>}
+
+            {/* Report Table (Only Show if Data is Available) */}
+            {currentReportData.length > 0 ? (
+                <PagenationTable columns={reportColumns} data={currentReportData} />
+            ) : (
+                !loading && <p className="text-gray-500">No data available. Click "Get Report" to load data.</p>
+            )}
         </div>
     );
 }
