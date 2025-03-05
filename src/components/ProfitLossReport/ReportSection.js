@@ -1,9 +1,10 @@
-import { getReportByDateRange } from "../../services/profitlossreport";
+import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
 import PagenationTable from '../Generic/PagenationTable'
 import React, { useState, useEffect } from "react";
 import { subDays, format } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+
 const reportColumns = [
     { accessorKey: "date", header: "Report Date" },
     { accessorKey: "stocks_realised", header: "Stocks Realized (₹)" },
@@ -23,7 +24,7 @@ function ReportSection() {
     const [startDate, setStartDate] = useState(subDays(new Date(), 90)); // Default: 30 days ago
     const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
-    // useEffect(() => {
+
     const fetchReport = async () => {
         setLoading(true);
         setError(null);
@@ -70,26 +71,13 @@ function ReportSection() {
                         </span>
                     </button>
                 </div>
-                {/* <div className="flex items-center space-x-4 mb-4">
-                    <div>
-                        <label id="search-section-label">Start Date: </label>
-                        <DatePicker selected={startDate} onChange={setStartDate} dateFormat="yyyy-MM-dd" id="date-picker" />
-                    </div>
-                    <div>
-                        <label id="search-section-label">End Date: </label>
-                        <DatePicker selected={endDate} onChange={setEndDate} dateFormat="yyyy-MM-dd" id="date-picker" />
-                    </div>
-                    <button onClick={fetchReport} id="multi-button" disabled={loading} >
-                        {loading ? "Loading..." : "Get Report"}
-                    </button>
-                </div> */}
+
             </section>
             {/* Error Message */}
             {error && <p className="text-red-500 mb-4">{error}</p>}
 
-            {/* Report Table (Only Show if Data is Available) */}
             {currentReportData.length > 0 ? (
-                <PagenationTable columns={reportColumns} data={currentReportData} />
+                <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry}/>
             ) : (
                 !loading && <p className="text-gray-500">No data available. Click "Get Report" to load data.</p>
             )}
