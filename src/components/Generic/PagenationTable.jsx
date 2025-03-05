@@ -110,14 +110,17 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
 
     const handleCreateRecord = async (newRecord) => {
         setAdding(true)
-        const isDuplicate = data.some(
-            (item) => item.date === newRecord.date
-        );
+        if (Array.isArray(data)) {
+            console.log(data)
+            const isDuplicate = data.some(
+                (item) => item.date === newRecord.date
+            );
 
-        if (isDuplicate) {
-            alert("Duplicate entry detected! Please enter a unique item.");
-            setAdding(false)
-            return;
+            if (isDuplicate) {
+                alert("Duplicate entry detected! Please enter a unique item.");
+                setAdding(false)
+                return;
+            }
         }
 
         const success = await CreateRequest(newRecord);
@@ -127,7 +130,12 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
             //         record.date === newRecord.date ? newRecord : record
             //     )
             // );
-            setData([newRecord, ...data ])
+            if (Array.isArray(data)) {
+                setData([newRecord, ...data])
+            }else{
+                setData([newRecord])
+            }
+            
             setAddShowModal(false);
         }
         setAdding(false)

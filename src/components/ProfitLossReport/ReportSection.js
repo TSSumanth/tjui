@@ -77,9 +77,15 @@ function ReportSection() {
             {error && <p className="text-red-500 mb-4">{error}</p>}
 
             {currentReportData.length > 0 ? (
-                <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry}/>
+                <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry} />
             ) : (
-                !loading && <p className="text-gray-500">No data available. Click "Get Report" to load data.</p>
+                !loading && (
+                    <>
+                        <p className="text-gray-500">No data available. Click "Get Report" to load data.</p>
+                        <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry} />
+                    </>
+                )
+
             )}
         </div>
     );
