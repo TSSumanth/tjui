@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import './Popup.css'
-function ConfirmPopup({trigger, onCancel, onConfirm, message}) {
-    // let [popup,setpopup] = useState(false);
+function ConfirmPopup({ trigger, onCancel, onConfirm, message }) {
 
     return (trigger) ? (
         <div className="confirmation-popup">
@@ -10,8 +9,20 @@ function ConfirmPopup({trigger, onCancel, onConfirm, message}) {
                 <button onClick={onCancel} className="confirmation-popup-Cancel-button">Cancel</button>
                 <button onClick={onConfirm} className="confirmation-popup-Accept-button">Accept</button>
             </div>
-            
+
         </div>
     ) : ''
 }
-export { ConfirmPopup }
+
+function InfoPopup({ trigger, onClose, children }) {
+    return (trigger) ? (
+        <div className="info-popup">
+            <div className="info-popup-inner">
+                <button onClick={onClose} className="info-popup-cancel-button">Close</button>
+                {children}
+            </div>
+        </div>
+    ) : ''
+}
+
+export { ConfirmPopup, InfoPopup }

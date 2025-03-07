@@ -10,7 +10,9 @@ export const getReportByDateRange = async (startdate, enddate) => {
             enddate: enddate
         }
     });
-    
+    if (! (response.status === 200)) {
+        throw new Error("Failed to Get records for selected date range");
+    }
     return response.data;
 };
 

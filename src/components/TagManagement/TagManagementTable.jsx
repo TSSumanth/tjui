@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { subDays, format } from "date-fns";
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from "@tanstack/react-table";
-import { ConfirmPopup } from './Popup.jsx'
-import { UpdateProfitLossEntry } from './ProfitLossModelPopup.jsx'
-import { CreateProfitLossEntry } from '../Generic/ProfitLossModelPopup.jsx'
-
+import { ConfirmPopup, InfoPopup } from '../Generic/Popup.jsx'
+import { UpdateTag } from '../Generic/TagsModelPopup.jsx'
+import { CreateTag } from '../Generic/TagsModelPopup.jsx'
+import DOMPurify from 'dompurify';
 const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);
     const [selectedRows, setSelectedRows] = useState({});
@@ -14,6 +14,8 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
     const [recordToEdit, setRecordToEdit] = useState(null);
     const [showAddModal, setAddShowModal] = useState(false);
     const [adding, setAdding] = useState(false);
+    const [showInfoPopup, setShowInfoPopup] = useState(false);
+    const [popupContent, setPopupContent] = useState("");
     const {
         getHeaderGroups,
         getRowModel,
@@ -32,7 +34,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
         initialState: {
             pagination: {
                 pageIndex: 0,
-                pageSize: 10,
+                pageSize: 25,
             },
         },
     });
@@ -77,13 +79,16 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
             setDeleting(false);
             return;
         }
+
+        // Wait for all deletions to complete using Promise.all
         const deletionResults = await Promise.all(
             selectedIndexes.map(async (index) => {
                 let entryToDelete = data[index];
-                const success = await DeleteRequest(entryToDelete.date);
-                return { index, name: entryToDelete.date, success };
+                const success = await DeleteRequest(entryToDelete.name);
+                return { index, name: entryToDelete.name, success };
             })
         );
+
         // Filter out failed deletions
         const failedDeletions = deletionResults.filter(result => !result.success);
 
@@ -99,6 +104,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
 
         // Reset selected rows
         setSelectedRows({});
+
         setDeleting(false);
     };
 
@@ -108,11 +114,26 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
     };
 
     const handleUpdateRecord = async (updatedRecord) => {
-        const success = await UpdateRequest(updatedRecord);
+        if (recordToEdit.name !== updatedRecord.name) {
+            const isDuplicate = data.some(
+                (item) => item.name === updatedRecord.name
+            );
+
+            if (isDuplicate) {
+                alert(`Duplicate entry detected! Please enter a unique tag name. Tag Name ${updatedRecord.name} is already present`);
+                setIsEditModalOpen(false)
+                return;
+            }
+            updatedRecord.id = recordToEdit.id;
+        }
+        else {
+            updatedRecord.id = recordToEdit.id;
+        }
+        const success = await UpdateRequest(recordToEdit.name, updatedRecord);
         if (success) {
             setData((prevData) =>
                 prevData.map((record) =>
-                    record.date === updatedRecord.date ? updatedRecord : record
+                    record.name === recordToEdit.name ? updatedRecord : record
                 )
             );
             setIsEditModalOpen(false);
@@ -124,11 +145,11 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
         if (Array.isArray(data)) {
             console.log(data)
             const isDuplicate = data.some(
-                (item) => item.date === newRecord.date
+                (item) => item.name === newRecord.name
             );
 
             if (isDuplicate) {
-                alert("Duplicate entry detected! Please enter a unique item.");
+                alert(`Duplicate entry detected! Please enter a unique tag name. Tag Name ${newRecord.name} is already present`);
                 setAdding(false)
                 return;
             }
@@ -145,6 +166,20 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
             setAddShowModal(false);
         }
         setAdding(false)
+    };
+
+    const sanitizeAndRenderHTML = (htmlString) => {
+        const sanitizedHtml = DOMPurify.sanitize(htmlString);
+        return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
+    };
+
+    const handleViewClick = (content) => {
+        setPopupContent(content);
+        setShowInfoPopup(true);
+    };
+
+    const closeInfoPopup = () => {
+        setShowInfoPopup(false);
     };
 
     return (
@@ -185,7 +220,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
                 </thead>
                 <tbody>
                     {getRowModel().rows.map((row, index) => (
-                        <tr key={`${row.original.date}_${index}`} className="border">
+                        <tr key={`${row.original.id}`} className="border">
                             <td className="border p-2 text-center">
                                 <input
                                     type="checkbox"
@@ -195,7 +230,15 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
                             </td>
                             {row.getVisibleCells().map((cell) => (
                                 <td key={cell.id} className="border p-2">
-                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    {cell.column.id === 'description' // Check if it's the description cell
+                                        ? (
+                                            <button
+                                                onClick={() => handleViewClick(cell.getValue())}
+                                                className="px-3 py-1 bg-blue-500 text-white rounded"
+                                            >
+                                                View
+                                            </button>)
+                                        : flexRender(cell.column.columnDef.cell, cell.getContext())}
                                 </td>
                             ))}
                             <td className="border p-2">
@@ -246,7 +289,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
 
             {/* Edit Entry Modal */}
             {isEditModalOpen && (
-                <UpdateProfitLossEntry
+                <UpdateTag
                     isOpen={isEditModalOpen}
                     record={recordToEdit}
                     onClose={() => setIsEditModalOpen(false)}
@@ -257,9 +300,18 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
             {/* Add Entry Model */}
             {
                 showAddModal && (
-                    <CreateProfitLossEntry isOpen={showAddModal} onClose={() => setAddShowModal(false)} onSave={handleCreateRecord} />
+                    <CreateTag isOpen={showAddModal} onClose={() => setAddShowModal(false)} onSave={handleCreateRecord} />
                 )
             }
+
+            {/* Popup */}
+            {showInfoPopup && (
+                <InfoPopup trigger = {showInfoPopup} onClose = {closeInfoPopup}>
+                    <div>
+                        {sanitizeAndRenderHTML(popupContent)}
+                    </div>
+                </InfoPopup>
+            )}
         </div>
     );
 };

@@ -1,0 +1,27 @@
+nav {
+    padding: 5px;
+    width: 80%;
+    height: 110px;
+    border: 1px solid #fff;
+    margin: 0 auto;
+}
+
+.header-container {
+    /* width: 80%;  */
+    margin: 0 auto;
+    display: flex;
+    flex-direction: row;
+    justify-content: left; 
+}
+
+.logo img{ 
+    height: 100px;
+    width: 200px;
+    padding: 5px;
+}
+
+.menu-items {
+    flex-direction: row;
+    display: flexbox;
+    align-items: center
+}

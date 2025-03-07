@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import DatePicker from "react-datepicker";
+import DateComponent from './DateComponent';
 import './ProfitLossModelPopup.css'
 import { subDays, format } from "date-fns";
 function UpdateProfitLossEntry({ isOpen, onClose, record, onSave }) {
@@ -79,10 +79,10 @@ function CreateProfitLossEntry({ isOpen, onClose, onSave }) {
     // Object that we want to update when the date changes
     const [updatedRecord, setUpdatedRecord] = useState({
         "date": null,
-        "stocks_realised": "0",
-        "stocks_unrealised": "0",
-        "fo_realised": "0",
-        "fo_unrealised": "0",
+        "stocks_realised": "",
+        "stocks_unrealised": "",
+        "fo_realised": "",
+        "fo_unrealised": "",
         "fo_pl": "0",
         "stock_pl": "0",
         "total_pl": "0"
@@ -106,10 +106,18 @@ function CreateProfitLossEntry({ isOpen, onClose, onSave }) {
             fo_pl: Number(prev.fo_realised) + Number(prev.fo_unrealised),
             total_pl: Number(prev.stocks_realised) + Number(prev.stocks_unrealised) + Number(prev.fo_realised) + Number(prev.fo_unrealised),
         }));
-    }, [updatedRecord.date,updatedRecord.stocks_realised, updatedRecord.stocks_unrealised, updatedRecord.fo_realised, updatedRecord.fo_unrealised]);
+    }, [updatedRecord.date, updatedRecord.stocks_realised, updatedRecord.stocks_unrealised, updatedRecord.fo_realised, updatedRecord.fo_unrealised]);
 
     const handleChange = (e) => {
-        setUpdatedRecord({ ...updatedRecord, [e.target.name]: Number(e.target.value) });
+        const { name, value } = e.target;
+
+        // Allow empty string (so user can delete input) and only valid numbers
+        if (value === "" || value === "-" || !isNaN(value)) {
+            setUpdatedRecord((prev) => ({
+                ...prev,
+                [name]: value, // Keep as string while editing
+            }));
+        }
     };
 
     const handleSave = () => {
@@ -122,14 +130,19 @@ function CreateProfitLossEntry({ isOpen, onClose, onSave }) {
     return (
         <div >
             <section className='model-container' id='modelcontainer'>
-                <section className='model' id='model'>
+                <section className='model' id='model' onClick={(e) => {
+                    // Check if the click target is outside the date picker
+                    if (!e.target.closest('.date-picker')) {
+                        onClose(); // Close the popup only if the click is outside the date picker
+                    }
+                }}>
                     <button onClick={onClose} className='close-btn' id='close-button'>X</button>
                     <div className='model-content'>
                         <h1>Add New P/L Entry</h1>
-                        <form className='model-form'>
+                        <form className='model-form' onClick={(e) => e.stopPropagation()}>
                             <div>
                                 <label className="label-field" name='Date'>Report Date </label>
-                                <DatePicker className="date-field" type="text" name="date" selected={selectedDate} onChange={handleDateChange} dateFormat="yyyy-MM-dd" id="date-picker" placeholderText="Select a Date" />
+                                <DateComponent initialDate="" onDateSelect={handleDateChange} />
                             </div>
                             <div>
                                 <label className="label-field" name='Stocks Realised'>Stocks Realized (₹) </label>

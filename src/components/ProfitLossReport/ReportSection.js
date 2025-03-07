@@ -1,9 +1,10 @@
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
 import PagenationTable from '../Generic/PagenationTable'
+import DateComponent from "../Generic/DateComponent";
 import React, { useState, useEffect } from "react";
 import { subDays, format } from "date-fns";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+// import DatePicker from "react-datepicker";
+// import "react-datepicker/dist/react-datepicker.css";
 
 const reportColumns = [
     { accessorKey: "date", header: "Report Date" },
@@ -59,11 +60,11 @@ function ReportSection() {
                 <div className="input-field first-wrap">
                     <div>
                         <label id="search-section-label">Start Date: </label>
-                        <DatePicker selected={startDate} onChange={setStartDate} dateFormat="yyyy-MM-dd" id="date-picker" placeholderText="Start Date" />
+                        <DateComponent initialDate = {startDate} onDateSelect={setStartDate} />
                     </div>
                     <div>
                         <label id="search-section-label">End Date: </label>
-                        <DatePicker selected={endDate} onChange={setEndDate} dateFormat="yyyy-MM-dd" id="date-picker" placeholderText="End Date" />
+                        <DateComponent initialDate = {endDate} onDateSelect={setEndDate} />
                     </div>
                     <button onClick={fetchReport} id="multi-button" disabled={loading} >
                         <span id="multi-button-contained-primary">
