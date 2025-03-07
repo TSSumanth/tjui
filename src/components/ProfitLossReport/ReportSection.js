@@ -1,5 +1,5 @@
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
-import PagenationTable from '../Generic/PagenationTable'
+import PagenationTable from './ProfitLossTable'
 import DateComponent from "../Generic/DateComponent";
 import React, { useState, useEffect } from "react";
 import { subDays, format } from "date-fns";
@@ -60,11 +60,11 @@ function ReportSection() {
                 <div className="input-field first-wrap">
                     <div>
                         <label id="search-section-label">Start Date: </label>
-                        <DateComponent initialDate = {startDate} onDateSelect={setStartDate} />
+                        <DateComponent initialDate={startDate} onDateSelect={setStartDate} />
                     </div>
                     <div>
                         <label id="search-section-label">End Date: </label>
-                        <DateComponent initialDate = {endDate} onDateSelect={setEndDate} />
+                        <DateComponent initialDate={endDate} onDateSelect={setEndDate} />
                     </div>
                     <button onClick={fetchReport} id="multi-button" disabled={loading} >
                         <span id="multi-button-contained-primary">

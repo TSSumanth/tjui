@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import DateComponent from './DateComponent';
+import DateComponent from '../Generic/DateComponent';
 import './ProfitLossModelPopup.css'
 import { subDays, format } from "date-fns";
 function UpdateProfitLossEntry({ isOpen, onClose, record, onSave }) {

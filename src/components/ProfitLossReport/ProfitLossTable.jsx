@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { subDays, format } from "date-fns";
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from "@tanstack/react-table";
-import { ConfirmPopup } from './Popup.jsx'
-import { UpdateProfitLossEntry } from './ProfitLossModelPopup.jsx'
-import { CreateProfitLossEntry } from '../Generic/ProfitLossModelPopup.jsx'
+import { ConfirmPopup } from '../Generic/Popup.jsx'
+import { UpdateProfitLossEntry,CreateProfitLossEntry } from './ProfitLossModelPopup.jsx'
 
 const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);

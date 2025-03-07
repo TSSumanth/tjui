@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import NotesEditor from './NotesEditor.jsx'
+import NotesEditor from '../Generic/NotesEditor.jsx'
 import './TagsModelPopup.css'
 function UpdateTag({ isOpen, onClose, record, onSave }) {
     const [name, setName] = useState(record.name);

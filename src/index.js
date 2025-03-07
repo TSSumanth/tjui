@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+import MarketAnalysis from '../src/pages/MarketAnalysis'
 import Trades from '../src/pages/Trades'
 import Dashboard from './pages/DashBoardManagement'
 import TagManagement from './pages/TagManagement'
@@ -14,6 +14,7 @@ export default function MyApp() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="marketanalysis" element={<MarketAnalysis />} />
                 <Route path="trades" element={<Trades />} />
                 <Route path="profitlossreport" element={<Report />} />
                 <Route path="dashboard" element={<Dashboard />} />
@@ -27,15 +28,4 @@ export default function MyApp() {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<MyApp />);
 
-// const root = ReactDOM.createRoot(document.getElementById('root'));
-// root.render(
-//     <React.StrictMode>
-//         <Trades />
-//     </React.StrictMode>
-// );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
-// import './learningsrc/index.js';

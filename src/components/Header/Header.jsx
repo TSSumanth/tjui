@@ -42,10 +42,11 @@ function Header() {
                     <MyImage to="/" image={Logo} alt="My Trading Journal" />
                 </div>
                 <div className='menu-items'>
-                    <MyButton to="/profitlossreport">Profit Loss Report</MyButton>
+                    <MyButton to="/marketanalysis">Daily Market Analysis</MyButton>
                     <MyButton to="/trades">Trades</MyButton>
-                    <MyButton to="/dashboard">Dashboard</MyButton>
+                    <MyButton to="/profitlossreport">Profit Loss Report</MyButton>
                     <MyButton to="/">My Stratagies</MyButton>
+                    <MyButton to="/dashboard">Dashboard</MyButton>
                     <MyButton to="/tagmanagement">Tag Management</MyButton>
                 </div>
             </div>

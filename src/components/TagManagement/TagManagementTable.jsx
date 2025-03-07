@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { subDays, format } from "date-fns";
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from "@tanstack/react-table";
 import { ConfirmPopup, InfoPopup } from '../Generic/Popup.jsx'
-import { UpdateTag } from '../Generic/TagsModelPopup.jsx'
-import { CreateTag } from '../Generic/TagsModelPopup.jsx'
+import { UpdateTag } from './TagsModelPopup.jsx'
+import { CreateTag } from './TagsModelPopup.jsx'
 import DOMPurify from 'dompurify';
 const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);
@@ -306,7 +306,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
 
             {/* Popup */}
             {showInfoPopup && (
-                <InfoPopup trigger = {showInfoPopup} onClose = {closeInfoPopup}>
+                <InfoPopup trigger={showInfoPopup} onClose={closeInfoPopup}>
                     <div>
                         {sanitizeAndRenderHTML(popupContent)}
                     </div>
