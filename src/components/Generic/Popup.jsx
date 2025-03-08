@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import './Popup.css'
-function ConfirmPopup({ trigger, onCancel, onConfirm, message }) {
 
+function ConfirmPopup({ trigger, onCancel, onConfirm, message }) {
     return (trigger) ? (
         <div className="confirmation-popup">
             <div className="confirmation-popup-inner">
