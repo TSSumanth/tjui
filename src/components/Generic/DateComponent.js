@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { format, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, getYear, getMonth, parseISO, isValid } from 'date-fns';
 import './DateComponent.css'; // Create a CSS file for styling
 
-const DateComponent = ({ initialDate,onDateSelect }) => {
+const DateComponent = ({ initialDate, onDateSelect }) => {
     const [selectedDate, setSelectedDate] = useState(initialDate || new Date());
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
@@ -29,7 +29,7 @@ const DateComponent = ({ initialDate,onDateSelect }) => {
         event.stopPropagation();    // Prevent event bubbling
         setCurrentMonth(addMonths(currentMonth, 1));
     };
-    
+
     const prevMonth = (event) => {
         event.preventDefault(); // Prevent default behavior
         event.stopPropagation();    // Prevent event bubbling

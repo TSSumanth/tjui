@@ -14,6 +14,18 @@ function ConfirmPopup({ trigger, onCancel, onConfirm, message }) {
     ) : ''
 }
 
+function AlertPopup({ trigger, onConfirm, message }) {
+    return (trigger) ? (
+        <div className="confirmation-popup">
+            <div className="confirmation-popup-inner">
+                <h2 className='confirmation-popup-message'>{message}</h2>
+                <button onClick={onConfirm} className="confirmation-popup-Accept-button">Ok</button>
+            </div>
+
+        </div>
+    ) : ''
+}
+
 function InfoPopup({ trigger, onClose, children }) {
     return (trigger) ? (
         <div className="info-popup">
@@ -25,4 +37,4 @@ function InfoPopup({ trigger, onClose, children }) {
     ) : ''
 }
 
-export { ConfirmPopup, InfoPopup }
+export { ConfirmPopup, InfoPopup, AlertPopup }

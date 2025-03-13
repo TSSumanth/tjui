@@ -59,8 +59,8 @@ export function ActionItems() {
                 </div>
                 {!loading ?
                     activeActionItems.length > 0 ?
-                        activeActionItems.map((item) => {
-                            return <div className='action-item' id='actionitem'>
+                        activeActionItems.map((item, index) => {
+                            return <div key={index} className='action-item' id='actionitem'>
                                 <p>{item.description}</p>
                                 <button onClick={() => markComplete(item)}>Mark as Complete</button>
                             </div>

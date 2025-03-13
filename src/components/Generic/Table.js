@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from "react";
-function TradesTable({ data }) {
-    console.log(data)
+import { format, parseISO } from "date-fns";
+import './Table.css'
+const formatDate = (dateString) => {
+    if (!dateString) return ""; // Handle empty or undefined values
+    try {
+        return format(parseISO(dateString), "yyyy-MM-dd HH:mm"); // Converts to "YYYY-MM-DD HH:MM"
+    } catch (error) {
+        console.error("Invalid date:", dateString);
+        return "Invalid Date"; // Fallback value
+    }
+};
+
+function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrade }) {
     const [sortedData, setSortedData] = useState(data);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
@@ -12,7 +23,7 @@ function TradesTable({ data }) {
     }, [data]); // ✅ Runs only when 'data' changes
 
     // Extract column headers dynamically
-    const columns = data.length > 0 ? Object.keys(data[0]) : [];
+    const columns = data.length > 0 ? Object.keys(data[0]).filter(col => includeColumns.includes(col)) : [];
 
     // Sorting logic
     const handleSort = (key) => {
@@ -34,17 +45,19 @@ function TradesTable({ data }) {
                 <thead className="trades-header">
                     <tr>
                         {columns.map((col) => (
-                            <th key={col} onClick={() => handleSort(col)} style={{ cursor: "pointer" }}>
-                                {col.toUpperCase()} {sortConfig.key === col ? (sortConfig.direction === "asc" ? "🔼" : "🔽") : ""}
+                            <th key={col} onClick={() => handleSort(col)} style={{ cursor: "pointer" }} >
+                                {columnAliases[col] || col.toUpperCase()}  {sortConfig.key === col ? (sortConfig.direction === "asc" ? "🔼" : "🔽") : ""}
                             </th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
                     {sortedData.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
+                        <tr key={rowIndex} className='table-rows' id='traderows' onClick={() => updateTrade(row)}>
                             {columns.map((col) => (
-                                <td key={col}>{row[col]}</td>
+                                <td key={col}>
+                                    {col === "entrydate" || col === "exitdate" || col === 'lastmodifieddate' ? formatDate(row[col]) : row[col]}
+                                </td>
                             ))}
                         </tr>
                     ))}

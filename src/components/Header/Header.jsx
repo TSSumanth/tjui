@@ -4,16 +4,13 @@ import { BrowserRouter, useNavigate, Link } from 'react-router-dom'
 import Logo from '../../images/logo.png';
 import './Header.css'
 import { ActionItems } from '../ActionItems/ActionItems'
-
+import { Card } from '../Trades/OrderForm'
 
 function MyButton({ to, children, className }) {
-
     const navigate = useNavigate();
-
     const handleClick = () => {
         navigate(to);
     };
-
     return (
         <button onClick={handleClick} className={className}>
             {children}
@@ -23,7 +20,6 @@ function MyButton({ to, children, className }) {
 
 function MyImage({ to, image, alt, className }) {
     const navigate = useNavigate();
-
     const handleClick = () => {
         navigate(to);
     };
@@ -32,10 +28,7 @@ function MyImage({ to, image, alt, className }) {
     );
 }
 
-
-
 function Header() {
-
     return (
         <>
             <nav>
@@ -50,7 +43,6 @@ function Header() {
                         <MyButton to="/" className="nav-button">My Stratagies</MyButton>
                         <MyButton to="/dashboard" className="nav-button">Dashboard</MyButton>
                         <MyButton to="/tagmanagement" className="nav-button">Tag Management</MyButton>
-                        <MyButton to="/tagmanagement" className="nav-button">Add Action Item</MyButton>
                     </div>
                 </div>
             </nav>

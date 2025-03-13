@@ -1,0 +1,84 @@
+.trades-section-container {
+  background-color: #040107;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  width: fit-content;
+  margin: 0 auto;
+}
+.trades-section-container h2 {
+  color: #dddbe4;
+  text-align: center;
+  font-size: 30px;
+  padding: 10px;
+  margin: 0px;
+}
+
+.trades-section-header {
+  display: flex;
+  /* padding: 10px 10px 10px 10px; */
+} 
+
+.trades-section-header button {
+  background-color: rgb(47, 47, 143);
+  border-color: #ffffff;
+  border-width: 1px;
+  border-radius: 6px;
+  color: #ffffff;
+  text-align: center;
+  font-size: 15px;
+  padding: 2px;
+  max-height: 70px;
+  max-width: 150px;
+  cursor: pointer;
+  margin: 10px;
+} 
+
+#trades-section {
+  padding: 1rem;
+}
+
+#trades-section ul {
+  list-style: none;
+  padding: 10px;
+  margin: 10px;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#trades-section li {
+  width: 10rem;
+  height: 15rem;
+  text-align: center;
+  background-color: #261c48;
+}
+
+#trades-section li:hover {
+  background-color: rgb(79, 49, 134);
+  cursor: pointer;
+  width: 10.2rem;
+  height: 15.2rem;
+}
+
+#trades-section li img {
+  height: 10rem;
+  width: 10rem;
+  object-fit: cover;
+}
+
+#trades-section li img:hover {
+  height: 10.2rem;
+  width: 10.2rem;
+  cursor: pointer;
+}
+
+#trades-section li h3 {
+  margin: 10px 0;
+  color: #dddbe4;
+  /* width:fit-content; */
+}
+
+#trades-section li p {
+  font-size: 15px;
+  color: #dddbe4;
+}
