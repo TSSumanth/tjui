@@ -78,7 +78,7 @@ function CreateProfitLossEntry({ isOpen, onClose, onSave }) {
     const [selectedDate, setSelectedDate] = useState(null);
     // Object that we want to update when the date changes
     const [updatedRecord, setUpdatedRecord] = useState({
-        "date": null,
+        "date": format(new Date(), "yyyy-MM-dd"),
         "stocks_realised": "",
         "stocks_unrealised": "",
         "fo_realised": "",
@@ -142,7 +142,7 @@ function CreateProfitLossEntry({ isOpen, onClose, onSave }) {
                         <form className='model-form' onClick={(e) => e.stopPropagation()}>
                             <div>
                                 <label className="label-field" name='Date'>Report Date </label>
-                                <DateComponent initialDate="" onDateSelect={handleDateChange} />
+                                <DateComponent initialDate={updatedRecord.date} onDateSelect={handleDateChange} />
                             </div>
                             <div>
                                 <label className="label-field" name='Stocks Realised'>Stocks Realized (₹) </label>

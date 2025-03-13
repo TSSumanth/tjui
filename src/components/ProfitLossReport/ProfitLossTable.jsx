@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { subDays, format } from "date-fns";
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from "@tanstack/react-table";
 import { ConfirmPopup } from '../Generic/Popup.jsx'
-import { UpdateProfitLossEntry,CreateProfitLossEntry } from './ProfitLossModelPopup.jsx'
+import { UpdateProfitLossEntry, CreateProfitLossEntry } from './ProfitLossModelPopup.jsx'
 
 const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);
@@ -31,7 +30,7 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
         initialState: {
             pagination: {
                 pageIndex: 0,
-                pageSize: 10,
+                pageSize: 50,
             },
         },
     });
