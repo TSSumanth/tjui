@@ -1,6 +1,6 @@
 
-import { Header } from '../components/Header/Header'
-import  TagsSection  from '../components/TagManagement/TagManagement'
+import  Header  from '../components/Header/Header'
+import TagsSection from '../components/TagManagement/TagManagement'
 
 function TagManagement() {
     return (

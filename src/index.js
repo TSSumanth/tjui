@@ -1,11 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import MarketAnalysis from '../src/pages/MarketAnalysis'
-import Trades from '../src/pages/Trades'
+import MarketAnalysis from './pages/MarketAnalysis'
+import Trades from './pages/Trades'
 import Dashboard from './pages/DashBoardManagement'
 import TagManagement from './pages/TagManagement'
-import Report from '../src/pages/ProfitLossReport'
+import Report from './pages/ProfitLossReport'
 import Home from './pages/Home'
 import StrategyPage from './pages/MyStrategies'
 import reportWebVitals from './reportWebVitals';
@@ -26,6 +26,18 @@ export default function MyApp() {
         </BrowserRouter>
     );
 }
+
+// export default function MyApp() {
+//     return (
+//         <BrowserRouter>
+//             <Routes>
+//                 <Route path="*" element={<StrategyPage />} />
+//             </Routes>
+//         </BrowserRouter>
+//     );
+// }
+
+
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<MyApp />);

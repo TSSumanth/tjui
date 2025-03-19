@@ -75,13 +75,14 @@ const StrategyHeader = () => {
                     </Button>
                 </Box>
             </Container>
-            {viewSearchFilter && <Container sx={{
+            {viewSearchFilter && <Container maxWidth={false} sx={{
                 backgroundColor: "#fafbfb",
-                padding: 1,
-                margin: 1,
-                width: "fit-content",
+                padding: "3",
+                margin: "5" ,
+                width: "100%",
                 border: "1px solid grey", // Correct border syntax
-                borderRadius: "8px"
+                borderRadius: "8px",
+                
             }}>
                 <Typography sx={{
                     padding: 2,
