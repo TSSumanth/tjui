@@ -1,319 +1,173 @@
-import React, { useState } from "react";
-import { subDays, format } from "date-fns";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    Paper, Button, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions,
+    IconButton, Typography
+} from "@mui/material";
+import { Delete, Edit, Visibility, Close } from "@mui/icons-material";
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from "@tanstack/react-table";
-import { ConfirmPopup, InfoPopup } from '../Generic/Popup.jsx'
-import { UpdateTag } from './TagsModelPopup.jsx'
-import { CreateTag } from './TagsModelPopup.jsx'
-import DOMPurify from 'dompurify';
-const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
+import TagModal from "./TagsModelPopup.jsx";
+import DOMPurify from "dompurify";
+
+const TagsTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);
     const [selectedRows, setSelectedRows] = useState({});
-    const [deleting, setDeleting] = useState(false);
-    const [showModal, setShowModal] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [recordToEdit, setRecordToEdit] = useState(null);
-    const [showAddModal, setAddShowModal] = useState(false);
-    const [adding, setAdding] = useState(false);
-    const [showInfoPopup, setShowInfoPopup] = useState(false);
+    const [modalState, setModalState] = useState({ type: null, isOpen: false, record: null });
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [infoPopupOpen, setInfoPopupOpen] = useState(false);
     const [popupContent, setPopupContent] = useState("");
-    const {
-        getHeaderGroups,
-        getRowModel,
-        getCanPreviousPage,
-        getCanNextPage,
-        previousPage,
-        nextPage,
-        getState,
-        setPageSize,
-        getPageCount,
-    } = useReactTable({
+
+    const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
-        initialState: {
-            pagination: {
-                pageIndex: 0,
-                pageSize: 25,
-            },
-        },
+        initialState: { pagination: { pageIndex: 0, pageSize: 25 } },
     });
 
-
-    // Handle row selection
-    const handleRowSelection = (rowId) => {
-        setSelectedRows((prev) => ({
-            ...prev,
-            [rowId]: !prev[rowId],
-        }));
-    };
-
-    // Open Add Entry popup
-    const openAddEntryPopup = () => {
-        setAddShowModal(true);
-    };
-
-    // Close Add Entry popup
-    const closeAddEntryPopup = () => {
-        setAddShowModal(false);
-    };
-    // Open modal for confirmation
-    const openDeleteConfirmation = () => {
-        setShowModal(true);
-    };
-
-    // Close modal without deleting
-    const closeDeleteConfirmation = () => {
-        setShowModal(false);
-    };
-
-    const handleDelete = async () => {
-        setShowModal(false);
-        setDeleting(true);
-
-        const selectedIndexes = Object.keys(selectedRows)
-            .filter((index) => selectedRows[index])
-            .map((index) => parseInt(index));
-
-        if (selectedIndexes.length === 0) {
-            setDeleting(false);
-            return;
-        }
-
-        // Wait for all deletions to complete using Promise.all
-        const deletionResults = await Promise.all(
-            selectedIndexes.map(async (index) => {
-                let entryToDelete = data[index];
-                const success = await DeleteRequest(entryToDelete.name);
-                return { index, name: entryToDelete.name, success };
-            })
-        );
-
-        // Filter out failed deletions
-        const failedDeletions = deletionResults.filter(result => !result.success);
-
-        if (failedDeletions.length > 0) {
-            const failedNames = failedDeletions.map(result => result.name).join(", ");
-            alert(`Failed to delete the following records: ${failedNames}. Please try again.`);
-        }
-
-        // Remove the deleted items from the data
-        setData((prevData) =>
-            prevData.filter((_, index) => !selectedIndexes.includes(index))
-        );
-
-        // Reset selected rows
-        setSelectedRows({});
-
-        setDeleting(false);
-    };
-
-    const handleEditClick = (record) => {
-        setRecordToEdit(record);
-        setIsEditModalOpen(true);
-    };
-
-    const handleUpdateRecord = async (updatedRecord) => {
-        if (recordToEdit.name !== updatedRecord.name) {
-            const isDuplicate = data.some(
-                (item) => item.name === updatedRecord.name
-            );
-
-            if (isDuplicate) {
-                alert(`Duplicate entry detected! Please enter a unique tag name. Tag Name ${updatedRecord.name} is already present`);
-                setIsEditModalOpen(false)
-                return;
-            }
-            updatedRecord.id = recordToEdit.id;
-        }
-        else {
-            updatedRecord.id = recordToEdit.id;
-        }
-        const success = await UpdateRequest(recordToEdit.name, updatedRecord);
-        if (success) {
-            setData((prevData) =>
-                prevData.map((record) =>
-                    record.name === recordToEdit.name ? updatedRecord : record
-                )
-            );
-            setIsEditModalOpen(false);
-        }
-    };
-
-    const handleCreateRecord = async (newRecord) => {
-        setAdding(true)
-        if (Array.isArray(data)) {
-            console.log(data)
-            const isDuplicate = data.some(
-                (item) => item.name === newRecord.name
-            );
-
-            if (isDuplicate) {
-                alert(`Duplicate entry detected! Please enter a unique tag name. Tag Name ${newRecord.name} is already present`);
-                setAdding(false)
-                return;
-            }
-        }
-
-        const success = await CreateRequest(newRecord);
-        if (success) {
-            if (Array.isArray(data)) {
-                setData([newRecord, ...data])
-            } else {
-                setData([newRecord])
-            }
-
-            setAddShowModal(false);
-        }
-        setAdding(false)
-    };
-
-    const sanitizeAndRenderHTML = (htmlString) => {
-        const sanitizedHtml = DOMPurify.sanitize(htmlString);
-        return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
-    };
+    useEffect(() => {
+        setData(initialdata || []);
+    }, [initialdata]);
 
     const handleViewClick = (content) => {
         setPopupContent(content);
-        setShowInfoPopup(true);
+        setInfoPopupOpen(true);
     };
 
-    const closeInfoPopup = () => {
-        setShowInfoPopup(false);
+    const handleClosePopup = () => {
+        setInfoPopupOpen(false);
+    };
+
+    const selectedIndexes = useMemo(() => Object.keys(selectedRows).filter(id => selectedRows[id]), [selectedRows]);
+
+    const handleModal = (type, record = null) => setModalState({ type, isOpen: !!type, record });
+
+    const handleRowSelection = (index) => setSelectedRows(prev => ({ ...prev, [index]: !prev[index] }));
+
+    const handleDelete = async () => {
+        setModalState({ type: null, isOpen: false });
+        setIsProcessing(true);
+
+        // Get the names of selected records
+        const selectedNames = selectedIndexes.map(index => data[index].name);
+
+        // Delete records asynchronously
+        await Promise.all(selectedNames.map(async (name) => {
+            await DeleteRequest(name);
+        }));
+
+        // Update state by removing deleted records using their names
+        setData(prev => prev.filter(record => !selectedNames.includes(record.name)));
+
+        setSelectedRows({});
+        setIsProcessing(false);
+    };
+
+    const handleSave = async (newRecord, isEdit = false) => {
+        setIsProcessing(true);
+        if (!isEdit && data.some(item => item.name === newRecord.name)) {
+            alert(`Tag Name ${newRecord.name} already exists!`);
+            setIsProcessing(false);
+            return;
+        }
+
+        const success = isEdit ? await UpdateRequest(modalState.record.name, newRecord) : await CreateRequest(newRecord);
+        if (success) {
+            setData(isEdit ? data.map(item => (item.name === modalState.record.name ? newRecord : item)) : [newRecord, ...data]);
+            handleModal(null);
+        }
+        setIsProcessing(false);
     };
 
     return (
-        <div className="p-4 border rounded-lg shadow-md bg-white relative">
-            <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center space-x-4 mb-2">
-                    <button
-                        onClick={openDeleteConfirmation}
-                        disabled={Object.values(selectedRows).every((val) => !val)}
-                        className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50"
-                    >
-                        {deleting ? "Deleting..." : "Delete Selected"}
-                    </button>
-                    <button
-                        onClick={openAddEntryPopup}
-                        disabled={adding}
-                        className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50"
-                    >
-                        {adding ? "Adding..." : "Add New Entry"}
-                    </button>
-                </div>
+        <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 3 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                <Button variant="contained" color="error" startIcon={<Delete />} onClick={() => handleModal("delete")} disabled={!selectedIndexes.length}>
+                    {isProcessing ? "Deleting..." : "Delete Selected"}
+                </Button>
+                <Button variant="contained" color="primary" onClick={() => handleModal("create")} disabled={isProcessing}>
+                    {isProcessing ? "Adding..." : "Add New Entry"}
+                </Button>
             </div>
 
-            {/* Table */}
-            <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                    {getHeaderGroups().map((headerGroup) => (
-                        <tr key={headerGroup.id} className="bg-gray-100">
-                            <th className="border p-2">Select</th>
-                            {headerGroup.headers.map((header) => (
-                                <th key={header.id} className="border p-2">
-                                    {flexRender(header.column.columnDef.header, header.getContext())}
-                                </th>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow sx={{ backgroundColor: "lightblue" }}>
+                            <TableCell>Select</TableCell>
+                            {table.getHeaderGroups().map(group => (
+                                group.headers.map(header => (
+                                    <TableCell key={header.id}>{flexRender(header.column.columnDef.header, header.getContext())}</TableCell>
+                                ))
                             ))}
-                            <th className="border p-2">Update Details</th>
-                        </tr>
-                    ))}
-                </thead>
-                <tbody>
-                    {getRowModel().rows.map((row, index) => (
-                        <tr key={`${row.original.id}`} className="border">
-                            <td className="border p-2 text-center">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedRows[index] || false}
-                                    onChange={() => handleRowSelection(index)}
-                                />
-                            </td>
-                            {row.getVisibleCells().map((cell) => (
-                                <td key={cell.id} className="border p-2">
-                                    {cell.column.id === 'description' // Check if it's the description cell
-                                        ? (
-                                            <button
-                                                onClick={() => handleViewClick(cell.getValue())}
-                                                className="px-3 py-1 bg-blue-500 text-white rounded"
-                                            >
-                                                View
-                                            </button>)
-                                        : flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </td>
-                            ))}
-                            <td className="border p-2">
-                                <button
-                                    onClick={() => handleEditClick(row.original)}
-                                    className="px-3 py-1 bg-blue-500 text-white rounded"
-                                >
-                                    Edit
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                            <TableCell>Edit</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {table.getRowModel().rows.map((row, index) => (
+                            <TableRow key={row.original.id} >
+                                <TableCell sx={{
+                                    backgroundColor: index % 2 === 0 ? "#f5f5f5" : "#e0e0e0", // Alternating colors
+                                }}>
+                                    <Checkbox checked={!!selectedRows[index]} onChange={() => handleRowSelection(index)} />
+                                </TableCell>
+                                {row.getVisibleCells().map(cell => (
+                                    <TableCell key={cell.id} sx={{
+                                        backgroundColor: index % 2 === 0 ? "#f5f5f5" : "#e0e0e0", // Alternating colors
+                                    }}>
+                                        {cell.column.id === "description" ? (
+                                            <IconButton onClick={() => handleViewClick(cell.getValue())} color="primary">
+                                                <Visibility />
+                                            </IconButton>
+                                        ) : flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </TableCell>
+                                ))}
+                                <TableCell sx={{
+                                    backgroundColor: index % 2 === 0 ? "#f5f5f5" : "#e0e0e0", // Alternating colors
+                                }}>
+                                    <IconButton color="secondary" onClick={() => handleModal("edit", row.original)}>
+                                        <Edit />
+                                    </IconButton>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
 
-            {/* Pagination Controls */}
-            <div className="mt-4 flex justify-between">
-                <button
-                    onClick={previousPage}
-                    disabled={!getCanPreviousPage()}
-                    className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-                >
-                    Previous
-                </button>
-                <button
-                    onClick={nextPage}
-                    disabled={!getCanNextPage()}
-                    className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-                >
-                    Next
-                </button>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+                <Button variant="outlined" onClick={table.previousPage} disabled={!table.getCanPreviousPage()}>Previous</Button>
+                <Typography variant="body2">Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</Typography>
+                <Button variant="outlined" onClick={table.nextPage} disabled={!table.getCanNextPage()}>Next</Button>
             </div>
 
-            {/* Page info */}
-            <div className="mt-4 text-sm">
-                <p>
-                    Page {getState().pagination.pageIndex + 1} of {getPageCount()}
-                </p>
-                <p>
-                    Showing {getRowModel().rows.length} of {data.length} records
-                </p>
-            </div>
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={modalState.type === "delete"} onClose={() => handleModal(null)}>
+                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogContent>Are you sure you want to delete the selected records?</DialogContent>
+                <DialogActions>
+                    <Button onClick={() => handleModal(null)}>Cancel</Button>
+                    <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
+                </DialogActions>
+            </Dialog>
 
-            {/* Confirmation Modal */}
-            {showModal && (
-                <ConfirmPopup trigger={showModal} message="Do you want to delete the selected records ?" onCancel={closeDeleteConfirmation} onConfirm={handleDelete} />
-            )}
+            <Dialog open={infoPopupOpen} onClose={handleClosePopup} fullWidth maxWidth="sm">
+                <DialogTitle>
+                    Description
+                    <IconButton onClick={handleClosePopup} sx={{ position: "absolute", right: 8, top: 8 }}>
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(popupContent) }} />
+                </DialogContent>
+            </Dialog>
 
-            {/* Edit Entry Modal */}
-            {isEditModalOpen && (
-                <UpdateTag
-                    isOpen={isEditModalOpen}
-                    record={recordToEdit}
-                    onClose={() => setIsEditModalOpen(false)}
-                    onSave={handleUpdateRecord}
-                />
-            )}
-
-            {/* Add Entry Model */}
-            {
-                showAddModal && (
-                    <CreateTag isOpen={showAddModal} onClose={() => setAddShowModal(false)} onSave={handleCreateRecord} />
-                )
-            }
-
-            {/* Popup */}
-            {showInfoPopup && (
-                <InfoPopup trigger={showInfoPopup} onClose={closeInfoPopup}>
-                    <div>
-                        {sanitizeAndRenderHTML(popupContent)}
-                    </div>
-                </InfoPopup>
-            )}
-        </div>
+            {/* Edit and Create Modals */}
+            {modalState.type === "edit" && <TagModal isOpen record={modalState.record} onClose={() => handleModal(null)} onSave={(data) => handleSave(data, true)} />}
+            {modalState.type === "create" && <TagModal isOpen onClose={() => handleModal(null)} onSave={handleSave} />}
+        </Paper>
     );
 };
 
-export default PagenationTable;
+export default TagsTable;

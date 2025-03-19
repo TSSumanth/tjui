@@ -1,93 +1,70 @@
-import React, { useState, useEffect } from "react";
-import NotesEditor from '../Generic/NotesEditor.jsx'
-import './TagsModelPopup.css'
-function UpdateTag({ isOpen, onClose, record, onSave }) {
-    const [name, setName] = useState(record.name);
-    const [description, setDescription] = useState(record.description);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    // const [updatedRecord, setUpdatedRecord] = useState(record);
+import React, { useState } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    TextField,
+    Button,
+    Box,
+    IconButton,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import NotesEditor from "../Generic/NotesEditor.jsx";
 
-    const handleSave = () => {
-        onSave({
-            "name": name,
-            "description": description
-        });
-        setIsSubmitting(false)
-        onClose();
-    };
-
-
-    if (!isOpen) return null;
-
-
-    return (
-        <div className='model-container' id='modelcontainer'>
-            <div className='model' id='model'>
-                <button onClick={onClose} className='close-btn' id='close-button'>X</button>
-                <div className='model-content'>
-                    <h1>Create Tag</h1>
-                    <form className='model-form' onSubmit={(e) => {
-                        e.preventDefault();
-                        handleSave();
-                    }}>
-                        <div>
-                            <label className="label-field" name='tag-name'>Tag Name(Required) </label>
-                            <input type="text" name="name" value={name} onChange={(e) => setName(e.target.value)} className="form-input" />
-                        </div>
-                        <div>
-                            <label className="label-field" name='description'>Description </label>
-                            <NotesEditor id="noteseditor" type="text" name="description" initialValue={description} onChange={(content) => setDescription(content)} className="notes-editor" />
-                        </div>
-                        <button className='submit-btn' id='submit-button' disabled={isSubmitting}>
-                            {isSubmitting ? 'Saving...' : 'Save'}</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function CreateTag({ isOpen, onClose, onSave }) {
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
+function TagModal({ isOpen, onClose, onSave, record = {} }) {
+    const [name, setName] = useState(record.name || "");
+    const [description, setDescription] = useState(record.description || "");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSave = () => {
-        onSave({
-            "name": name,
-            "description": description
-        });
-        setIsSubmitting(false)
+        setIsSubmitting(true);
+        onSave({ name, description });
+        setIsSubmitting(false);
         onClose();
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div >
-            <section className='model-container' id='modelcontainer'>
-                <section className='model' id='model'>
-                    <button onClick={onClose} className='close-btn' id='close-button'>X</button>
-                    <div className='model-content'>
-                        <h1>Create Tag</h1>
-                        <form className='model-form'>
-                            <div>
-                                <label className="label-field" name='tag-name'>Tag Name(Required) </label>
-                                <input type="text" name="name" value={name} onChange={(e) => setName(e.target.value)} className="form-input" />
-                            </div>
-                            <div>
-                                <label className="label-field" name='description'>Description </label>
-                                <NotesEditor id="noteseditor" type="text" name="description" value={description} onChange={(content) => setDescription(content)} className="notes-editor" />
-                            </div>
-                            <button onClick={handleSave} className='submit-btn' id='submit-button' type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Saving...' : 'Save'}</button>
-                        </form>
-                    </div>
-                </section>
-
-            </section>
-        </div>
-    )
+        <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>
+                {record.name ? "Update Tag" : "Create Tag"}
+                <IconButton
+                    onClick={onClose}
+                    sx={{ position: "absolute", right: 8, top: 8 }}
+                >
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent>
+                <Box component="form" onSubmit={(e) => e.preventDefault()}>
+                    <TextField
+                        label="Tag Name (Required)"
+                        variant="outlined"
+                        fullWidth
+                        margin="normal"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <NotesEditor
+                        id="noteseditor"
+                        name="description"
+                        initialValue={description}
+                        onChange={(content) => setDescription(content)}
+                    />
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        onClick={handleSave}
+                        disabled={isSubmitting}
+                        sx={{ mt: 2 }}
+                    >
+                        {isSubmitting ? "Saving..." : "Save"}
+                    </Button>
+                </Box>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
-export { UpdateTag, CreateTag }
+export default TagModal;
