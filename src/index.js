@@ -7,6 +7,7 @@ import Dashboard from './pages/DashBoardManagement'
 import TagManagement from './pages/TagManagement'
 import Report from '../src/pages/ProfitLossReport'
 import Home from './pages/Home'
+import StrategyPage from './pages/MyStrategies'
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 export default function MyApp() {
@@ -19,6 +20,7 @@ export default function MyApp() {
                 <Route path="profitlossreport" element={<Report />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="tagmanagement" element={<TagManagement />} />
+                <Route path="mystrategies" element={<StrategyPage />} />
                 <Route path="*" element={<Home />} />
             </Routes>
         </BrowserRouter>

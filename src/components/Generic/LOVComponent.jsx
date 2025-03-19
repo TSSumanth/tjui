@@ -16,6 +16,9 @@ export default function LOVComponent({ options, label, placeholder, onSelect }) 
     }, [searchTerm, options]);
 
     const handleSelect = (value) => {
+        if (value === "") {
+            value = "No Data available";
+        }
         setSelectedValue(value);
         setSearchTerm(value);
         setShowDropdown(false);
@@ -32,13 +35,19 @@ export default function LOVComponent({ options, label, placeholder, onSelect }) 
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => setShowDropdown(true)}
             />
-            {showDropdown && filteredOptions.length > 0 && (
+            {showDropdown && (
                 <ul className="lov-dropdown">
-                    {filteredOptions.map((option, index) => (
-                        <li key={index} onClick={() => handleSelect(option)}>
-                            {option}
-                        </li>
-                    ))}
+                    {
+                        filteredOptions.length > 0 ?
+                            filteredOptions.map((option, index) => (
+                                <li key={index} onClick={() => handleSelect(option)}>
+                                    {option}
+                                </li>
+                            )) :
+                            <li key={"no-data"} onClick={() => handleSelect("")}>
+                                No Data available
+                            </li>
+                    }
                 </ul>
             )}
         </div>

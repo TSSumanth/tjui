@@ -4,6 +4,7 @@ import losstradesimage from '../../images/Loss_Trades.png'
 import profitabletradesimage from '../../images/profitable_trades.png'
 import { addNewStockTrade, getStockTrades, updateStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade } from '../../services/trades.js'
 import { AlertPopup } from '../Generic/Popup.jsx'
+import { CreateStrategy } from '../Strategies/CreateStrategyPopup.jsx'
 import { StockTradeForm } from './StockTradeForm.jsx'
 import { OptionTradeForm } from './OptionTradeForm.jsx'
 import TradesTable from '../Generic/Table'
@@ -38,35 +39,30 @@ function TradeTypeSection() {
     const [selectedDataType, setSelectedDataType] = useState("All Trades");
     const [showAddNewStockTrade, setShowAddNewStockTrade] = useState(false);
     const [showAddNewOptionTrade, setShowAddNewOptionTrade] = useState(false);
+    const [showCreateStrategyPopup, setShowCreateStrategyPopup] = useState(false);
     const [showUpdateStockTrade, setShowUpdateStockTrade] = useState(false);
     const [showUpdateOptionTrade, setShowUpdateOptionTrade] = useState(false);
     const [updateTradeDetails, setUpdateTradeDetails] = useState({});
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
 
+    async function getTableDate(filterObject) {
+        let stockresponse = await getStockTrades(filterObject)
+        let optionresponse = await getOptionTrades(filterObject)
+        setSelectedData([...stockresponse, ...optionresponse])
+    }
 
     async function handleClickOnCard(props) {
+        setSelectedDataType(props)
         if (props === "Open Trades") {
-            let stockresponse = await getStockTrades({ status: "OPEN" })
-            let optionresponse = await getOptionTrades({ status: "OPEN" })
-            setSelectedData([...stockresponse, ...optionresponse])
-            setSelectedDataType("Open Trades")
+            await getTableDate({ status: "OPEN" })
         }
         else if (props === "Closed Trades") {
-            let stockresponse = await getStockTrades({ status: "CLOSED" })
-            let optionresponse = await getOptionTrades({ status: "CLOSED" })
-            setSelectedData([...stockresponse, ...optionresponse])
-            setSelectedDataType("Closed Trades")
+            await getTableDate({ status: "CLOSED" })
         }
         else if (props === "Profitable Trades") {
-            let stockresponse = await getStockTrades({ minimumreturn: 0, status: "CLOSED" })
-            let optionresponse = await getOptionTrades({ minimumreturn: 0, status: "CLOSED" })
-            setSelectedData([...stockresponse, ...optionresponse])
-            setSelectedDataType("Profitable Trades")
+            await getTableDate({ minimumreturn: 0, status: "CLOSED" })
         } else if (props === "Loss Trades") {
-            let stockresponse = await getStockTrades({ maximumreturn: 0, status: "CLOSED" })
-            let optionresponse = await getOptionTrades({ maximumreturn: 0, status: "CLOSED" })
-            setSelectedData([...stockresponse, ...optionresponse])
-            setSelectedDataType("Loss Trades")
+            await getTableDate({ maximumreturn: 0, status: "CLOSED" })
         }
     }
 
@@ -87,6 +83,7 @@ function TradeTypeSection() {
         else {
             setShowTradeFailedAlertPopup(true)
         }
+        await handleClickOnCard(selectedDataType)
     }
 
 
@@ -98,6 +95,7 @@ function TradeTypeSection() {
         else {
             setShowTradeFailedAlertPopup(true)
         }
+        await handleClickOnCard(selectedDataType)
     }
 
     async function updateCurrentOptionTrade(tradedetails) {
@@ -108,6 +106,7 @@ function TradeTypeSection() {
         else {
             setShowTradeFailedAlertPopup(true)
         }
+        await handleClickOnCard(selectedDataType)
     }
 
     async function updateCurrentStockTrade(tradedetails) {
@@ -118,6 +117,7 @@ function TradeTypeSection() {
         else {
             setShowTradeFailedAlertPopup(true)
         }
+        await handleClickOnCard(selectedDataType)
     }
 
     async function clickOnUpdateTrade(tradedetails) {
@@ -130,6 +130,9 @@ function TradeTypeSection() {
         }
     }
 
+
+
+
     return (
         <>
             <div>
@@ -138,6 +141,7 @@ function TradeTypeSection() {
                     <div className="trades-section-header">
                         <button onClick={() => setShowAddNewStockTrade(true)}>Add Stock Trade</button>
                         <button onClick={() => setShowAddNewOptionTrade(true)}>Add Option Trade</button>
+                        <button onClick={() => setShowCreateStrategyPopup(true)}>Create Strategy</button>
                     </div>
 
                     <section id='trades-section'>
@@ -203,6 +207,7 @@ function TradeTypeSection() {
 
 
             {showTradeFailedAlertPopup && <AlertPopup trigger={showTradeFailedAlertPopup} onConfirm={() => setShowTradeFailedAlertPopup(false)} message="Unable to Create Trade." />}
+            {showCreateStrategyPopup && <CreateStrategy title='Create Strategy' onSubmit={() => setShowCreateStrategyPopup(false)} onCancel={() => setShowCreateStrategyPopup(false)} />}
         </>
     );
 }

@@ -40,7 +40,7 @@ function Header() {
                         <MyButton to="/marketanalysis" className="nav-button">Daily Market Analysis</MyButton>
                         <MyButton to="/trades" className="nav-button">Trades</MyButton>
                         <MyButton to="/profitlossreport" className="nav-button">Profit Loss Report</MyButton>
-                        <MyButton to="/" className="nav-button">My Stratagies</MyButton>
+                        <MyButton to="/mystrategies" className="nav-button">My Stratagies</MyButton>
                         <MyButton to="/dashboard" className="nav-button">Dashboard</MyButton>
                         <MyButton to="/tagmanagement" className="nav-button">Tag Management</MyButton>
                     </div>
