@@ -1,10 +1,9 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { Box, Button, Typography, Paper, CircularProgress, Alert, Stack, Divider } from "@mui/material";
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
-import PagenationTable from './ProfitLossTable'
+import PagenationTable from "./ProfitLossTable";
 import DateComponent from "../Generic/DateComponent";
-import React, { useState, useEffect } from "react";
 import { subDays, format } from "date-fns";
-// import DatePicker from "react-datepicker";
-// import "react-datepicker/dist/react-datepicker.css";
 
 const reportColumns = [
     { accessorKey: "date", header: "Report Date" },
@@ -17,79 +16,97 @@ const reportColumns = [
     { accessorKey: "total_pl", header: "Total P/L (₹)" },
 ];
 
-
-function ReportSection() {
-    const [currentReportData, setLatestcurrentReportData] = useState([]);
+const ReportSection = () => {
+    const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [startDate, setStartDate] = useState(subDays(new Date(), 90)); // Default: 30 days ago
+    const [startDate, setStartDate] = useState(subDays(new Date(), 90)); // Default: 90 days ago
     const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
-
-    const fetchReport = async () => {
+    // Fetch report data
+    const fetchReport = useCallback(async () => {
         setLoading(true);
         setError(null);
         const formattedStartDate = format(startDate, "yyyy-MM-dd");
         const formattedEndDate = format(endDate, "yyyy-MM-dd");
+
         try {
             const data = await getReportByDateRange(formattedStartDate, formattedEndDate);
-            setLatestcurrentReportData(data);
-        }
-        catch (err) {
+            setReportData(data);
+        } catch (err) {
             console.error("Error fetching data:", err);
             setError("Failed to load report data.");
         } finally {
             setLoading(false);
         }
-    };
+    }, [startDate, endDate]);
 
-    // Trigger fetch when component mounts to load the last 30 days of data
     useEffect(() => {
-        fetchReport(); // Automatically fetch data when the page loads
-    }, []); // Empty dependency array means this runs once when the component mounts
+        fetchReport();
+    }, [fetchReport]);
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Profit & Loss Report</h1>
+        <Box p={4}>
+            {/* Title */}
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Profit & Loss Report
+            </Typography>
 
-            {/* Date Filters & Get Report Button */}
-            <section id="search-section">
+            {/* Search Section */}
+            <Paper sx={{ p: 1, mb: 1 }}>
+                <Typography variant="h6" fontWeight="bold" mb={1}>
+                    Search Report
+                </Typography>
 
-                <legend>SEARCH REPORT</legend>
-
-                <div className="input-field first-wrap">
-                    <div>
-                        <label id="search-section-label">Start Date: </label>
+                {/* Using Stack for layout instead of Grid */}
+                <Stack spacing={2} direction={{ xs: "column", sm: "row" }} alignItems="center">
+                    <Box>
+                        <Typography variant="body1">Start Date:</Typography>
                         <DateComponent initialDate={startDate} onDateSelect={setStartDate} />
-                    </div>
-                    <div>
-                        <label id="search-section-label">End Date: </label>
+                    </Box>
+                    <Box>
+                        <Typography variant="body1">End Date:</Typography>
                         <DateComponent initialDate={endDate} onDateSelect={setEndDate} />
-                    </div>
-                    <button onClick={fetchReport} id="multi-button" disabled={loading} >
-                        <span id="multi-button-contained-primary">
-                            {loading ? "Loading..." : "Get Report"}
-                        </span>
-                    </button>
-                </div>
+                    </Box>
 
-            </section>
-            {/* Error Message */}
-            {error && <p className="text-red-500 mb-4">{error}</p>}
+                </Stack>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={fetchReport}
+                    disabled={loading}
+                    sx={{ minWidth: "150px" , marginTop: 1}}
+                >
+                    {loading ? <CircularProgress size={24} /> : "Get Report"}
+                </Button>
+            </Paper>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", margin: "10px" }}/>
+            {/* Error Handling */}
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
 
-            {currentReportData.length > 0 ? (
-                <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry} />
+            {/* Report Table */}
+            {reportData.length > 0 ? (
+                <PagenationTable
+                    columns={reportColumns}
+                    initialdata={reportData}
+                    DeleteRequest={deleteEntry}
+                    UpdateRequest={updateEntry}
+                    CreateRequest={addEntry}
+                />
             ) : (
                 !loading && (
-                    <>
-                        <p className="text-gray-500">No data available. Click "Get Report" to load data.</p>
-                        <PagenationTable columns={reportColumns} initialdata={currentReportData} DeleteRequest={deleteEntry} UpdateRequest={updateEntry} CreateRequest={addEntry} />
-                    </>
+                    <Typography variant="body1" color="textSecondary" align="center">
+                        No data available. Click "Get Report" to load data.
+                    </Typography>
                 )
-
             )}
-        </div>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", marginTop: "10px" }}/>
+        </Box>
     );
-}
+};
 
 export default ReportSection;
