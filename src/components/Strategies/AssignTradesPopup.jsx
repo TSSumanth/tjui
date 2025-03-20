@@ -1,26 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { AlertPopup } from '../Generic/Popup'
-import LovComponent from '../Generic/LOVComponent'
-import './AssignTradesPopup.css';
-import { getOpenStrategies, updateStrategy } from '../../services/strategies'
+import React, { useState, useEffect } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Table,
+    TableHead,
+    TableBody,
+    TableRow,
+    TableCell,
+    Box
+} from "@mui/material";
+import { AlertPopup } from "../Generic/Popup";
+import { getOpenStrategies, updateStrategy } from "../../services/strategies";
 
-function AssignTradesToStrategy({ title, tradeDetails, onSubmit }) {
+function AssignTradesToStrategy({ title, tradeDetails, onSubmit, open, onClose }) {
     const [selectedStrategy, setSelectedStrategy] = useState({});
     const [openStrategies, setOpenStrategies] = useState([]);
-    const [openStrategyNames, setOpenStrategyNames] = useState([]);
-    const [showCreateConfirmation, setCreateConfimation] = useState(false);
+    const [showCreateConfirmation, setCreateConfirmation] = useState(false);
     const [showCreateFailedMessage, setShowCreateFailedMessage] = useState(false);
 
     useEffect(() => {
         const fetchStrategies = async () => {
             try {
                 const response = await getOpenStrategies();
-                setOpenStrategies(response)
-                let names = [];
-                response.map((element) => {
-                    names.push(element.name)
-                })
-                setOpenStrategyNames(names);
+                setOpenStrategies(response);
             } catch (error) {
                 console.error("Error fetching strategies:", error);
             }
@@ -29,104 +38,126 @@ function AssignTradesToStrategy({ title, tradeDetails, onSubmit }) {
     }, []);
 
     // Handle strategy selection change
-    const handleStrategyChange = (value) => {
-        openStrategies.map((element) => {
-            if (element.name === value)
-                setSelectedStrategy(element);
-        })
+    const handleStrategyChange = (event) => {
+        const selected = openStrategies.find((strategy) => strategy.name === event.target.value);
+        setSelectedStrategy(selected || {});
     };
 
     // Handle submit action
-    const handleSubmit = async (event, strategy) => {
-        event.preventDefault();  // Prevents form submission and page reload
-
-        if (!strategy) {
+    const handleSubmit = async () => {
+        if (!selectedStrategy.id) {
             alert("Please select a strategy.");
             return;
         }
-        // Pass selected strategy and trades to parent component
-        let new_stock_trades = [];
-        let new_option_trades = []
+
+        let stockTrades = [];
+        let optionTrades = [];
+
         tradeDetails.forEach((trade) => {
-            if (trade.lotsize === undefined) {
-                new_stock_trades.push(trade.tradeid)
-            } else {
-                new_option_trades.push(trade.tradeid)
-            }
-            return "";
-        })
+            trade.lotsize === undefined
+                ? stockTrades.push(trade.tradeid)
+                : optionTrades.push(trade.tradeid);
+        });
 
-        let updatepayload = {
-            id: strategy.id,
-            name: strategy.name,
-            stock_trades: Array.from(new Set([...strategy.stock_trades, ...new_stock_trades])),
-            option_trades: Array.from(new Set([...strategy.option_trades, ...new_option_trades])),
-            status: strategy.status
+        const updatePayload = {
+            ...selectedStrategy,
+            stock_trades: Array.from(new Set([...selectedStrategy.stock_trades, ...stockTrades])),
+            option_trades: Array.from(new Set([...selectedStrategy.option_trades, ...optionTrades])),
+        };
+
+        try {
+            await updateStrategy(updatePayload);
+            setCreateConfirmation(true);
+        } catch (error) {
+            setShowCreateFailedMessage(true);
         }
-        await updateStrategy(updatepayload);
-
-        setCreateConfimation(true)
-        onSubmit();
     };
 
-
     return (
-        <div className="assign-strategy-card">
-            {title && <div className="assign-strategy-card-header">{title}</div>}
-            <div className="assign-strategy-card-body">
-                <form>
-                    <div className="assign-strategy-form-group">
-                        <label className="label-field" name='status'>Status </label>
-                        <LovComponent type="text" name="name" className="form-input" options={openStrategyNames} placeholder="Select a Status" onSelect={handleStrategyChange} />
-                    </div>
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+            <DialogTitle>{title || "Assign Trades to Strategy"}</DialogTitle>
+            <DialogContent>
+                {/* Strategy Selection */}
+                <Box sx={{ mb: 2 }}>
+                    <FormControl fullWidth>
+                        <InputLabel>Select a Strategy</InputLabel>
+                        <Select value={selectedStrategy.name || ""} onChange={handleStrategyChange}>
+                            {openStrategies.map((strategy) => (
+                                <MenuItem key={strategy.id} value={strategy.name}>
+                                    {strategy.name}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
 
-
-                </form>
-            </div>
-            {tradeDetails.length > 0 && (
-                <div className='trade-table-grid'>
-                    <table className='trade-table'>
-                        <thead>
-                            <tr>
-                                <th>Id</th>
-                                <th>Mrarket</th>
-                                <th>Asset</th>
-                                <th>Open Quantity</th>
-                                <th>Price</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                {/* Trade Details Table */}
+                {tradeDetails.length > 0 && (
+                    <Table sx={{ mt: 2 }}>
+                        <TableHead sx={{ backgroundColor: "#e3f2fd" }}>
+                            <TableRow>
+                                <TableCell>Id</TableCell>
+                                <TableCell>Market</TableCell>
+                                <TableCell>Asset</TableCell>
+                                <TableCell>Open Quantity</TableCell>
+                                <TableCell>Price</TableCell>
+                                <TableCell>Date</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
                             {tradeDetails.map((trade, index) => (
-                                <tr className={trade.lotsize === undefined ? "buy-order" : "sell-order"} key={index}>
-                                    <td>{trade.tradeid}</td>
-                                    <td>{trade.lotsize === undefined ? "Stock" : "Option"}</td>
-                                    <td>{trade.asset}</td>
-                                    <td>{trade.openquantity}</td>
-                                    <td>{trade.entryprice}</td>
-                                    <td>{trade.date}</td>
-                                </tr>
-                            ))
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            )
-            }
-            <button id='assign-strategy-submit' type="submit" onClick={(e) => handleSubmit(e, selectedStrategy)}>Submit</button>
-            <button id='assign-strategy-cancel' type="cancel" onClick={onSubmit}>Cancel</button>
+                                <TableRow
+                                    key={index}
+                                    sx={{
+                                        backgroundColor: trade.lotsize === undefined ? "#c8e6c9" : "#ffcdd2",
+                                    }}
+                                >
+                                    <TableCell>{trade.tradeid}</TableCell>
+                                    <TableCell>{trade.lotsize === undefined ? "Stock" : "Option"}</TableCell>
+                                    <TableCell>{trade.asset}</TableCell>
+                                    <TableCell>{trade.openquantity}</TableCell>
+                                    <TableCell>{trade.entryprice}</TableCell>
+                                    <TableCell>{trade.date}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </DialogContent>
 
-            {showCreateConfirmation && <AlertPopup trigger={showCreateConfirmation} onConfirm={() => {
-                setCreateConfimation(false)
-                onSubmit()
-            }} message="Strategy updated." />}
+            {/* Popup Footer Buttons */}
+            <DialogActions>
+                <Button variant="contained" color="primary" onClick={handleSubmit} disabled={!selectedStrategy.id}>
+                    Submit
+                </Button>
+                <Button variant="outlined" color="secondary" onClick={onClose}>
+                    Cancel
+                </Button>
+            </DialogActions>
 
-            {showCreateFailedMessage && <AlertPopup trigger={showCreateFailedMessage} onConfirm={() => {
-                setShowCreateFailedMessage(false)
-                onSubmit()
-            }} message="Unable to update Strategy." />}
+            {/* Success & Failure Popups */}
+            {showCreateConfirmation && (
+                <AlertPopup
+                    trigger={showCreateConfirmation}
+                    onConfirm={() => {
+                        setCreateConfirmation(false);
+                        onSubmit();
+                    }}
+                    message="Strategy updated successfully."
+                />
+            )}
 
-        </div>
+            {showCreateFailedMessage && (
+                <AlertPopup
+                    trigger={showCreateFailedMessage}
+                    onConfirm={() => {
+                        setShowCreateFailedMessage(false);
+                        onClose();
+                    }}
+                    message="Unable to update Strategy."
+                />
+            )}
+        </Dialog>
     );
 }
 

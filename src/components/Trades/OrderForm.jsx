@@ -1,76 +1,119 @@
-import React, { useState } from 'react';
-import DateTimePicker from '../Generic/DateTimeComponent'
-import './OrderForm.css';
+import React, { useState } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Box
+} from "@mui/material";
+import DateTimePicker from "../Generic/DateTimeComponent";
 
-function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
-    const [orderDetails, setTradeDetails] = useState(updateOrderdetails || {
+function OrderForm({ title, onSubmit, onCancel, updateOrderdetails, open }) {
+    const [orderDetails, setOrderDetails] = useState(updateOrderdetails || {
         ordertype: "Buy",
         quantity: "",
         price: "",
         date: "",
         notes: "",
-        tags: ""
+        tags: "",
     });
 
     const handleDateTimeChange = (newDateTime) => {
-        setTradeDetails((prevData) => ({
+        setOrderDetails((prevData) => ({
             ...prevData,
-            date: newDateTime
+            date: newDateTime,
         }));
     };
 
-    function handleChange(event) {
+    const handleChange = (event) => {
         const { name, value } = event.target;
-        setTradeDetails((prevData) => ({
+        setOrderDetails((prevData) => ({
             ...prevData,
-            [name]: value
+            [name]: value,
         }));
-    }
-
+    };
 
     const handleOnSubmit = (e) => {
         e.preventDefault();
-        console.log("orderpopup: " + orderDetails)
-        onSubmit(orderDetails)
-    }
+        onSubmit(orderDetails);
+    };
 
     return (
-        <div className="card">
-            {title && <div className="card-header">{title}</div>}
-            <div className="card-body">
-                <form>
-                    <div className="form-group">
-                        <label htmlFor="dropdownField">Order Type:</label>
-                        <select id="dropdownField" name="ordertype" value={orderDetails.ordertype} onChange={handleChange}>
-                            <option value="Buy">Buy</option>
-                            <option value="Sell">Sell</option>
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="inputField">Quantity:</label>
-                        <input type="number" id="inputField" name="quantity" value={orderDetails.quantity} onChange={handleChange} />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="inputField">Price:</label>
-                        <input type="number" id="inputField" name="price" value={orderDetails.price} onChange={handleChange} />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="textareaField">Date & Time:</label>
-                        <DateTimePicker id="datetimepicker" name="date" onChange={handleDateTimeChange}></DateTimePicker>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="textareaField">Notes:</label>
-                        <textarea id="textareaField" name="notes" value={orderDetails.notes} onChange={handleChange}></textarea>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="textareaField">Tags:</label>
-                        <input id="textareaField" name="tags" value={orderDetails.tags} onChange={handleChange}></input>
-                    </div>
-                    <button id='submit' type="submit" onClick={handleOnSubmit}>Submit</button>
-                    <button id='cancel' type="cancel" onClick={onCancel}>Cancel</button>
-                </form>
-            </div>
-        </div>
+        <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
+            <DialogTitle>{title || "Order Form"}</DialogTitle>
+            <DialogContent>
+                <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+                    {/* Order Type Dropdown */}
+                    <FormControl fullWidth>
+                        <InputLabel>Order Type</InputLabel>
+                        <Select name="ordertype" value={orderDetails.ordertype} onChange={handleChange}>
+                            <MenuItem value="Buy">Buy</MenuItem>
+                            <MenuItem value="Sell">Sell</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    {/* Quantity Input */}
+                    <TextField
+                        label="Quantity"
+                        type="number"
+                        name="quantity"
+                        value={orderDetails.quantity}
+                        onChange={handleChange}
+                        fullWidth
+                    />
+
+                    {/* Price Input */}
+                    <TextField
+                        label="Price"
+                        type="number"
+                        name="price"
+                        value={orderDetails.price}
+                        onChange={handleChange}
+                        fullWidth
+                    />
+
+                    {/* Date & Time Picker */}
+                    <FormControl fullWidth>
+                        <DateTimePicker name="date" onChange={handleDateTimeChange} />
+                    </FormControl>
+
+                    {/* Notes Input */}
+                    <TextField
+                        label="Notes"
+                        name="notes"
+                        value={orderDetails.notes}
+                        onChange={handleChange}
+                        multiline
+                        rows={3}
+                        fullWidth
+                    />
+
+                    {/* Tags Input */}
+                    <TextField
+                        label="Tags"
+                        name="tags"
+                        value={orderDetails.tags}
+                        onChange={handleChange}
+                        fullWidth
+                    />
+                </Box>
+            </DialogContent>
+
+            <DialogActions>
+                <Button variant="contained" color="primary" onClick={handleOnSubmit}>
+                    Submit
+                </Button>
+                <Button variant="outlined" color="secondary" onClick={onCancel}>
+                    Cancel
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 }
 

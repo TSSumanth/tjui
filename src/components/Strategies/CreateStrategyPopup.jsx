@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Snackbar, Alert } from "@mui/material";
-import { AlertPopup } from '../Generic/Popup'
 import { createStrategy } from '../../services/strategies'
-import { Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from "@mui/material";
+import { Container,  Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from "@mui/material";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import './CreateStrategyPopup.css';
 
 function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
     const [strategydetails, setstrategydetails] = useState(updateStrategydetails || {

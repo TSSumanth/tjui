@@ -137,8 +137,11 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
     async function updateOrder(order) {
         let response = await updateStockOrder(order)
         if (response) {
-            await fetchOrders(tradeDetails.tradeid);
+            await fetchOrders(order.tradeid);
             setShowUpdateOrder(false);
+        }
+        else {
+            setShowOrderFailedAlertPopup(true)
         }
     }
 
@@ -155,7 +158,7 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
     async function deleteOrder(e) {
         let response = await deleteTradeStockOrder(e.id)
         if (response === true) {
-            await fetchOrders(tradeDetails.tradeid);
+            await fetchOrders(e.tradeid);
             setShowOrderDeleteConfirmPopup(false)
             setSelectedOrder(null);
         } else {
@@ -213,9 +216,9 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
 
     return (
         <>
-            <div className="card">
-                {title && <div className="card-header">{title}</div>}
-                <div className="card-body">
+            <div className="addtrade-card ">
+                {title && <div className="addtrade-card-header">{title}</div>}
+                <div className="addtrade-card-body">
                     <div className="tabs">
                         <button
                             className={activeTab === "trade" ? "active" : ""}
@@ -357,8 +360,8 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
                     <button id='cancel-trade' type="cancel" onClick={onCancel}>Cancel</button>
                     {isUpdate && <button id='delete-trade' type="submit" onClick={handleOnDelete}>Delete Trade</button>}
                 </div>
-                {showAddNewOrder && <OrderForm title='New Order' buttonText='Submit' onSubmit={(orderdetails) => createNewOrder(orderdetails)} onCancel={() => setShowAddNewOrder(false)} />}
-                {showUpdateOrder && <OrderForm title='Update Order' buttonText='Submit' onSubmit={(orderdetails) => updateOrder(orderdetails)} onCancel={() => setShowUpdateOrder(false)} updateOrderdetails={selectedOrder} />}
+                {showAddNewOrder && <OrderForm title='New Order' open={showAddNewOrder} onSubmit={(orderdetails) => createNewOrder(orderdetails)} onCancel={() => setShowAddNewOrder(false)} />}
+                {showUpdateOrder && <OrderForm title='Update Order' open={showUpdateOrder} onSubmit={(orderdetails) => updateOrder(orderdetails)} onCancel={() => setShowUpdateOrder(false)} updateOrderdetails={selectedOrder} />}
             </div >
             {showOrderFailedAlertPopup && (
                 <AlertPopup trigger={showOrderFailedAlertPopup} onConfirm={() => setShowOrderFailedAlertPopup(false)} message="Unable to Create Order." />
