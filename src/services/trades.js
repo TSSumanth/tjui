@@ -41,7 +41,8 @@ export const getStockTrades = async (e) => {
             params: {
                 status: e.status,
                 minimumreturn: e.minimumreturn,
-                maximumreturn: e.maximumreturn
+                maximumreturn: e.maximumreturn,
+                tradeid: e.id
             }
         });
         if (response.status === 200) {
@@ -54,6 +55,22 @@ export const getStockTrades = async (e) => {
     }
 };
 
+export const getStockTradesbyId = async (id) => {
+    try {
+        const response = await axios.get(API_URL + "/stock", {
+            params: {
+                id: id
+            }
+        });
+        if (response.status === 200) {
+            console.log(response.data)
+            return response.data
+        }
+        return [];
+    } catch (e) {
+        throw new Error("Unable to get trades")
+    }
+};
 
 export const deleteStockTrade = async (tradeid) => {
     try {
@@ -93,6 +110,24 @@ export const getOptionTrades = async (e) => {
                 status: e.status,
                 minimumreturn: e.minimumreturn,
                 maximumreturn: e.maximumreturn
+            }
+        });
+        if (response.status === 200) {
+            console.log(response.data)
+            return response.data
+        }
+        return [];
+    } catch (e) {
+        throw new Error("Unable to get trades")
+    }
+};
+
+
+export const getOptionTradesbyId = async (id) => {
+    try {
+        const response = await axios.get(API_URL + "/option", {
+            params: {
+                id: id
             }
         });
         if (response.status === 200) {

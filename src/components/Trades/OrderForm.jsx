@@ -45,7 +45,7 @@ function OrderForm({ title, onSubmit, onCancel, updateOrderdetails, open }) {
     };
 
     return (
-        <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
+        <Dialog open={true} onClose={onCancel} maxWidth="sm" fullWidth>
             <DialogTitle>{title || "Order Form"}</DialogTitle>
             <DialogContent>
                 <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>

@@ -177,9 +177,10 @@
      width: 100%;
      background-color: #302f2f;
      border-radius: 8px;
-     overflow: hidden;
+     /* overflow: hidden; */
      border-collapse: separate;
      border-spacing: 0 5px;
+     overflow-y: auto;
  }
 
  /* Add spacing between rows */

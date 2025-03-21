@@ -22,66 +22,6 @@ const strategies = [
         ],
         currentPL: -250, // Negative (Red)
         maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
-    },
-    {
-        id: 2,
-        name: "Mean Reversion Strategy",
-        assets: [
-            { assetName: "GOOGL", openQuantity: 3 },
-            { assetName: "AMZN", openQuantity: 2 }
-        ],
-        currentPL: -250, // Negative (Red)
-        maxPL: 800
     }
 
 ];
@@ -100,8 +40,8 @@ const StrategyCards = () => {
                 gap={3}
                 sx={{ mt: 2 }}
             >
-                {strategies.map((strategy) => (
-                    <Card key={strategy.id} sx={{ width: 300, borderRadius: 3, boxShadow: 3 }}>
+                {strategies.map((strategy, index) => (
+                    <Card key={index} sx={{ width: 300, borderRadius: 3, boxShadow: 3 }}>
                         <CardContent>
                             {/* Strategy Name */}
                             <Typography variant="h6" sx={{ fontWeight: "bold" }}>

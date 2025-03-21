@@ -5,11 +5,14 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { CreateStrategy } from './CreateStrategyPopup'
+
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import Close from "@mui/icons-material/Close";
-import dayjs from "dayjs";
 import { getStrategies } from '../../services/strategies'
+import { useNavigate } from "react-router-dom";
+
+
 
 const StrategyHeader = () => {
     const [showCreateStrategy, setShowCreateStrategy] = useState(false);
@@ -21,7 +24,7 @@ const StrategyHeader = () => {
         createdafter: null,
         createdbefore: null,
     });
-
+    const navigate = useNavigate();
     const handleClear = () => {
         setSearchData({
             name: "",
@@ -52,6 +55,12 @@ const StrategyHeader = () => {
     const handleCreateStrategy = () => {
         setShowCreateStrategy(true);
     };
+
+    const handleUpdateStrategy = (strategy) => {
+        console.log("Infto: "+ strategy)
+        navigate(`/updatestrategy/${strategy.id}`);
+    };
+
     const handleViewStrategies = () => setViewSearchFilter(true);
     const handleCloseSearchFilter = () => setViewSearchFilter(false);
 
@@ -78,11 +87,11 @@ const StrategyHeader = () => {
             {viewSearchFilter && <Container maxWidth={false} sx={{
                 backgroundColor: "#fafbfb",
                 padding: "3",
-                margin: "5" ,
+                margin: "5",
                 width: "100%",
                 border: "1px solid grey", // Correct border syntax
                 borderRadius: "8px",
-                
+
             }}>
                 <Typography sx={{
                     padding: 2,
@@ -166,7 +175,15 @@ const StrategyHeader = () => {
                         </TableHead>
                         <TableBody>
                             {strategies.map((strategy, index) => (
-                                <TableRow key={strategy.id + index} sx={{ backgroundColor: index % 2 === 0 ? "#ffffff !important" : "#f9f9f9 !important" }}>
+                                <TableRow key={index} hover
+                                    onClick={() => handleUpdateStrategy(strategy)}
+                                    sx={{
+                                        // backgroundColor: isSelected ? "#b3e5fc" : index % 2 === 0 ? "#f5f5f5" : "#e0e0e0",
+                                        cursor: "pointer",
+                                        "&:hover": {
+                                            backgroundColor: "lightgreen !important", // Light blue when hovered
+                                        }
+                                    }}>
                                     <TableCell sx={{ backgroundColor: index % 2 === 0 ? "#ffffff !important" : "#f9f9f9 !important", color: "black" }}>{strategy.id}</TableCell>
                                     <TableCell sx={{ backgroundColor: index % 2 === 0 ? "#ffffff !important" : "#f9f9f9 !important", color: "black" }}>{strategy.name}</TableCell>
                                     <TableCell sx={{ backgroundColor: index % 2 === 0 ? "#ffffff !important" : "#f9f9f9 !important", color: "black" }}>{strategy.description}</TableCell>
@@ -179,6 +196,7 @@ const StrategyHeader = () => {
                 </TableContainer>
             }
             {showCreateStrategy && <CreateStrategy title="Create Strategy" onSubmit={() => setShowCreateStrategy(false)} onCancel={() => setShowCreateStrategy(false)} />}
+
         </Stack>
     );
 };

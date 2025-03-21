@@ -60,7 +60,21 @@ export const updateStrategy = async (e) => {
         return true;
     } catch (e) {
         throw new Error(e)
-        // console.log(e)
-        // return false
+    }
+};
+
+export const deleteStrategy = async (id) => {
+    try {
+        const response = await axios.delete(API_URL, {
+            params: {
+                id: id
+            }
+        });
+        if (response.status === 204) {
+            return true;
+        }
+        return false;
+    } catch (e) {
+        throw new Error(e)
     }
 };

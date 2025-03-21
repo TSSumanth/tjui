@@ -36,26 +36,7 @@ function TradeTypeSection() {
     };
 
 
-    async function getTableDate(filterObject) {
-        let stockresponse = await getStockTrades(filterObject)
-        let optionresponse = await getOptionTrades(filterObject)
-        setSelectedData([...stockresponse, ...optionresponse])
-    }
 
-    async function handleClickOnCard(props) {
-        setSelectedDataType(props)
-        if (props === "Open Trades") {
-            await getTableDate({ status: "OPEN" })
-        }
-        else if (props === "Closed Trades") {
-            await getTableDate({ status: "CLOSED" })
-        }
-        else if (props === "Profitable Trades") {
-            await getTableDate({ minimumreturn: 0, status: "CLOSED" })
-        } else if (props === "Loss Trades") {
-            await getTableDate({ maximumreturn: 0, status: "CLOSED" })
-        }
-    }
     const handleTradeTypeClick = async (tradeType) => {
         setSelectedDataType(tradeType.title);
         if (tradeType.filter) {
@@ -168,9 +149,9 @@ function TradeTypeSection() {
 
             <Dialog open={!!updateTradeDetails} onClose={() => setUpdateTradeDetails(null)}>
                 {updateTradeDetails?.lotsize === undefined ? (
-                    <StockTradeForm title='Update Stock Trade' buttonText='Submit' onSubmit={(details) => handleSubmitTrade(details, true, true)} onCancel={() => setUpdateTradeDetails(null)} isUpdate currentTrade={updateTradeDetails} />
+                    <StockTradeForm title='Update Stock Trade' buttonText='Submit' onSubmit={(details) => handleSubmitTrade(details, true, true)} onCancel={() => setUpdateTradeDetails(null)} isUpdate={true} currentTrade={updateTradeDetails} />
                 ) : (
-                    <OptionTradeForm title='Update Option Trade' buttonText='Submit' onSubmit={(details) => handleSubmitTrade(details, false, true)} onCancel={() => setUpdateTradeDetails(null)} isUpdate currentTrade={updateTradeDetails} />
+                    <OptionTradeForm title='Update Option Trade' buttonText='Submit' onSubmit={(details) => handleSubmitTrade(details, false, true)} onCancel={() => setUpdateTradeDetails(null)} isUpdate={true} currentTrade={updateTradeDetails} />
                 )}
             </Dialog>
 

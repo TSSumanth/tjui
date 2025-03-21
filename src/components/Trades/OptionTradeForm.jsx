@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
 import { addOptionOrder, getTradeOptionOrders, updateOptionOrder, deleteAllTradeOptionOrders, deleteTradeOptionOrder } from '../../services/orders.js'
+import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
 import { deleteOptionTrade } from '../../services/trades.js'
 import { AlertPopup, ConfirmPopup } from '../Generic/Popup.jsx'
 const getCurrentDateTime = () => {
@@ -15,7 +16,7 @@ const getCurrentDateTime = () => {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
-function OptionTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTrade }) {
+function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
     const [newTradeId, setNewTradeId] = useState(uuidv4());
@@ -104,16 +105,16 @@ function OptionTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentT
             quantity: entryorderquantity * Number(tradeDetails.lotsize),
             openquantity: (entryorderquantity - exitorderquantity) * Number(tradeDetails.lotsize),
             closedquantity: exitorderquantity * Number(tradeDetails.lotsize),
-            entryprice: entryavgprice,
-            exitaverageprice: exitavgprice,
+            entryprice: parseFloat(entryavgprice).toFixed(2),
+            exitaverageprice: parseFloat(exitavgprice).toFixed(2),
             "status": (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN",
             entrydate: allorders[0].date,
-            finalexitprice: (entryorderquantity - exitorderquantity === 0) ? exitavgprice : 0,
-            capitalused: (entryorderquantity - exitorderquantity !== 0) ? ((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)) - ((exitorderquantity * exitavgprice) * Number(tradeDetails.lotsize)) : 0,
-            overallreturn: (entryorderquantity - exitorderquantity === 0) ? (tradeDetails.tradetype.toUpperCase() === "LONG" ? ((exitorderquantity * exitavgprice) - (entryorderquantity * entryavgprice)) * Number(tradeDetails.lotsize) : ((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)) * Number(tradeDetails.lotsize)) : 0,
+            finalexitprice: (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : 0,
+            capitalused: (entryorderquantity - exitorderquantity !== 0) ? parseFloat(((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)) - ((exitorderquantity * exitavgprice) * Number(tradeDetails.lotsize))).toFixed(2) : 0,
+            overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice) : (exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice))).toFixed(2),
             exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
             lastmodifieddate: getCurrentDateTime(),
-            premiumamount: (entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)
+            premiumamount: parseFloat((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)).toFixed(2)
         }));
         console.log(tradeDetails)
     }
@@ -208,9 +209,17 @@ function OptionTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentT
                 setShowTradeDeleteConfirmPopup(false)
                 setShowTradeFailedAlertPopup(true)
             }
+            if (strategyid !== undefined) {
+                let response2 = await getStrategies({ id: strategyid })
+                response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
+                await updateStrategy(response2[0])
+            }
         } else {
             setShowTradeDeleteConfirmPopup(false)
             setShowTradeFailedAlertPopup(true)
+        }
+        if (onDelete) {
+            onDelete()
         }
     }
 
@@ -247,6 +256,10 @@ function OptionTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentT
                                     <div className="form-group">
                                         <label htmlFor="inputField">Asset:</label>
                                         <input type="text" id="inputField" name="asset" value={tradeDetails.asset} onChange={handleTextChange} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label htmlFor="inputField">Strike Prize:</label>
+                                        <input type="text" id="inputField" name="strikeprize" value={tradeDetails.strikeprize} onChange={handleTextChange} />
                                     </div>
                                     <div className="form-group">
                                         <label htmlFor="inputField">Lot Size:</label>
@@ -369,8 +382,8 @@ function OptionTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentT
                     <button id='cancel-trade' type="cancel" onClick={onCancel}>Cancel</button>
                     {isUpdate && <button id='delete-trade' type="submit" onClick={handleOnDelete}>Delete Trade</button>}
                 </div>
-                {showAddNewOrder && <OrderForm title='New Option Order'  open={showAddNewOrder}  onSubmit={(orderdetails) => createNewOrder(orderdetails)} onCancel={() => setShowAddNewOrder(false)} />}
-                {showUpdateOrder && <OrderForm title='Update Option Order'  open={showUpdateOrder}  onSubmit={(orderdetails) => updateOrder(orderdetails)} onCancel={() => setShowUpdateOrder(false)} updateOrderdetails={selectedOrder} />}
+                {showAddNewOrder && <OrderForm title='New Option Order' open={showAddNewOrder} onSubmit={(orderdetails) => createNewOrder(orderdetails)} onCancel={() => setShowAddNewOrder(false)} />}
+                {showUpdateOrder && <OrderForm title='Update Option Order' open={showUpdateOrder} onSubmit={(orderdetails) => updateOrder(orderdetails)} onCancel={() => setShowUpdateOrder(false)} updateOrderdetails={selectedOrder} />}
             </div >
             {showOrderFailedAlertPopup && (
                 <AlertPopup trigger={showOrderFailedAlertPopup} onConfirm={() => setShowOrderFailedAlertPopup(false)} message="Unable to Create Order." />

@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
 import { addStockOrder, getTradeStockOrders, deleteTradeStockOrder, updateStockOrder, deleteAllTradeStockOrders } from '../../services/orders.js'
+import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
 import { deleteStockTrade } from '../../services/trades.js'
 import { AlertPopup, ConfirmPopup } from '../Generic/Popup.jsx'
 const getCurrentDateTime = () => {
@@ -15,7 +16,7 @@ const getCurrentDateTime = () => {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
-function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTrade }) {
+function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
     const [newTradeId, setNewTradeId] = useState(uuidv4());
@@ -102,13 +103,13 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
             quantity: entryorderquantity,
             openquantity: entryorderquantity - exitorderquantity,
             closedquantity: exitorderquantity,
-            entryprice: entryavgprice,
-            exitaverageprice: exitavgprice,
+            entryprice: parseFloat(entryavgprice).toFixed(2),
+            exitaverageprice: parseFloat(exitavgprice).toFixed(2),
             "status": (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN",
             entrydate: allorders[0].date,
-            finalexitprice: (entryorderquantity - exitorderquantity === 0) ? exitavgprice : 0,
-            capitalused: (entryorderquantity - exitorderquantity !== 0) ? (entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice) : 0,
-            overallreturn: (entryorderquantity - exitorderquantity === 0) ? (tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice) - (entryorderquantity * entryavgprice) : (entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)) : 0,
+            finalexitprice: (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : 0,
+            capitalused: (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0,
+            overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice) : (exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice))).toFixed(2),
             exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
             lastmodifieddate: getCurrentDateTime()
         }));
@@ -207,9 +208,17 @@ function StockTradeForm({ title, onSubmit, onCancel, isUpdate = false, currentTr
                 setShowTradeDeleteConfirmPopup(false)
                 setShowTradeFailedAlertPopup(true)
             }
+            if (strategyid !== undefined) {
+                let response2 = await getStrategies({ id: strategyid })
+                response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
+                await updateStrategy(response2[0])
+            }
         } else {
             setShowTradeDeleteConfirmPopup(false)
             setShowTradeFailedAlertPopup(true)
+        }
+        if(onDelete){
+            onDelete()
         }
     }
 
