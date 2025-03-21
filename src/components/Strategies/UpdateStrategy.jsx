@@ -14,7 +14,7 @@ import {
     TextField,
     CircularProgress,
     Dialog,
-    DialogActions, DialogContent, DialogContentText, DialogTitle
+    DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, Select, MenuItem
 } from "@mui/material";
 import { AlertPopup } from "../Generic/Popup.jsx";
 import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
@@ -132,6 +132,15 @@ const ModifyStrategyDetails = ({ id }) => {
         }));
     };
 
+    const handleStatusChange = (event) => {
+        const newstatus = event.target.value;
+
+        setCurrentStrategy((prev) => ({
+            ...prev,
+            status: newstatus,
+        }));
+    };
+
     const handleStockPriceChange = (event) => {
         const newPrice = event.target.value.trim();
         updatestockprize(newPrice)
@@ -233,6 +242,19 @@ const ModifyStrategyDetails = ({ id }) => {
                         error={!!nameError}
                         helperText={nameError}
                     />
+
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                            value={currentStrategy?.status}
+                            onChange={handleStatusChange}
+                            label="Status"
+                        >
+                            <MenuItem value="OPEN">OPEN</MenuItem>
+                            <MenuItem value="CLOSE">CLOSE</MenuItem>
+                        </Select>
+                    </FormControl>
+
                     <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
                         <TextField
                             label="Current Stock Price"
