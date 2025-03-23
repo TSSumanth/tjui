@@ -8,10 +8,7 @@ import StrategyCards from '../components/Strategies/StrategyCard'
 const StrategyPage = () => {
     return (
         <Stack>
-            {/* <Header />
-           */}
             <Header />
-            
             <StrategyHeader />
             <StrategyCards />
         </Stack>

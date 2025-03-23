@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Snackbar, Alert } from "@mui/material";
 import { createStrategy } from '../../services/strategies'
-import { Container,  Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from "@mui/material";
+import { Container, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from "@mui/material";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -12,7 +12,8 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
         status: "Open",
         name: "",
         description: "",
-        created_at: dayjs()
+        created_at: dayjs(),
+        symbol: ""
     });
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -63,6 +64,13 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
                         name="name"
                         fullWidth
                         value={strategydetails.name}
+                        onChange={handleChange}
+                    />
+                    <TextField
+                        label="Stock Symbol Used for this Strategy"
+                        name="symbol"
+                        fullWidth
+                        value={strategydetails.symbol}
                         onChange={handleChange}
                     />
                     <TextField
