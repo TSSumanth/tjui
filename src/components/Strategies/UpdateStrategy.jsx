@@ -16,11 +16,13 @@ import {
     Dialog,
     DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, Select, MenuItem, Slider
 } from "@mui/material";
+import SettingsSuggestTwoToneIcon from '@mui/icons-material/SettingsSuggestTwoTone';
 import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
 import { getStockTradesbyId, getOptionTradesbyId } from '../../services/trades';
 import { StockTradeForm } from "../Trades/StockTradeForm.jsx";
 import OptionTradeForm from "../Trades/OptionTradeForm.jsx";
 import { addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades.js";
+// import { culateOptionPrice } from "../../services/optionPriceSimulation.js";
 import { useNavigate } from "react-router-dom";
 import { getStockLivePrice } from '../../services/nsedata.js';
 
@@ -60,7 +62,7 @@ const ModifyStrategyDetails = ({ id }) => {
     const [totalunrealizedpl, updatetotalunrealizedpl] = useState(0);
     const [CreateStockTrade, setCreateStockTrade] = useState(false);
     const [CreateOptionTrade, setCreateOptionTrade] = useState(false);
-    const [sliderStartValue, setSliderStartValue] = useState(0); 
+    const [sliderStartValue, setSliderStartValue] = useState(0);
     const [sliderValue, setSliderValue] = useState(0); // Slider starts at 0%
     const [isManual, setIsManual] = useState(false);
     const [optionErrors, setOptionErrors] = useState(Array(optionAssets.length).fill(false)); // Error states for options
@@ -193,14 +195,26 @@ const ModifyStrategyDetails = ({ id }) => {
         setSliderValue(event.target.value);
         setIsManual(true); // Mark as manually changed
         updateStockUnrealizedPL(event.target.value)
-        updateStockPrice(event.target.value)
-    };
 
-    // useEffect(() => {
-    //     if (!isManual) {
-    //         setSliderValue(lateststockprice);
-    //     }
-    // }, [lateststockprice]); // Only run when stockPrice changes
+        // setOptionAssets(prevAssets =>
+        //     prevAssets.map((a, index) => {
+        //         let newOptionPrice = 0;
+        //         optiontrades.forEach((trade) => {
+        //             console.log(trade.asset, a.name, trade.status)
+        //             if (trade.asset === a.name && trade.status === "OPEN") {
+        //                 newOptionPrice = parseFloat(culateOptionPrice(Number(lateststockprice), trade.strikeprize, a.price, "24-04-2025", 3, (Number(event.target.value) - Number(lateststockprice)), 1, "put")).toFixed(2)
+        //                 console.log(newOptionPrice)
+        //             }
+        //         })
+        //         return { ...a, price: parseFloat(newOptionPrice).toFixed(2) }
+        //     }
+        //     )
+        // );
+        // updateOptionUnrealizedPL()
+
+        updateStockPrice(event.target.value)
+
+    };
 
     const updateStockPrice = (newPrice) => {
         updatestockprize(newPrice);
@@ -332,6 +346,7 @@ const ModifyStrategyDetails = ({ id }) => {
 
     const totalPL = (stocktrades.reduce((sum, trade) => sum + (trade.overallreturn || 0), 0) + optiontrades.reduce((sum, trade) => sum + (trade.overallreturn || 0), 0));
 
+    async function runStrategyPredictionSimulator() { }
     return (
         <>
             {loading ? (
@@ -345,6 +360,7 @@ const ModifyStrategyDetails = ({ id }) => {
                     <Box display="flex" justifyContent="space-between" sx={{ mb: 5 }}>
                         <Button variant="contained" color="primary" onClick={handleCreateStockTrade}>Add Stock Trade</Button>
                         <Button variant="contained" color="primary" onClick={handleCreateOptionTrade}>Add Option Trade</Button>
+                        <Button variant="contained" color="success" onClick={runStrategyPredictionSimulator} startIcon={<SettingsSuggestTwoToneIcon />}>Run Simulation</Button>
                         <Button variant="contained" color="secondary" onClick={handleUpdateStrategy}>Update Strategy Details</Button>
                         <Button variant="contained" color="error" onClick={() => setDeleteDialogOpen(true)}>Delete Strategy</Button>
                     </Box>

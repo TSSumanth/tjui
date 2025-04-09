@@ -24,7 +24,7 @@ const ReportSection = () => {
     const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
     // Fetch report data
-    const fetchReport = useCallback(async () => {
+    async function fetchReport() {
         setLoading(true);
         setError(null);
         const formattedStartDate = format(startDate, "yyyy-MM-dd");
@@ -39,11 +39,11 @@ const ReportSection = () => {
         } finally {
             setLoading(false);
         }
-    }, [startDate, endDate]);
+    };
 
     useEffect(() => {
         fetchReport();
-    }, [fetchReport]);
+    }, []);
 
     return (
         <Box p={4}>
@@ -73,14 +73,14 @@ const ReportSection = () => {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={fetchReport}
+                    onClick={() => fetchReport()}
                     disabled={loading}
-                    sx={{ minWidth: "150px" , marginTop: 1}}
+                    sx={{ minWidth: "150px", marginTop: 1 }}
                 >
                     {loading ? <CircularProgress size={24} /> : "Get Report"}
                 </Button>
             </Paper>
-            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", margin: "10px" }}/>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", margin: "10px" }} />
             {/* Error Handling */}
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
@@ -91,6 +91,7 @@ const ReportSection = () => {
             {/* Report Table */}
             {reportData.length > 0 ? (
                 <PagenationTable
+                    key={JSON.stringify(reportData)}
                     columns={reportColumns}
                     initialdata={reportData}
                     DeleteRequest={deleteEntry}
@@ -104,7 +105,7 @@ const ReportSection = () => {
                     </Typography>
                 )
             )}
-            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", marginTop: "10px" }}/>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", marginTop: "10px" }} />
         </Box>
     );
 };

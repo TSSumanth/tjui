@@ -15,7 +15,7 @@ import {
     Stack
 } from "@mui/material";
 import { ConfirmPopup } from "../Generic/Popup.jsx";
-import  ProfitLossForm from "./ProfitLossModelPopup.jsx";
+import ProfitLossForm from "./ProfitLossModelPopup.jsx";
 
 const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, CreateRequest }) => {
     const [data, setData] = useState(initialdata || []);
@@ -50,9 +50,11 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
     });
 
     const handleRowSelection = (rowId) => {
+        console.log(rowId)
         setSelectedRows((prev) => ({
             ...prev,
-            [rowId]: !prev[rowId],
+            [data[rowId].date]: !prev[data[rowId].date],
+
         }));
     };
 
@@ -65,33 +67,28 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
         setShowModal(false);
         setDeleting(true);
 
-        const selectedIndexes = Object.keys(selectedRows)
-            .filter((index) => selectedRows[index])
-            .map((index) => parseInt(index));
+        const selectedDates = Object.keys(selectedRows).filter((key) => selectedRows[key]);
 
-        if (selectedIndexes.length === 0) {
+        if (selectedDates.length === 0) {
             setDeleting(false);
             return;
         }
 
         const deletionResults = await Promise.all(
-            selectedIndexes.map(async (index) => {
-                let entryToDelete = data[index];
-                const success = await DeleteRequest(entryToDelete.date);
-                return { index, name: entryToDelete.date, success };
+            selectedDates.map(async (date) => {
+                const success = await DeleteRequest(date);
+                return { date, success };
             })
         );
 
-        const failedDeletions = deletionResults.filter(result => !result.success);
+        const failedDeletions = deletionResults.filter((result) => !result.success);
 
         if (failedDeletions.length > 0) {
-            const failedNames = failedDeletions.map(result => result.name).join(", ");
+            const failedNames = failedDeletions.map((result) => result.date).join(", ");
             alert(`Failed to delete the following records: ${failedNames}. Please try again.`);
         }
 
-        setData((prevData) =>
-            prevData.filter((_, index) => !selectedIndexes.includes(index))
-        );
+        setData((prevData) => prevData.filter((record) => !selectedDates.includes(record.date)));
 
         setSelectedRows({});
         setDeleting(false);
@@ -180,8 +177,8 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
                                     backgroundColor: index % 2 === 0 ? "#f5f5f5" : "#e0e0e0", // Alternating colors
                                 }}>
                                     <Checkbox
-                                        checked={selectedRows[index] || false}
-                                        onChange={() => handleRowSelection(index)}
+                                        checked={selectedRows[row.original.date] || false}
+                                        onChange={() => handleRowSelection(row.index)}
                                     />
                                 </TableCell>
                                 {row.getVisibleCells().map((cell) => (
