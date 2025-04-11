@@ -3,55 +3,88 @@ import Header from '../components/Header/Header'
 import LineChartMUI from '../components/Dashboard/LineChart'
 import { getReportByDateRange } from "../services/profitlossreport";
 
+// Utility function to get financial year range
 const getFinancialYearRange = () => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = today.getMonth() + 1; // JavaScript months are 0-based
+    const month = today.getMonth() + 1;
 
-    let startYear, endYear;
+    const startYear = month >= 4 ? year : year - 1;
+    const endYear = month >= 4 ? year + 1 : year;
 
-    if (month >= 4) {
-        // If current month is April (4) or later, financial year starts this year
-        startYear = year;
-        endYear = year + 1;
-    } else {
-        // If before April, financial year started last year
-        startYear = year - 1;
-        endYear = year;
-    }
-
-    const startDate = `${startYear}-04-01`;
-    const endDate = `${endYear}-03-31`;
-
-    return { startDate, endDate };
+    return {
+        startDate: `${startYear}-04-01`,
+        endDate: `${endYear}-03-31`
+    };
 };
 
+// Constants for data processing
+const SELECTED_FIELDS = ["date", "stock_pl", "fo_pl", "total_pl"];
 
 function Dashboard() {
-    const [profitlossreportdata, setprofitlossreportdata] = useState([]);
+    const [profitLossData, setProfitLossData] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    async function getProfitLossReport() {
-        let daterange = getFinancialYearRange()
-        let data = await getReportByDateRange(daterange.startDate, daterange.endDate)
-        const selectedFields = ["date", "stock_pl", "fo_pl", "total_pl"]; // Fields to keep
-        console.log(data)
+    const processProfitLossData = (data) => {
         if (!Array.isArray(data)) {
-            setprofitlossreportdata([])
-            return
+            return [];
         }
-        let filteredData = data
-            .map(item => Object.fromEntries(selectedFields.map(field => [field, item[field]])))
+
+        return data
+            .map(item => Object.fromEntries(
+                SELECTED_FIELDS.map(field => [field, item[field]])
+            ))
             .sort((a, b) => new Date(a.date) - new Date(b.date));
-        setprofitlossreportdata(filteredData)
-        console.log(filteredData)
-    }
+    };
+
+    const fetchProfitLossReport = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const dateRange = getFinancialYearRange();
+            const rawData = await getReportByDateRange(dateRange.startDate, dateRange.endDate);
+
+            const processedData = processProfitLossData(rawData);
+            setProfitLossData(processedData);
+        } catch (err) {
+            setError("Failed to fetch profit loss data");
+            console.error("Error fetching profit loss report:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        getProfitLossReport();
+        fetchProfitLossReport();
     }, []);
+
+    if (isLoading) {
+        return (
+            <div>
+                <Header />
+                <div>Loading...</div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div>
+                <Header />
+                <div className="error-message">{error}</div>
+            </div>
+        );
+    }
+
     return (
         <div>
             <Header />
-            <LineChartMUI data={profitlossreportdata} title={"Profit Loss Report for Current Financial Year"} />
+            <LineChartMUI
+                data={profitLossData}
+                title="Profit Loss Report for Current Financial Year"
+            />
         </div>
     );
 }

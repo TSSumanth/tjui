@@ -25,6 +25,7 @@ import { addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrad
 // import { culateOptionPrice } from "../../services/optionPriceSimulation.js";
 import { useNavigate } from "react-router-dom";
 import { getStockLivePrice } from '../../services/nsedata.js';
+import StrategyNotes from './StrategyNotes';
 
 const ConfirmationDialog = ({ open, onClose, onConfirm, message, title }) => {
     return (
@@ -587,6 +588,8 @@ const ModifyStrategyDetails = ({ id }) => {
                             </Table>
                         </TableContainer>
                     }
+
+                    <StrategyNotes strategyId={id} />
                 </Container >
             )}
 
