@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, Typography, Button, Box } from "@mui/material";
-import { getactiveactionitems, updateactionitem, addactionitem } from "../../services/actionitems.js";
+import { Typography, Button, Box, CircularProgress, Alert } from "@mui/material";
+import { getActionItems, updateActionItem, addActionItem } from "../../services/actionitems.js";
 import { CreateActionItem } from "./ActionModelPopup.jsx";
+import ActionCard from "./ActionCard.jsx";
 
 const ActionItems = () => {
     const [activeActionItems, setActiveActionItems] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
 
     // Fetch active action items
     const fetchActiveActionItems = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await getactiveactionitems();
+            setError(null);
+            const data = await getActionItems();
             setActiveActionItems(data);
         } catch (error) {
             console.error("Error fetching action items:", error);
+            setError("Failed to fetch action items. Please try again later.");
         } finally {
             setLoading(false);
         }
@@ -29,13 +33,15 @@ const ActionItems = () => {
     const markComplete = async (item) => {
         try {
             setLoading(true);
+            setError(null);
             const updatedItem = { ...item, status: "COMPLETED" };
-            const response = await updateactionitem(updatedItem);
+            const response = await updateActionItem(updatedItem);
             if (response) {
                 setActiveActionItems((prev) => prev.filter((record) => record.id !== item.id));
             }
         } catch (error) {
             console.error("Error updating action item:", error);
+            setError("Failed to update action item. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -45,16 +51,21 @@ const ActionItems = () => {
     const addItem = async (item) => {
         try {
             setLoading(true);
+            setError(null);
+
             if (!item.status || !item.description) {
-                alert("Status and Description are required.");
+                setError("Status and Description are required.");
                 return;
             }
-            const response = await addactionitem(item);
+
+            const response = await addActionItem(item);
             if (response) {
-                fetchActiveActionItems();
+                await fetchActiveActionItems();
+                setShowModal(false);
             }
         } catch (error) {
             console.error("Error adding action item:", error);
+            setError("Failed to add action item. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -66,64 +77,90 @@ const ActionItems = () => {
     const rightItems = activeActionItems.slice(midIndex);
 
     return (
-        <Box>
+        <Box sx={{ p: 2 }}>
             {/* Header Section */}
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin:1 }}>
-                <Typography variant="h5" sx={{ fontWeight: "bold", color: "red" }}>
+            <Box sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3
+            }}>
+                <Typography variant="h5" sx={{ fontWeight: "bold", color: "primary.main" }}>
                     Action Items
                 </Typography>
-                <Button variant="contained" color="primary" onClick={() => setShowModal(true)}>
-                    Create Strategy
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => setShowModal(true)}
+                    disabled={loading}
+                >
+                    Create Action Item
                 </Button>
             </Box>
+
+            {/* Error Alert */}
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {/* Loading State */}
+            {loading && (
+                <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
+                    <CircularProgress />
+                </Box>
+            )}
 
             {/* Action Items List */}
-            <Box sx={{ display: "flex", gap: 2 }}>
-                {activeActionItems.length > 0 ? (
-                    <>
-                        <Box sx={{ flex: 1 }}>
-                            {leftItems.map((item) => (
-                                <ActionCard key={item.id} item={item} onComplete={() => markComplete(item)} />
-                            ))}
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                            {rightItems.map((item) => (
-                                <ActionCard key={item.id} item={item} onComplete={() => markComplete(item)} />
-                            ))}
-                        </Box>
-                    </>
-                ) : (
-                    <Typography variant="h5" sx={{ fontWeight: "bold", color: "green", marginLeft:1  }}>
-                        No Pending Action Items
-                    </Typography>
-                )}
-            </Box>
+            {!loading && (
+                <Box sx={{ display: "flex", gap: 3 }}>
+                    {activeActionItems.length > 0 ? (
+                        <>
+                            <Box sx={{ flex: 1 }}>
+                                {leftItems.map((item) => (
+                                    <ActionCard
+                                        key={item.id}
+                                        item={item}
+                                        onComplete={() => markComplete(item)}
+                                    />
+                                ))}
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                                {rightItems.map((item) => (
+                                    <ActionCard
+                                        key={item.id}
+                                        item={item}
+                                        onComplete={() => markComplete(item)}
+                                    />
+                                ))}
+                            </Box>
+                        </>
+                    ) : (
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                textAlign: "center",
+                                color: "success.main",
+                                width: "100%",
+                                py: 4
+                            }}
+                        >
+                            No Pending Action Items
+                        </Typography>
+                    )}
+                </Box>
+            )}
 
             {/* Modal Popup */}
-            {showModal && <CreateActionItem isOpen={showModal} onClose={() => setShowModal(false)} onSave={addItem} />}
+            {showModal && (
+                <CreateActionItem
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    onSave={addItem}
+                />
+            )}
         </Box>
-    );
-};
-
-// Reusable Action Card Component
-const ActionCard = ({ item, onComplete }) => {
-    return (
-        <Card sx={{ mb: 2, backgroundColor: item.status === "COMPLETED" ? "#e0e0e0" : "white" }}>
-            <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography
-                    variant="body1"
-                    sx={{
-                        textDecoration: item.status === "COMPLETED" ? "line-through" : "none",
-                        mr: 2,
-                    }}
-                >
-                    {item.description}
-                </Typography>
-                <Button variant="contained" color="success" disabled={item.status === "COMPLETED"} onClick={onComplete}>
-                    {item.status === "COMPLETED" ? "Completed" : "Mark as Complete"}
-                </Button>
-            </CardContent>
-        </Card>
     );
 };
 
