@@ -1,49 +1,60 @@
 import axios from "axios";
+import { API_URLS } from '../config/api';
 
-const API_URL = "http://localhost:1000/api/tags";
-
-
-export const getTags = async (e) => {
-    const response = await axios.get(API_URL, {
-        params: {
-            "name": e
+export const getTags = async () => {
+    try {
+        const response = await axios.get(API_URLS.TAG_MANAGEMENT);
+        if (response.status === 200) {
+            return response.data;
         }
-    });
-    if (!(response.status === 200)) {
-        throw new Error("Failed to Get tags");
+        return [];
+    } catch (e) {
+        console.error(e);
+        return [];
     }
-    return response.data;
 };
 
 export const getTag = async (e) => {
-    const response = await axios.get(API_URL + "/" + e);
+    const response = await axios.get(API_URLS.TAG_MANAGEMENT + "/" + e);
     if (!(response.status === 200)) {
         throw new Error("Failed to Get tags");
     }
     return response.data;
 };
 
-export const deleteTag = async (e) => {
-    const response = await axios.delete(API_URL + "/" + e);
-    if (!(response.status === 204)) {
+export const deleteTag = async (id) => {
+    try {
+        const response = await axios.delete(API_URLS.TAG_MANAGEMENT, {
+            params: { id }
+        });
+        return response.status === 204;
+    } catch (e) {
+        console.error(e);
         return false;
     }
-    return true;
 };
 
-
-export const addTag = async (e) => {
-    const response = await axios.post(API_URL, e);
-    if (!(response.status === 201)) {
-        return false;
+export const addTag = async (tag) => {
+    try {
+        const response = await axios.post(API_URLS.TAG_MANAGEMENT, tag);
+        if (response.status === 201) {
+            return response.data;
+        }
+        return null;
+    } catch (e) {
+        console.error(e);
+        return null;
     }
-    return true;
 };
 
-export const updateTag = async (name, e) => {
-    const response = await axios.patch(API_URL+"/"+ name, e );
-    if (!(response.status === 200)) {
+export const updateTag = async (id, tag) => {
+    try {
+        const response = await axios.patch(API_URLS.TAG_MANAGEMENT, tag, {
+            params: { id }
+        });
+        return response.status === 200;
+    } catch (e) {
+        console.error(e);
         return false;
     }
-    return true;
 };

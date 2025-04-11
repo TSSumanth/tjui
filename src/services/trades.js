@@ -1,12 +1,10 @@
 import axios from "axios";
-
-const API_URL = "http://localhost:1000/api/trades";
-
+import { API_URLS } from '../config/api';
 
 export const addNewStockTrade = async (e) => {
     console.log(e)
     try {
-        const response = await axios.post(API_URL + "/stock", e);
+        const response = await axios.post(`${API_URLS.TRADES}/stock`, e);
         if (!(response.status === 201)) {
             return { "created": false }
         }
@@ -19,7 +17,7 @@ export const addNewStockTrade = async (e) => {
 export const updateStockTrade = async (e) => {
     console.log(e)
     try {
-        const response = await axios.patch(API_URL + "/stock", e, {
+        const response = await axios.patch(`${API_URLS.TRADES}/stock`, e, {
             params: {
                 id: e.tradeid
             }
@@ -33,11 +31,10 @@ export const updateStockTrade = async (e) => {
     }
 };
 
-
 export const getStockTrades = async (e) => {
     console.log(e)
     try {
-        const response = await axios.get(API_URL + "/stock", {
+        const response = await axios.get(`${API_URLS.TRADES}/stock`, {
             params: {
                 status: e.status,
                 minimumreturn: e.minimumreturn,
@@ -57,7 +54,7 @@ export const getStockTrades = async (e) => {
 
 export const getStockTradesbyId = async (id) => {
     try {
-        const response = await axios.get(API_URL + "/stock", {
+        const response = await axios.get(`${API_URLS.TRADES}/stock`, {
             params: {
                 id: id
             }
@@ -74,7 +71,7 @@ export const getStockTradesbyId = async (id) => {
 
 export const deleteStockTrade = async (tradeid) => {
     try {
-        const response = await axios.delete(API_URL + "/stock", {
+        const response = await axios.delete(`${API_URLS.TRADES}/stock`, {
             params: {
                 id: tradeid
             }
@@ -91,7 +88,7 @@ export const deleteStockTrade = async (tradeid) => {
 export const addNewOptionTrade = async (e) => {
     console.log(e)
     try {
-        const response = await axios.post(API_URL + "/option", e);
+        const response = await axios.post(`${API_URLS.TRADES}/option`, e);
         if (!(response.status === 201)) {
             return { "created": false }
         }
@@ -101,11 +98,10 @@ export const addNewOptionTrade = async (e) => {
     }
 };
 
-
 export const getOptionTrades = async (e) => {
     console.log(e)
     try {
-        const response = await axios.get(API_URL + "/option", {
+        const response = await axios.get(`${API_URLS.TRADES}/option`, {
             params: {
                 status: e.status,
                 minimumreturn: e.minimumreturn,
@@ -122,10 +118,9 @@ export const getOptionTrades = async (e) => {
     }
 };
 
-
 export const getOptionTradesbyId = async (id) => {
     try {
-        const response = await axios.get(API_URL + "/option", {
+        const response = await axios.get(`${API_URLS.TRADES}/option`, {
             params: {
                 id: id
             }
@@ -142,7 +137,7 @@ export const getOptionTradesbyId = async (id) => {
 
 export const deleteOptionTrade = async (tradeid) => {
     try {
-        const response = await axios.delete(API_URL + "/option", {
+        const response = await axios.delete(`${API_URLS.TRADES}/option`, {
             params: {
                 id: tradeid
             }
@@ -159,7 +154,7 @@ export const deleteOptionTrade = async (tradeid) => {
 export const updateOptionTrade = async (e) => {
     console.log(e)
     try {
-        const response = await axios.patch(API_URL + "/option", e, {
+        const response = await axios.patch(`${API_URLS.TRADES}/option`, e, {
             params: {
                 id: e.tradeid
             }

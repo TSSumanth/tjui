@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_URLS } from '../config/api';
 
 const API_URL = "http://localhost:1000/api/orders";
 
@@ -20,7 +21,7 @@ export const getTradeStockOrders = async (tradeid) => {
     if (!tradeid)
         return [];
     try {
-        const response = await axios.get(API_URL + "/stock", {
+        const response = await axios.get(`${API_URLS.ORDERS}/stock`, {
             params: {
                 "tradeid": tradeid
             }
@@ -58,7 +59,7 @@ export const deleteAllTradeStockOrders = async (tradeid) => {
     // Wait for all delete requests to complete
     const results = await Promise.all(response.map(async (order) => {
         try {
-            const response1 = await axios.delete(API_URL + "/stock", {
+            const response1 = await axios.delete(`${API_URLS.ORDERS}/stock`, {
                 params: { "id": order.id }
             });
             return response1.status === 204 ? order : null; // Return deleted order or null
@@ -109,7 +110,7 @@ export const getTradeOptionOrders = async (tradeid) => {
     if (!tradeid)
         return [];
     try {
-        const response = await axios.get(API_URL + "/option", {
+        const response = await axios.get(`${API_URLS.ORDERS}/option`, {
             params: {
                 "tradeid": tradeid
             }
@@ -166,7 +167,7 @@ export const deleteAllTradeOptionOrders = async (tradeid) => {
     // Wait for all delete requests to complete
     const results = await Promise.all(response.map(async (order) => {
         try {
-            const response1 = await axios.delete(API_URL + "/option", {
+            const response1 = await axios.delete(`${API_URLS.ORDERS}/option`, {
                 params: { "id": order.id }
             });
             return response1.status === 204 ? order : null; // Return deleted order or null

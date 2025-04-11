@@ -1,13 +1,11 @@
 import axios from "axios";
-
-const API_URL = "http://localhost:1000/api/livedata";
-
+import { API_URLS } from '../config/api';
 
 export const getStockLivePrice = async (symbol) => {
     if (!symbol)
         return {};
     try {
-        const response = await axios.get(API_URL + "/equity-stock", {
+        const response = await axios.get(`${API_URLS.LIVE_DATA}/equity-stock`, {
             params: {
                 "symbol": symbol
             }

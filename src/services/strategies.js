@@ -1,10 +1,9 @@
 import axios from "axios";
+import { API_URLS } from '../config/api';
 
-const API_URL = "http://localhost:1000/api/strategies";
-const NOTE_API_URL = "http://localhost:1000/api/strategy-notes";
 export const createStrategy = async (e) => {
     try {
-        const response = await axios.post(API_URL, e);
+        const response = await axios.post(API_URLS.STRATEGIES, e);
         if (!(response.status === 201)) {
             return false;
         }
@@ -17,7 +16,7 @@ export const createStrategy = async (e) => {
 
 export const getOpenStrategies = async () => {
     try {
-        const response = await axios.get(API_URL, {
+        const response = await axios.get(API_URLS.STRATEGIES, {
             params: {
                 status: "OPEN"
             }
@@ -34,7 +33,7 @@ export const getOpenStrategies = async () => {
 
 export const getStrategies = async (filter) => {
     try {
-        const response = await axios.get(API_URL, {
+        const response = await axios.get(API_URLS.STRATEGIES, {
             params: filter
         });
         if (!(response.status === 200)) {
@@ -49,7 +48,7 @@ export const getStrategies = async (filter) => {
 
 export const updateStrategy = async (e) => {
     try {
-        const response = await axios.patch(API_URL, e, {
+        const response = await axios.patch(API_URLS.STRATEGIES, e, {
             params: {
                 id: e.id
             }
@@ -65,7 +64,7 @@ export const updateStrategy = async (e) => {
 
 export const deleteStrategy = async (id) => {
     try {
-        const response = await axios.delete(API_URL, {
+        const response = await axios.delete(API_URLS.STRATEGIES, {
             params: {
                 id: id
             }
@@ -81,7 +80,7 @@ export const deleteStrategy = async (id) => {
 
 export const getStrategyNotes = async (strategyId) => {
     try {
-        const response = await axios.get(NOTE_API_URL, {
+        const response = await axios.get(API_URLS.STRATEGY_NOTES, {
             params: {
                 strategy_id: strategyId
             }
@@ -98,7 +97,7 @@ export const getStrategyNotes = async (strategyId) => {
 
 export const addStrategyNote = async (strategyId, content) => {
     try {
-        const response = await axios.post(NOTE_API_URL, {
+        const response = await axios.post(API_URLS.STRATEGY_NOTES, {
             strategy_id: strategyId,
             content: content
         });
@@ -114,7 +113,7 @@ export const addStrategyNote = async (strategyId, content) => {
 
 export const updateStrategyNote = async (noteId, content) => {
     try {
-        const response = await axios.patch(NOTE_API_URL, {
+        const response = await axios.patch(API_URLS.STRATEGY_NOTES, {
             content: content
         }, {
             params: {
@@ -130,7 +129,7 @@ export const updateStrategyNote = async (noteId, content) => {
 
 export const deleteStrategyNote = async (noteId) => {
     try {
-        const response = await axios.delete(NOTE_API_URL, {
+        const response = await axios.delete(API_URLS.STRATEGY_NOTES, {
             params: {
                 id: noteId
             }
