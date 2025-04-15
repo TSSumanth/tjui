@@ -46,7 +46,8 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         exitdate: "",
         lastmodifieddate: "",
         notes: "",
-        tags: ""
+        tags: "",
+        ltp: 0
     });
 
     async function fetchOrders(tradeid) {
@@ -111,7 +112,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
             entrydate: allorders[0].date,
             finalexitprice: (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : 0,
             capitalused: (entryorderquantity - exitorderquantity !== 0) ? parseFloat(((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)) - ((exitorderquantity * exitavgprice) * Number(tradeDetails.lotsize))).toFixed(2) : 0,
-            overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice * prevDetails.lotsize) - (exitorderquantity * entryavgprice * prevDetails.lotsize) : (exitorderquantity * entryavgprice * prevDetails.lotsize) - (exitorderquantity * exitavgprice* prevDetails.lotsize))).toFixed(2),
+            overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice * prevDetails.lotsize) - (exitorderquantity * entryavgprice * prevDetails.lotsize) : (exitorderquantity * entryavgprice * prevDetails.lotsize) - (exitorderquantity * exitavgprice * prevDetails.lotsize))).toFixed(2),
             exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
             lastmodifieddate: getCurrentDateTime(),
             premiumamount: parseFloat((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)).toFixed(2)
@@ -279,6 +280,18 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                     <div className="form-group">
                                         <label htmlFor="inputfield">Entry Average Price:</label>
                                         <input className="form-group-disabled" id="inputField" name="entryprice" type="text" value={tradeDetails.entryprice} disabled></input>
+                                    </div>
+                                    <div className="form-group">
+                                        <label htmlFor="ltp">Last Traded Price:</label>
+                                        <input
+                                            type="number"
+                                            id="ltp"
+                                            name="ltp"
+                                            value={tradeDetails.ltp}
+                                            onChange={handleTextChange}
+                                            step="0.01"
+                                            min="0"
+                                        />
                                     </div>
                                 </section>
                                 <section className='form-middle-section'>

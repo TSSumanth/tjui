@@ -263,7 +263,7 @@ const ModifyStrategyDetails = ({ id }) => {
         updateOptionUnrealizedPL();
     };
 
-    const handleGeneratePL = () => {
+    const handleGeneratePL = async () => {
         let hasError = false;
 
         // Check if stock price is empty
@@ -276,7 +276,9 @@ const ModifyStrategyDetails = ({ id }) => {
 
         // Check if all option prices are filled
         const updatedErrors = optionAssets.map((option, index) => {
-            if (!option.price) {
+            const matchingTrade = optiontrades.find(trade => trade.asset === option.name);
+            // Consider both manually entered price and LTP as valid
+            if (!option.price && !matchingTrade?.ltp) {
                 hasError = true;
                 return true; // Show error for this option
             }
@@ -288,9 +290,43 @@ const ModifyStrategyDetails = ({ id }) => {
         // If there are errors, stop the function
         if (hasError) return;
 
+        // Update LTP values for stock trades
+        for (const trade of stocktrades) {
+            if (trade && lateststockprice) {
+                try {
+                    const updatedTrade = {
+                        ...trade,
+                        ltp: lateststockprice
+                    };
+                    await updateStockTrade(updatedTrade);
+                } catch (error) {
+                    console.error(`Failed to update LTP for stock trade ${trade.asset}:`, error);
+                }
+            }
+        }
+
+        // Update LTP values for option trades
+        for (const option of optionAssets) {
+            const matchingTrade = optiontrades.find(trade => trade.asset === option.name);
+            if (matchingTrade && option.price) {
+                try {
+                    const updatedTrade = {
+                        ...matchingTrade,
+                        ltp: option.price
+                    };
+                    await updateOptionTrade(updatedTrade);
+                } catch (error) {
+                    console.error(`Failed to update LTP for ${option.name}:`, error);
+                }
+            }
+        }
+
         // Proceed with unrealized PL calculation if no errors
         generateOverAllUnrealizedPL();
-        setSliderStartValue(lateststockprice)
+        setSliderStartValue(lateststockprice);
+
+        // Refresh trades to get updated LTP values
+        await getTrades(currentStrategy);
     };
 
     useEffect(() => {
@@ -404,37 +440,41 @@ const ModifyStrategyDetails = ({ id }) => {
                             label="Current Stock Price"
                             value={lateststockprice}
                             onChange={(e) => updateStockPrice(Number(e.target.value))}
-                            error={!!stockpriceError} // Show error if there's an issue
-                            helperText={stockpriceError} // Display the error message
+                            error={!!stockpriceError}
+                            helperText={stockpriceError}
                             sx={{ m: 1, width: "calc(33.33% - 16px)" }}
                             disabled={disableStockPriceUpdate}
+                            placeholder={stocktrades[0]?.ltp ? `LTP: ${stocktrades[0].ltp}` : ""}
                         />
-                        {optionAssets.length > 0 && optionAssets.map((option, index) => (
-                            <TextField
-                                key={index}
-                                label={`Price for ${option.name}`}
-                                type="number"
-                                value={option.price === undefined || option.price === 0 ? "" : option.price}
-                                onChange={(e) => {
-                                    let newPrice = e.target.value;
-                                    if (newPrice === "" || /^[0-9]*\.?[0-9]{0,2}$/.test(newPrice)) {
-                                        setOptionAssets(prevAssets =>
-                                            prevAssets.map((a, i) =>
-                                                i === index ? { ...a, price: newPrice === "" ? undefined : parseFloat(newPrice) } : a
-                                            )
-                                        );
-                                    }
-                                }}
-                                inputMode="decimal"
-                                error={optionErrors[index]} // Show error if this option field is empty
-                                helperText={optionErrors[index] ? "Option price is required" : ""} // Display the error message for this option
-                                sx={{ m: 1, width: "calc(33.33% - 16px)" }}
-                            />
-                        ))}
+                        {optionAssets.length > 0 && optionAssets.map((option, index) => {
+                            const matchingTrade = optiontrades.find(trade => trade.asset === option.name);
+                            return (
+                                <TextField
+                                    key={index}
+                                    label={`Price for ${option.name}`}
+                                    type="number"
+                                    value={option.price === undefined || option.price === 0 ? (matchingTrade?.ltp || "") : option.price}
+                                    onChange={(e) => {
+                                        let newPrice = e.target.value;
+                                        if (newPrice === "" || /^[0-9]*\.?[0-9]{0,2}$/.test(newPrice)) {
+                                            setOptionAssets(prevAssets =>
+                                                prevAssets.map((a, i) =>
+                                                    i === index ? { ...a, price: newPrice === "" ? undefined : parseFloat(newPrice) } : a
+                                                )
+                                            );
+                                        }
+                                    }}
+                                    inputMode="decimal"
+                                    error={optionErrors[index]}
+                                    helperText={optionErrors[index] ? "Option price is required" : ""}
+                                    sx={{ m: 1, width: "calc(33.33% - 16px)" }}
+                                />
+                            );
+                        })}
                         <Button
                             variant="contained"
                             color="primary"
-                            onClick={handleGeneratePL} // Trigger validation and then action
+                            onClick={handleGeneratePL}
                             sx={{ m: 1, width: "100%" }}
                         >
                             Generate Unrealized P/L
@@ -503,6 +543,7 @@ const ModifyStrategyDetails = ({ id }) => {
                                         <TableCell><b>Trade Type</b></TableCell>
                                         <TableCell><b>Entry Price</b></TableCell>
                                         <TableCell><b>Average Exit Price</b></TableCell>
+                                        <TableCell><b>LTP</b></TableCell>
                                         <TableCell><b>Current P/L</b></TableCell>
                                         <TableCell><b>Unrealized P/L</b></TableCell>
                                     </TableRow>
@@ -527,6 +568,7 @@ const ModifyStrategyDetails = ({ id }) => {
                                             <TableCell>{trade.tradetype}</TableCell>
                                             <TableCell>{trade.entryprice}</TableCell>
                                             <TableCell>{trade.exitaverageprice}</TableCell>
+                                            <TableCell>{trade.ltp}</TableCell>
                                             <TableCell>{trade.overallreturn}</TableCell>
                                             <TableCell>{trade.unrealizedpl}</TableCell>
                                         </TableRow>
@@ -552,6 +594,7 @@ const ModifyStrategyDetails = ({ id }) => {
                                         <TableCell><b>Trade Type</b></TableCell>
                                         <TableCell><b>Entry Price</b></TableCell>
                                         <TableCell><b>Average Exit Price</b></TableCell>
+                                        <TableCell><b>LTP</b></TableCell>
                                         <TableCell><b>Current P/L</b></TableCell>
                                         <TableCell><b>Unrealized P/L</b></TableCell>
                                         <TableCell><b>Status</b></TableCell>
@@ -579,6 +622,7 @@ const ModifyStrategyDetails = ({ id }) => {
                                             <TableCell>{trade.tradetype}</TableCell>
                                             <TableCell>{trade.entryprice}</TableCell>
                                             <TableCell>{trade.exitaverageprice}</TableCell>
+                                            <TableCell>{trade.ltp}</TableCell>
                                             <TableCell>{trade.overallreturn}</TableCell>
                                             <TableCell>{trade.unrealizedpl}</TableCell>
                                             <TableCell>{trade.status}</TableCell>

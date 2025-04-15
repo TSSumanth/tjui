@@ -44,7 +44,8 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
         exitdate: "",
         lastmodifieddate: "",
         notes: "",
-        tags: ""
+        tags: "",
+        ltp: 0
     });
 
     async function fetchOrders(tradeid) {
@@ -217,7 +218,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             setShowTradeDeleteConfirmPopup(false)
             setShowTradeFailedAlertPopup(true)
         }
-        if(onDelete){
+        if (onDelete) {
             onDelete()
         }
     }
@@ -270,6 +271,18 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                     <div className="form-group">
                                         <label htmlFor="inputfield">Entry Average Price:</label>
                                         <input className="form-group-disabled" id="inputField" name="entryprice" type="text" value={tradeDetails.entryprice} disabled></input>
+                                    </div>
+                                    <div className="form-group">
+                                        <label htmlFor="ltp">Last Traded Price:</label>
+                                        <input
+                                            type="number"
+                                            id="ltp"
+                                            name="ltp"
+                                            value={tradeDetails.ltp}
+                                            onChange={handleTextChange}
+                                            step="0.01"
+                                            min="0"
+                                        />
                                     </div>
                                 </section>
                                 <section className='form-middle-section'>
