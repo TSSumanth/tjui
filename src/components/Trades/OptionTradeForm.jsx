@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './TradeForm.css';
 import { format, parseISO } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
@@ -7,6 +6,35 @@ import { addOptionOrder, getTradeOptionOrders, updateOptionOrder, deleteAllTrade
 import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
 import { deleteOptionTrade } from '../../services/trades.js'
 import { AlertPopup, ConfirmPopup } from '../Generic/Popup.jsx'
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Box,
+    Tabs,
+    Tab,
+    TextField,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Button,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Typography,
+    IconButton,
+    Tooltip
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+
 const getCurrentDateTime = () => {
     let date = new Date();
     const year = date.getFullYear();
@@ -16,11 +44,12 @@ const getCurrentDateTime = () => {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
+
 function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
     const [newTradeId, setNewTradeId] = useState(uuidv4());
-    const [activeTab, setActiveTab] = useState("trade");
+    const [activeTab, setActiveTab] = useState(0);
     const [showOrderFailedAlertPopup, setShowOrderFailedAlertPopup] = useState(false);
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
     const [showOrderDeleteConfirmPopup, setShowOrderDeleteConfirmPopup] = useState(false);
@@ -51,21 +80,35 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
     });
 
     async function fetchOrders(tradeid) {
-        let response = await getTradeOptionOrders(tradeid)
-        setallOrders(response)
+        try {
+            if (!tradeid) {
+                console.error('No trade ID provided for fetching orders');
+                setallOrders([]);
+                return;
+            }
+            const response = await getTradeOptionOrders(tradeid);
+            if (response && Array.isArray(response)) {
+                setallOrders(response);
+            } else {
+                console.error('Invalid response format from getTradeOptionOrders:', response);
+                setallOrders([]);
+            }
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            setallOrders([]);
+        }
     }
 
-
     useEffect(() => {
-        if (isUpdate)
+        if (isUpdate && tradeDetails.tradeid) {
             fetchOrders(tradeDetails.tradeid);
+        }
     }, [isUpdate, tradeDetails.tradeid]);
 
     // Update total when other fields change
     useEffect(() => {
         updateOptionTradeDetails()
     }, [allorders]);
-
 
     function updateOptionTradeDetails() {
         if (!allorders.length > 0)
@@ -85,14 +128,12 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                 let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
                 exitavgprice = newexitavgprice
                 exitorderquantity = newexitavgquantity
-                console.log(exitavgprice, exitorderquantity, order.quantity, order.price)
             }
             else if (tradeDetails.tradetype.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "BUY") {
                 let newexitavgquantity = exitorderquantity + Number(order.quantity);
                 let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
                 exitavgprice = newexitavgprice
                 exitorderquantity = newexitavgquantity
-                console.log(exitavgprice, exitorderquantity, order.quantity, order.price)
             }
             else if (tradeDetails.tradetype.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "SELL") {
                 let newentryquantity = entryorderquantity + Number(order.quantity);
@@ -117,7 +158,6 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
             lastmodifieddate: getCurrentDateTime(),
             premiumamount: parseFloat((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)).toFixed(2)
         }));
-        console.log(tradeDetails)
     }
 
     async function createNewOrder(orderdetails) {
@@ -169,10 +209,12 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         }
     }
 
+    const handleTabChange = (event, newValue) => {
+        setActiveTab(newValue);
+    };
 
     const handleTextChange = (e) => {
         const { name, value } = e.target;
-        // Allow empty string (so user can delete input) and only valid numbers
         if (value !== "") {
             setTradeDetails((prev) => ({
                 ...prev,
@@ -180,7 +222,6 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
             }));
         }
     };
-
 
     const handleOnSubmit = (e) => {
         e.preventDefault();
@@ -224,194 +265,320 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         }
     }
 
-
     return (
-        <>
-            <div className="addtrade-card ">
-                {title && <div className="addtrade-card-header">{title}</div>}
-                <div className="addtrade-card-body">
-                    <div className="tabs">
-                        <button
-                            className={activeTab === "trade" ? "active" : ""}
-                            onClick={() => setActiveTab("trade")}
-                        >
-                            Trade Details
-                        </button>
-                        <button
-                            className={activeTab === "orders" ? "active" : ""}
-                            onClick={() => setActiveTab("orders")}
-                        >
-                            Orders
-                        </button>
-                        <button
-                            className={activeTab === "notes" ? "active" : ""}
-                            onClick={() => setActiveTab("notes")}
-                        >
-                            Trade Notes
-                        </button>
-                    </div>
-                    <div className="tab-content">
-                        {activeTab === "trade" && (
-                            <form>
-                                <section className='form-top-section'>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Asset:</label>
-                                        <input type="text" id="inputField" name="asset" value={tradeDetails.asset} onChange={handleTextChange} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Strike Prize:</label>
-                                        <input type="text" id="inputField" name="strikeprize" value={tradeDetails.strikeprize} onChange={handleTextChange} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Lot Size:</label>
-                                        <input type="text" id="inputField" name="lotsize" value={tradeDetails.lotsize} onChange={handleTextChange} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="dropdownField">Trade Type:</label>
-                                        <select id="dropdownField" name="tradetype" value={tradeDetails.tradetype} onChange={handleTextChange}>
-                                            <option value="Long">Long</option>
-                                            <option value="Short">Short</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputfield">Total Quanity:</label>
-                                        <input className="form-group-disabled" id="inputField" name="quantity" type="text" value={tradeDetails.quantity} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputfield">Entry Average Price:</label>
-                                        <input className="form-group-disabled" id="inputField" name="entryprice" type="text" value={tradeDetails.entryprice} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="ltp">Last Traded Price:</label>
-                                        <input
-                                            type="number"
-                                            id="ltp"
-                                            name="ltp"
-                                            value={tradeDetails.ltp}
-                                            onChange={handleTextChange}
-                                            step="0.01"
-                                            min="0"
-                                        />
-                                    </div>
-                                </section>
-                                <section className='form-middle-section'>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Entry Date:</label>
-                                        <input className="form-group-disabled" type="text" id="inputField" name="entrydate" value={tradeDetails.entrydate} onChange={handleTextChange} disabled />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Open Quantity:</label>
-                                        <input className="form-group-disabled" type="text" id="inputField" name="openquantity" value={tradeDetails.openquantity} onChange={handleTextChange} disabled />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Closed Quantity:</label>
-                                        <input className="form-group-disabled" type="text" id="inputField" name="closedquantity" value={tradeDetails.closedquantity} onChange={handleTextChange} disabled />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputField">Exit Average Price:</label>
-                                        <input className="form-group-disabled" type="text" id="inputField" name="exitaverageprice" value={tradeDetails.exitaverageprice} onChange={handleTextChange} disabled />
-                                    </div>
-                                </section>
-                                <section className='form-bottom-section'>
-                                    <div className="form-group">
-                                        <label htmlFor="inputfield">Capital Used:</label>
-                                        <input className="form-group-disabled" id="inputField" name="capitalused" type="text" value={tradeDetails.capitalused} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="inputfield">Premium Paid:</label>
-                                        <input className="form-group-disabled" id="inputField" name="premiumamount" type="text" value={tradeDetails.premiumamount} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="textareaField">Overall Return:</label>
-                                        <input className="form-group-disabled" id="inputField" name="overallreturn" type="text" value={tradeDetails.overallreturn} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="textareaField">Status:</label>
-                                        <input className="form-group-disabled" id="inputField" name="status" type="text" value={tradeDetails.status} disabled></input>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="textareaField">Tags:</label>
-                                        <input id="textareaField" name="tags" value={tradeDetails.tags} onChange={handleTextChange}></input>
-                                    </div>
-                                </section>
-                            </form>
-                        )}
-                        {activeTab === "notes" && (
-                            <>
-                                <div className="form-group">
-                                    <label htmlFor="textareaField">Notes:</label>
-                                    <textarea id="textareaField" name="textareaField" onChange={handleTextChange}></textarea>
-                                </div>
-                            </>
-                        )}
-                        {activeTab === "orders" && (
-                            <>
-                                <button id='add-order' type="button" onClick={setShowAddNewOrder}>Add Order</button>
-                                <div className='orders-table-grid'>
-                                    <table className='orders-table'>
-                                        <thead>
-                                            <tr>
-                                                <th>Id</th>
-                                                <th>Type</th>
-                                                <th>Quantity</th>
-                                                <th>Price</th>
-                                                <th>Date</th>
-                                                <th>Notes</th>
-                                                <th>Tags</th>
-                                                <th>Update</th>
-                                                <th>Delete</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {allorders.map((order, index) => (
-                                                <tr className={order?.ordertype?.toUpperCase() === "BUY" ? "buy-order" : "sell-order"} key={index}>
-                                                    <td>{order.id}</td>
-                                                    <td>{order.ordertype}</td>
-                                                    <td>{order.quantity}</td>
-                                                    <td>{parseFloat(order.price).toFixed(2)}</td>
-                                                    <td>{order.date}</td>
-                                                    <td className="notes">{order.notes}</td>
-                                                    <td className="tags">{order.tags}</td>
-                                                    <td>
-                                                        <button onClick={() => handleOrderEditClick(order)}>Edit</button>
-                                                    </td>
-                                                    <td>
-                                                        <button onClick={() => handleOrderDeleteClick(order)}>Delete</button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </>
-                        )
-                        }
-                    </div>
-                </div>
+        <Dialog
+            open={true}
+            onClose={onCancel}
+            maxWidth="md"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    minHeight: '80vh',
+                    maxHeight: '80vh'
+                }
+            }}
+        >
+            <DialogTitle>{title}</DialogTitle>
+            <DialogContent
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '60vh',
+                    overflow: 'hidden'
+                }}
+            >
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                    <Tabs value={activeTab} onChange={handleTabChange}>
+                        <Tab label="Trade Details" />
+                        <Tab label="Orders" />
+                        <Tab label="Trade Notes" />
+                    </Tabs>
+                </Box>
 
-                <div className='form-footer'>
-                    <button id='submit-trade' type="submit" onClick={handleOnSubmit}>Submit</button>
-                    <button id='cancel-trade' type="cancel" onClick={onCancel}>Cancel</button>
-                    {isUpdate && <button id='delete-trade' type="submit" onClick={handleOnDelete}>Delete Trade</button>}
-                </div>
-                {showAddNewOrder && <OrderForm title='New Option Order' open={showAddNewOrder} onSubmit={(orderdetails) => createNewOrder(orderdetails)} onCancel={() => setShowAddNewOrder(false)} />}
-                {showUpdateOrder && <OrderForm title='Update Option Order' open={showUpdateOrder} onSubmit={(orderdetails) => updateOrder(orderdetails)} onCancel={() => setShowUpdateOrder(false)} updateOrderdetails={selectedOrder} />}
-            </div >
-            {showOrderFailedAlertPopup && (
-                <AlertPopup trigger={showOrderFailedAlertPopup} onConfirm={() => setShowOrderFailedAlertPopup(false)} message="Unable to Create Order." />
+                <Box sx={{
+                    flex: 1,
+                    overflow: 'auto',
+                    pr: 1
+                }}>
+                    {activeTab === 0 && (
+                        <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Asset"
+                                    name="asset"
+                                    value={tradeDetails.asset}
+                                    onChange={handleTextChange}
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Strike Price"
+                                    name="strikeprize"
+                                    value={tradeDetails.strikeprize}
+                                    onChange={handleTextChange}
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Lot Size"
+                                    name="lotsize"
+                                    value={tradeDetails.lotsize}
+                                    onChange={handleTextChange}
+                                    fullWidth
+                                />
+                                <FormControl fullWidth>
+                                    <InputLabel>Trade Type</InputLabel>
+                                    <Select
+                                        name="tradetype"
+                                        value={tradeDetails.tradetype}
+                                        onChange={handleTextChange}
+                                        label="Trade Type"
+                                    >
+                                        <MenuItem value="Long">Long</MenuItem>
+                                        <MenuItem value="Short">Short</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Trade Quantity"
+                                    name="quantity"
+                                    value={tradeDetails.quantity}
+                                    disabled
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Entry Average Price"
+                                    name="entryprice"
+                                    value={tradeDetails.entryprice}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Entry Date"
+                                    name="entrydate"
+                                    value={tradeDetails.entrydate}
+                                    disabled
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Open Quantity"
+                                    name="openquantity"
+                                    value={tradeDetails.openquantity}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Closed Quantity"
+                                    name="closedquantity"
+                                    value={tradeDetails.closedquantity}
+                                    disabled
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Exit Average Price"
+                                    name="exitaverageprice"
+                                    value={tradeDetails.exitaverageprice}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Capital Used"
+                                    name="capitalused"
+                                    value={tradeDetails.capitalused}
+                                    disabled
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Premium Paid"
+                                    name="premiumamount"
+                                    value={tradeDetails.premiumamount}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Overall Return"
+                                    name="overallreturn"
+                                    value={tradeDetails.overallreturn}
+                                    disabled
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Status"
+                                    name="status"
+                                    value={tradeDetails.status}
+                                    disabled
+                                    fullWidth
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    label="Last Traded Price"
+                                    name="ltp"
+                                    type="number"
+                                    value={tradeDetails.ltp}
+                                    onChange={handleTextChange}
+                                    inputProps={{ step: "0.01", min: "0" }}
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Tags"
+                                    name="tags"
+                                    value={tradeDetails.tags}
+                                    onChange={handleTextChange}
+                                    fullWidth
+                                />
+                            </Box>
+                        </Box>
+                    )}
+
+                    {activeTab === 1 && (
+                        <Box>
+                            <Button
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={() => setShowAddNewOrder(true)}
+                                sx={{ mb: 2 }}
+                            >
+                                Add Order
+                            </Button>
+                            <TableContainer component={Paper}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Id</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Quantity</TableCell>
+                                            <TableCell>Price</TableCell>
+                                            <TableCell>Date</TableCell>
+                                            <TableCell>Notes</TableCell>
+                                            <TableCell>Tags</TableCell>
+                                            <TableCell>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {Array.isArray(allorders) && allorders.map((order) => (
+                                            <TableRow key={order.id}>
+                                                <TableCell>{order.id}</TableCell>
+                                                <TableCell className={order.ordertype.toLowerCase()}>
+                                                    {order.ordertype}
+                                                </TableCell>
+                                                <TableCell>{order.quantity}</TableCell>
+                                                <TableCell>{parseFloat(order.price).toFixed(2)}</TableCell>
+                                                <TableCell>{order.date}</TableCell>
+                                                <TableCell>{order.notes}</TableCell>
+                                                <TableCell>{order.tags}</TableCell>
+                                                <TableCell>
+                                                    <Tooltip title="Edit">
+                                                        <IconButton onClick={() => handleOrderEditClick(order)}>
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton onClick={() => handleOrderDeleteClick(order)}>
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    )}
+
+                    {activeTab === 2 && (
+                        <TextField
+                            label="Notes"
+                            name="notes"
+                            value={tradeDetails.notes}
+                            onChange={handleTextChange}
+                            multiline
+                            rows={10}
+                            fullWidth
+                        />
+                    )}
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onCancel}>Cancel</Button>
+                {isUpdate && (
+                    <Button color="error" onClick={handleOnDelete}>
+                        Delete Trade
+                    </Button>
+                )}
+                <Button variant="contained" onClick={handleOnSubmit}>
+                    Submit
+                </Button>
+            </DialogActions>
+
+            {showAddNewOrder && (
+                <OrderForm
+                    title='New Order'
+                    onSubmit={(orderdetails) => createNewOrder(orderdetails)}
+                    onCancel={() => setShowAddNewOrder(false)}
+                />
             )}
+
+            {showUpdateOrder && (
+                <OrderForm
+                    title='Update Order'
+                    onSubmit={(orderdetails) => updateOrder(orderdetails)}
+                    onCancel={() => setShowUpdateOrder(false)}
+                    updateOrderdetails={selectedOrder}
+                />
+            )}
+
+            {showOrderFailedAlertPopup && (
+                <AlertPopup
+                    trigger={showOrderFailedAlertPopup}
+                    onConfirm={() => setShowOrderFailedAlertPopup(false)}
+                    message="Unable to Create Order."
+                />
+            )}
+
             {showTradeFailedAlertPopup && (
-                <AlertPopup trigger={showTradeFailedAlertPopup} onConfirm={() => setShowTradeFailedAlertPopup(false)} message="Unable to Delete Order." />
+                <AlertPopup
+                    trigger={showTradeFailedAlertPopup}
+                    onConfirm={() => setShowTradeFailedAlertPopup(false)}
+                    message="Unable to Delete Order."
+                />
             )}
 
             {showOrderDeleteConfirmPopup && (
-                <ConfirmPopup trigger={showOrderDeleteConfirmPopup} onConfirm={() => deleteOrder(selectedOrder)} onCancel={() => setShowOrderDeleteConfirmPopup(false)} message="Do you wish to delete Order." />
+                <ConfirmPopup
+                    trigger={showOrderDeleteConfirmPopup}
+                    onConfirm={() => deleteOrder(selectedOrder)}
+                    onCancel={() => setShowOrderDeleteConfirmPopup(false)}
+                    message="Do you wish to delete Order?"
+                />
             )}
+
             {showTradeDeleteConfirmPopup && (
-                <ConfirmPopup trigger={showTradeDeleteConfirmPopup} onConfirm={() => deleteCompleteTrade()} onCancel={() => setShowTradeDeleteConfirmPopup(false)} message="Do you wish to delete the trade and associated orders ?." />
+                <ConfirmPopup
+                    trigger={showTradeDeleteConfirmPopup}
+                    onConfirm={() => deleteCompleteTrade()}
+                    onCancel={() => setShowTradeDeleteConfirmPopup(false)}
+                    message="Do you wish to delete the trade and associated orders?"
+                />
             )}
-        </>
+        </Dialog>
     );
 }
 

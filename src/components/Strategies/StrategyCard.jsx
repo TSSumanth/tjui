@@ -313,24 +313,26 @@ const StrategyCard = ({ strategy }) => {
                 onClick={() => handleTradeClick(trade)}
                 sx={{
                     p: 2.5,
-                    bgcolor: theme.palette.background.paper,
+                    bgcolor: '#ffffff',
                     borderRadius: 2,
-                    boxShadow: 1,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                     height: '100%',
                     minHeight: '120px',
                     width: '100%',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    transition: 'all 0.3s ease',
                     cursor: 'pointer',
+                    border: `1px solid ${theme.palette.divider}`,
                     '&:hover': {
                         transform: 'translateY(-4px)',
-                        boxShadow: 3,
-                        bgcolor: theme.palette.action.hover
+                        boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+                        bgcolor: '#f8f9fa',
+                        border: `1px solid ${theme.palette.primary.main}`
                     }
                 }}
             >
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                     <ShowChartIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
-                    <Typography variant="subtitle1" sx={{ fontWeight: "bold", flexGrow: 1, mr: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: "bold", flexGrow: 1, mr: 2, color: '#2c3e50' }}>
                         {trade.asset}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -339,24 +341,24 @@ const StrategyCard = ({ strategy }) => {
                             size="small"
                             color="primary"
                             variant="outlined"
-                            sx={{ minWidth: '80px' }}
+                            sx={{ minWidth: '80px', borderColor: theme.palette.primary.main }}
                         />
                         <Chip
                             label={trade.status}
                             size="small"
                             color={trade.status === 'OPEN' ? "success" : "default"}
                             variant="outlined"
-                            sx={{ minWidth: '70px' }}
+                            sx={{ minWidth: '70px', borderColor: trade.status === 'OPEN' ? theme.palette.success.main : theme.palette.grey[400] }}
                         />
                     </Box>
                 </Box>
-                <Divider sx={{ my: 1.5 }} />
+                <Divider sx={{ my: 1.5, borderColor: theme.palette.divider }} />
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="body2" color="text.secondary">
                             Type
                         </Typography>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ color: '#2c3e50' }}>
                             {trade.type}
                         </Typography>
                     </Box>
@@ -364,7 +366,7 @@ const StrategyCard = ({ strategy }) => {
                         <Typography variant="body2" color="text.secondary">
                             Entry Price
                         </Typography>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ color: '#2c3e50' }}>
                             ₹{trade.entryprice}
                         </Typography>
                     </Box>
@@ -373,7 +375,7 @@ const StrategyCard = ({ strategy }) => {
                             <Typography variant="body2" color="text.secondary">
                                 Lot Size
                             </Typography>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ color: '#2c3e50' }}>
                                 {trade.lotsize} units
                             </Typography>
                         </Box>
@@ -404,6 +406,7 @@ const StrategyCard = ({ strategy }) => {
                 borderRadius: 3,
                 boxShadow: 3,
                 transition: 'transform 0.2s, box-shadow 0.2s',
+                background: 'linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%)',
                 '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 6,
@@ -412,7 +415,7 @@ const StrategyCard = ({ strategy }) => {
         >
             <CardContent sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: "bold", display: 'flex', alignItems: 'center', color: '#2c3e50' }}>
                         <Typography component="span" sx={{ mr: 1.5, color: theme.palette.primary.main, fontWeight: 'bold' }}>₹</Typography>
                         {strategy.name}
                     </Typography>
@@ -421,7 +424,7 @@ const StrategyCard = ({ strategy }) => {
                         color="success"
                         size="small"
                         variant="outlined"
-                        sx={{ px: 1 }}
+                        sx={{ px: 1, borderColor: theme.palette.success.main }}
                     />
                 </Box>
 
@@ -431,8 +434,9 @@ const StrategyCard = ({ strategy }) => {
                         mb: 4,
                         p: 3,
                         borderRadius: 2,
-                        bgcolor: theme.palette.background.default,
-                        border: `1px solid ${theme.palette.divider}`
+                        bgcolor: 'rgba(255, 255, 255, 0.9)',
+                        border: `1px solid ${theme.palette.divider}`,
+                        backdropFilter: 'blur(10px)'
                     }}
                 >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
