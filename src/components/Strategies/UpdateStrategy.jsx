@@ -14,7 +14,7 @@ import {
     TextField,
     CircularProgress,
     Dialog,
-    DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, Select, MenuItem, Slider
+    DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, InputLabel, Select, MenuItem, Slider, Chip, Grid
 } from "@mui/material";
 import SettingsSuggestTwoToneIcon from '@mui/icons-material/SettingsSuggestTwoTone';
 import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
@@ -26,6 +26,46 @@ import { addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrad
 import { useNavigate } from "react-router-dom";
 import { getStockLivePrice } from '../../services/nsedata.js';
 import StrategyNotes from './StrategyNotes';
+import AddIcon from '@mui/icons-material/Add';
+import SaveIcon from '@mui/icons-material/Save';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+// Add these constants at the top of the file after imports
+const TABLE_STYLES = {
+    container: {
+        padding: 2,
+        borderRadius: 2,
+        boxShadow: 3,
+        width: '100%',
+        overflowX: 'auto'
+    },
+    header: {
+        backgroundColor: "primary.light",
+        '& th': {
+            fontWeight: 'bold',
+            color: 'primary.contrastText',
+            whiteSpace: 'nowrap'
+        }
+    },
+    row: {
+        cursor: 'pointer',
+        '&:hover': {
+            backgroundColor: 'action.hover'
+        }
+    },
+    selectedRow: {
+        backgroundColor: 'primary.light',
+        '&:hover': {
+            backgroundColor: 'primary.light'
+        }
+    },
+    evenRow: {
+        backgroundColor: 'background.default'
+    },
+    oddRow: {
+        backgroundColor: 'background.paper'
+    }
+};
 
 // Component for confirmation dialog when deleting a strategy   
 const ConfirmationDialog = ({ open, onClose, onConfirm, message, title }) => {
@@ -61,19 +101,19 @@ const ModifyStrategyDetails = ({ id }) => {
     const [existingStrategies, setExistingStrategies] = useState([]);
     const [selectedTrades, setSelectedTrades] = useState([]);
     const [updateTradeDetails, setUpdateTradeDetails] = useState(null);
-    const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     // State for price management and calculations
     const [currentStockPrice, setCurrentStockPrice] = useState("");
-    const [isStockPriceUpdateDisabled, setIsStockPriceUpdateDisabled] = useState(false);
     const [totalUnrealizedPL, setTotalUnrealizedPL] = useState(0);
     const [showCreateStockTrade, setShowCreateStockTrade] = useState(false);
     const [showCreateOptionTrade, setShowCreateOptionTrade] = useState(false);
     const [sliderStartValue, setSliderStartValue] = useState(0);
     const [sliderValue, setSliderValue] = useState(0);
-    const [isManualPriceUpdate, setIsManualPriceUpdate] = useState(false);
     const [optionPriceErrors, setOptionPriceErrors] = useState(Array(optionAssets.length).fill(false));
+
+    // Add error state
+    const [error, setError] = useState(null);
 
     const navigate = useNavigate();
 
@@ -83,34 +123,32 @@ const ModifyStrategyDetails = ({ id }) => {
             setLoading(true);
             try {
                 const strategies = await getStrategies();
-                setExistingStrategies(strategies);
+                console.log('Fetched strategies:', strategies);
 
-                const strategy = strategies.find((s) => s.id == id);
-                if (strategy) {
-                    setCurrentStrategy(strategy);
-                    await getTrades(strategy);
+                if (!strategies || !Array.isArray(strategies)) {
+                    throw new Error("Invalid strategies data received");
                 }
-                // await getLivePrice(strategy.symbol)
+
+                const strategy = strategies.find((s) => s.id === parseInt(id));
+                console.log('Found strategy:', strategy);
+
+                if (!strategy) {
+                    throw new Error(`Strategy not found with id: ${id}`);
+                }
+
+                setCurrentStrategy(strategy);
+                await getTrades(strategy);
             } catch (error) {
-                console.error("Error fetching strategies:", error);
+                console.error("Error in fetchStrategies:", error);
+                setError(error.message);
             } finally {
                 setLoading(false);
             }
         };
         fetchStrategies();
-    }, []);
+    }, [id]);
 
     // useEffect(() => { getLivePrice(currentStrategy.symbol) }, [currentStrategy.symbol]);
-
-    // Fetch live stock price for the strategy's symbol
-    async function getLivePrice(symbol) {
-        const liveData = await getStockLivePrice(symbol)
-        if (liveData.priceInfo.lastPrice !== undefined && liveData.priceInfo.lastPrice !== 0) {
-            setCurrentStockPrice(liveData.priceInfo.lastPrice)
-            setIsStockPriceUpdateDisabled(true)
-            updateStockUnrealizedPL(liveData.priceInfo.lastPrice)
-        }
-    }
 
     // Fetch all trades associated with the strategy
     async function getTrades(strategy) {
@@ -128,29 +166,56 @@ const ModifyStrategyDetails = ({ id }) => {
 
         // Calculate unrealized P/L for stock trades
         const updatedStockTrades = flatStockTrades.map(trade => {
-            if (strategy.current_stock_price) {
-                const unrealizedPL = (trade.openquantity * strategy.current_stock_price) - (trade.openquantity * trade.entryprice);
+            // Use LTP if available, otherwise use current stock price
+            const currentPrice = trade.ltp || strategy.current_stock_price;
+            if (currentPrice) {
+                // For LONG trades: (LTP - Entry Price) * Quantity
+                // For SHORT trades: (Entry Price - LTP) * Quantity
+                const unrealizedPL = trade.tradetype === 'LONG'
+                    ? (currentPrice - trade.entryprice) * trade.openquantity
+                    : (trade.entryprice - currentPrice) * trade.openquantity;
+
+                // Round to 2 decimal places
+                const roundedUnrealizedPL = Math.round(unrealizedPL * 100) / 100;
+
                 return {
                     ...trade,
-                    ltp: strategy.current_stock_price,
-                    unrealizedpl: unrealizedPL
+                    ltp: currentPrice,
+                    unrealizedpl: roundedUnrealizedPL
                 };
             }
-            return trade;
+            return {
+                ...trade,
+                unrealizedpl: 0
+            };
         });
 
         // Calculate unrealized P/L for option trades
         const updatedOptionTrades = flatOptionTrades.map(trade => {
+            // Use LTP if available, otherwise try to find price from option assets
             const matchingAsset = (strategy.option_prices || []).find(price => price.name === trade.asset);
-            if (matchingAsset?.price) {
-                const unrealizedPL = (trade.openquantity * matchingAsset.price) - (trade.openquantity * trade.entryprice);
+            const currentPrice = trade.ltp || (matchingAsset?.price);
+
+            if (currentPrice) {
+                // For LONG trades: (LTP - Entry Price) * Quantity
+                // For SHORT trades: (Entry Price - LTP) * Quantity
+                const unrealizedPL = trade.tradetype === 'LONG'
+                    ? (currentPrice - trade.entryprice) * trade.openquantity
+                    : (trade.entryprice - currentPrice) * trade.openquantity;
+
+                // Round to 2 decimal places
+                const roundedUnrealizedPL = Math.round(unrealizedPL * 100) / 100;
+
                 return {
                     ...trade,
-                    ltp: matchingAsset.price,
-                    unrealizedpl: unrealizedPL
+                    ltp: currentPrice,
+                    unrealizedpl: roundedUnrealizedPL
                 };
             }
-            return trade;
+            return {
+                ...trade,
+                unrealizedpl: 0
+            };
         });
 
         setTrades([...updatedStockTrades, ...updatedOptionTrades]);
@@ -158,16 +223,11 @@ const ModifyStrategyDetails = ({ id }) => {
         setOptionTrades(updatedOptionTrades);
 
         // Create a new array for option assets, ignoring trades with status "CLOSED"
-        console.log('Flat Option Trades:', flatOptionTrades);
-        console.log('Strategy Option Prices:', strategy.option_prices);
-
         const optionAssetsMap = new Map();
 
         (flatOptionTrades || []).forEach(trade => {
-            console.log('Processing trade:', trade);
             if (trade && trade.asset && trade.status !== "CLOSED") {
-                const price = (strategy.option_prices || []).find(p => p && p.name === trade.asset)?.price || 0;
-                console.log('Found price for trade:', { asset: trade.asset, price });
+                const price = trade.ltp || (strategy.option_prices || []).find(p => p && p.name === trade.asset)?.price || 0;
                 optionAssetsMap.set(trade.asset, {
                     name: trade.asset,
                     price
@@ -176,13 +236,13 @@ const ModifyStrategyDetails = ({ id }) => {
         });
 
         const newOptionAssets = Array.from(optionAssetsMap.values());
-        console.log('New Option Assets:', newOptionAssets);
         setOptionAssets(newOptionAssets);
 
         // Calculate total unrealized P/L
         const totalStockUnrealizedPL = updatedStockTrades.reduce((sum, trade) => sum + (trade.unrealizedpl || 0), 0);
         const totalOptionUnrealizedPL = updatedOptionTrades.reduce((sum, trade) => sum + (trade.unrealizedpl || 0), 0);
-        setTotalUnrealizedPL(totalStockUnrealizedPL + totalOptionUnrealizedPL);
+        const totalUnrealizedPL = Math.round((totalStockUnrealizedPL + totalOptionUnrealizedPL) * 100) / 100;
+        setTotalUnrealizedPL(totalUnrealizedPL);
 
         // Initialize option price errors array
         setOptionPriceErrors(Array(newOptionAssets.length).fill(false));
@@ -198,28 +258,26 @@ const ModifyStrategyDetails = ({ id }) => {
     }
 
     // Update strategy details in the backend
-    async function handleUpdateStrategy() {
+    const handleUpdateStrategy = async () => {
         try {
             let response = await updateStrategy(currentStrategy);
             if (response)
                 await getTrades(currentStrategy);
         } catch (error) {
             console.error("Strategy update failed:", error);
-            setShowTradeFailedAlertPopup(true);
         }
-    }
+    };
 
     // Delete strategy and navigate back to strategies list
-    async function handleDeleteStrategy() {
+    const handleDeleteStrategy = async () => {
         try {
             let response = await deleteStrategy(currentStrategy.id);
             if (response)
                 navigate(`/mystrategies`);
         } catch (error) {
             console.error("Strategy deletion failed:", error);
-            setShowTradeFailedAlertPopup(true);
         }
-    }
+    };
 
     // Handle strategy name change with validation
     const handleNameChange = (event) => {
@@ -256,7 +314,6 @@ const ModifyStrategyDetails = ({ id }) => {
     // Handle price slider changes for simulation
     const handleSliderChange = (event) => {
         setSliderValue(event.target.value);
-        setIsManualPriceUpdate(true);
         updateStockUnrealizedPL(event.target.value)
         updateStockPrice(event.target.value)
     };
@@ -265,7 +322,6 @@ const ModifyStrategyDetails = ({ id }) => {
     const updateStockPrice = (newPrice) => {
         setCurrentStockPrice(newPrice);
         setSliderValue(newPrice)
-        setIsManualPriceUpdate(false);
     };
 
     // Calculate unrealized P/L for stock trades
@@ -318,10 +374,6 @@ const ModifyStrategyDetails = ({ id }) => {
     const updateOptionUnrealizedPL = () => {
         if (optionAssets.length === 0) return;
 
-        console.log('Updating option unrealized P/L');
-        console.log('Current option trades:', optionTrades);
-        console.log('Current option assets:', optionAssets);
-
         setOptionTrades((prevTrades) => {
             const assetPriceMap = new Map(optionAssets.map(asset => [asset.name, asset.price]));
 
@@ -339,23 +391,16 @@ const ModifyStrategyDetails = ({ id }) => {
                     // Round to 2 decimal places
                     const roundedUnrealizedPL = Math.round(unrealizedPL * 100) / 100;
 
-                    console.log('Calculating option trade P/L:', {
-                        tradeId: trade.tradeid,
-                        tradeType: trade.tradetype,
-                        asset: trade.asset,
-                        openQuantity: trade.openquantity,
-                        entryPrice: trade.entryprice,
-                        ltp: latestPrice,
-                        unrealizedPL: roundedUnrealizedPL
-                    });
                     return {
                         ...trade,
                         unrealizedpl: roundedUnrealizedPL,
                     };
                 }
-                return trade;
+                return {
+                    ...trade,
+                    unrealizedpl: 0
+                };
             });
-            console.log('Updated option trades:', updatedTrades);
 
             // Calculate and update total unrealized P/L
             const totalStockUnrealizedPL = stockTrades.reduce((sum, trade) => sum + (trade.unrealizedpl || 0), 0);
@@ -455,7 +500,6 @@ const ModifyStrategyDetails = ({ id }) => {
             setSliderStartValue(currentStockPrice);
         } catch (error) {
             console.error("Error updating trades and strategy:", error);
-            setShowTradeFailedAlertPopup(true);
         }
     };
 
@@ -514,27 +558,57 @@ const ModifyStrategyDetails = ({ id }) => {
 
     // Handle trade submission (create/update)
     const handleSubmitTrade = async (tradeDetails, isStock, isUpdate = false) => {
-        const tradeFunction = isStock
-            ? isUpdate ? updateStockTrade : addNewStockTrade
-            : isUpdate ? updateOptionTrade : addNewOptionTrade;
-
         try {
-            const response = await tradeFunction(tradeDetails);
-            if (response?.created) {
-                if (isUpdate) {
-                    await getTrades(currentStrategy);
-                } else {
-                    await addTradeToStrategy(response.data.tradeid, isStock);
-                }
-                setUpdateTradeDetails(null);
-                setShowCreateStockTrade(false);
-                setShowCreateOptionTrade(false);
+            let response;
+            if (isStock) {
+                response = isUpdate ? await updateStockTrade({ ...tradeDetails, strategy_id: id }) : await addNewStockTrade({ ...tradeDetails, strategy_id: id });
             } else {
-                setShowTradeFailedAlertPopup(true);
+                response = isUpdate ? await updateOptionTrade({ ...tradeDetails, strategy_id: id }) : await addNewOptionTrade({ ...tradeDetails, strategy_id: id });
+            }
+
+            if (response?.created) {
+                if (!isUpdate) {
+                    // Only add new trades to strategy, not updates
+                    await addTradeToStrategy(response.tradeid, isStock);
+                }
+
+                // Update the UI state with the new/updated trade
+                const updatedTrade = {
+                    ...tradeDetails,
+                    tradeid: response.tradeid
+                };
+
+                if (isStock) {
+                    if (isUpdate) {
+                        setStockTrades(prev => prev.map(trade =>
+                            trade.tradeid === updatedTrade.tradeid ? updatedTrade : trade
+                        ));
+                    } else {
+                        setStockTrades(prev => [...prev, updatedTrade]);
+                        setShowCreateStockTrade(false);
+                    }
+                } else {
+                    if (isUpdate) {
+                        setOptionTrades(prev => prev.map(trade =>
+                            trade.tradeid === updatedTrade.tradeid ? updatedTrade : trade
+                        ));
+                    } else {
+                        setOptionTrades(prev => [...prev, updatedTrade]);
+                        setShowCreateOptionTrade(false);
+                    }
+                }
+
+                // Refresh trades to show the updated data
+                await getTrades(currentStrategy);
+
+                // Close the update dialog if this was an update
+                if (isUpdate) {
+                    setUpdateTradeDetails(null);
+                }
             }
         } catch (error) {
-            console.error("Trade submission failed:", error);
-            setShowTradeFailedAlertPopup(true);
+            console.error("Error submitting trade:", error);
+            // Handle error appropriately
         }
     };
 
@@ -550,273 +624,393 @@ const ModifyStrategyDetails = ({ id }) => {
     // Placeholder for strategy prediction simulator
     async function runStrategyPredictionSimulator() { }
 
+    // Add this helper function after the TABLE_STYLES constant
+    const getRowStyle = (isSelected, index) => ({
+        ...TABLE_STYLES.row,
+        ...(isSelected ? TABLE_STYLES.selectedRow : {}),
+        ...(index % 2 === 0 ? TABLE_STYLES.evenRow : TABLE_STYLES.oddRow)
+    });
+
     // Main render function
     return (
         <>
             {loading ? (
-                <CircularProgress size={24} />
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+                    <CircularProgress size={24} />
+                </Box>
+            ) : error ? (
+                <Typography variant="h6" color="error" sx={{ p: 3 }}>
+                    {error}
+                </Typography>
             ) : !currentStrategy ? (
-                <Typography variant="h6" color="error">
+                <Typography variant="h6" color="error" sx={{ p: 3 }}>
                     Strategy not found
                 </Typography>
             ) : (
-                <Container sx={{ mt: 4 }}>
+                <Box sx={{ width: '100%', p: 3 }}>
                     {/* Strategy header and actions */}
-                    <Typography variant="h4" gutterBottom sx={{ mb: 2 }}>
-                        {currentStrategy?.name}
-                    </Typography>
-
-                    <Box display="flex" justifyContent="space-between" sx={{ mb: 5 }}>
-                        <Button variant="contained" color="primary" onClick={handleCreateStockTrade}>Add Stock Trade</Button>
-                        <Button variant="contained" color="primary" onClick={handleCreateOptionTrade}>Add Option Trade</Button>
-                        <Button variant="contained" color="success" onClick={runStrategyPredictionSimulator} startIcon={<SettingsSuggestTwoToneIcon />}>Run Simulation</Button>
-                        <Button variant="contained" color="secondary" onClick={handleUpdateStrategy}>Update Strategy Details</Button>
-                        <Button variant="contained" color="error" onClick={() => setDeleteDialogOpen(true)}>Delete Strategy</Button>
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 4,
+                        flexWrap: 'wrap',
+                        gap: 2
+                    }}>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                            {currentStrategy?.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={handleCreateStockTrade}
+                                startIcon={<AddIcon />}
+                            >
+                                Add Stock Trade
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={handleCreateOptionTrade}
+                                startIcon={<AddIcon />}
+                            >
+                                Add Option Trade
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="success"
+                                onClick={runStrategyPredictionSimulator}
+                                startIcon={<SettingsSuggestTwoToneIcon />}
+                            >
+                                Run Simulation
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                onClick={handleUpdateStrategy}
+                                startIcon={<SaveIcon />}
+                            >
+                                Update Strategy
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={() => setDeleteDialogOpen(true)}
+                                startIcon={<DeleteIcon />}
+                            >
+                                Delete Strategy
+                            </Button>
+                        </Box>
                     </Box>
 
                     {/* Strategy details form */}
-                    <TextField
-                        label="Name"
-                        value={currentStrategy?.name || ""}
-                        fullWidth
-                        onChange={handleNameChange}
-                        sx={{ mb: 2 }}
-                        error={!!nameError}
-                        helperText={nameError}
-                    />
-
-                    <TextField
-                        label="Stock Symbol Used for this Strategy"
-                        value={currentStrategy?.symbol || ""}
-                        fullWidth
-                        onChange={handleSymbolChange}
-                        sx={{ mb: 2 }}
-                        error={!!nameError}
-                        helperText={nameError}
-                    />
-
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                        <InputLabel>Status</InputLabel>
-                        <Select
-                            value={currentStrategy?.status}
-                            onChange={handleStatusChange}
-                            label="Status"
-                        >
-                            <MenuItem value="OPEN">OPEN</MenuItem>
-                            <MenuItem value="CLOSE">CLOSE</MenuItem>
-                        </Select>
-                    </FormControl>
+                    <Paper sx={{ p: 3, mb: 4 }}>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    label="Name"
+                                    value={currentStrategy?.name || ""}
+                                    fullWidth
+                                    onChange={handleNameChange}
+                                    error={!!nameError}
+                                    helperText={nameError}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    label="Stock Symbol"
+                                    value={currentStrategy?.symbol || ""}
+                                    fullWidth
+                                    onChange={handleSymbolChange}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Status</InputLabel>
+                                    <Select
+                                        value={currentStrategy?.status}
+                                        onChange={handleStatusChange}
+                                        label="Status"
+                                    >
+                                        <MenuItem value="OPEN">OPEN</MenuItem>
+                                        <MenuItem value="CLOSE">CLOSE</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        </Grid>
+                    </Paper>
 
                     {/* Price update section */}
-                    <Box sx={{ mb: 3, p: 1, border: "1px solid #ddd", borderRadius: "8px", background: "#f9f9f9", display: "flex", flexWrap: "wrap", alignItems: "center" }}>
-                        <Typography variant="body2" gutterBottom sx={{ width: "100%", color: "black" }}> Update Stock and Option Prices to Calculate Unrealized P/L</Typography>
-                        <TextField
-                            label="Current Stock Price"
-                            value={currentStockPrice === undefined || currentStockPrice === 0 ? "" : currentStockPrice}
-                            onChange={(e) => handleStockPriceChange(e.target.value)}
-                            error={!!stockPriceError}
-                            helperText={stockPriceError}
-                            sx={{ m: 1, width: "calc(33.33% - 16px)" }}
-                        />
-                        {optionAssets.length > 0 && optionAssets.map((option, index) => {
-                            const matchingTrade = optionTrades.find(trade => trade.asset === option.name);
-                            const displayValue = matchingTrade?.ltp ? matchingTrade.ltp : (option.price === undefined || option.price === 0 ? "" : option.price);
-                            return (
+                    <Paper sx={{ p: 3, mb: 4 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Update Stock and Option Prices
+                        </Typography>
+                        <Grid container spacing={3} alignItems="center">
+                            <Grid item xs={12} md={4}>
                                 <TextField
-                                    key={index}
-                                    label={`Price for ${option.name}`}
-                                    type="number"
-                                    value={displayValue}
-                                    onChange={(e) => handleOptionPriceChange(index, e.target.value)}
-                                    inputMode="decimal"
-                                    error={optionPriceErrors[index]}
-                                    helperText={optionPriceErrors[index] ? "Option price is required" : ""}
-                                    sx={{ m: 1, width: "calc(33.33% - 16px)" }}
+                                    label="Current Stock Price"
+                                    value={currentStockPrice === undefined || currentStockPrice === 0 ? "" : currentStockPrice}
+                                    onChange={(e) => handleStockPriceChange(e.target.value)}
+                                    error={!!stockPriceError}
+                                    helperText={stockPriceError}
+                                    fullWidth
                                 />
-                            );
-                        })}
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleGeneratePL}
-                            sx={{ m: 1, width: "100%" }}
-                        >
-                            Generate Unrealized P/L
-                        </Button>
+                            </Grid>
+                            {optionAssets.map((option, index) => (
+                                <Grid item xs={12} md={4} key={index}>
+                                    <TextField
+                                        label={`Price for ${option.name}`}
+                                        type="number"
+                                        value={option.price === undefined || option.price === 0 ? "" : option.price}
+                                        onChange={(e) => handleOptionPriceChange(index, e.target.value)}
+                                        error={optionPriceErrors[index]}
+                                        helperText={optionPriceErrors[index] ? "Option price is required" : ""}
+                                        fullWidth
+                                    />
+                                </Grid>
+                            ))}
+                            <Grid item xs={12}>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleGeneratePL}
+                                    fullWidth
+                                    size="large"
+                                >
+                                    Generate Unrealized P/L
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
+                    {/* P/L summary cards */}
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                        <Grid item xs={12} md={4}>
+                            <Paper sx={{ p: 3, textAlign: 'center' }}>
+                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                                    Total Realized P/L
+                                </Typography>
+                                <Typography variant="h4" color={totalPL >= 0 ? 'success.main' : 'error.main'}>
+                                    {totalPL >= 0 ? '+' : ''}{totalPL}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <Paper sx={{ p: 3, textAlign: 'center' }}>
+                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                                    Total Unrealized P/L
+                                </Typography>
+                                <Typography variant="h4" color={totalUnrealizedPL >= 0 ? 'success.main' : 'error.main'}>
+                                    {totalUnrealizedPL >= 0 ? '+' : ''}{totalUnrealizedPL}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <Paper sx={{ p: 3, textAlign: 'center' }}>
+                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                                    Final P/L
+                                </Typography>
+                                <Typography variant="h4" color={(totalUnrealizedPL + totalPL) >= 0 ? 'success.main' : 'error.main'}>
+                                    {(totalUnrealizedPL + totalPL) >= 0 ? '+' : ''}{totalUnrealizedPL + totalPL}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+
+                    {/* Stock and Option trades tables */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {stockTrades.length > 0 && (
+                            <TableContainer component={Paper} sx={TABLE_STYLES.container}>
+                                <Typography variant="h6" gutterBottom sx={{ mb: 1, textAlign: "center", color: "primary.main" }}>
+                                    Stock Trades
+                                </Typography>
+                                <Table>
+                                    <TableHead sx={TABLE_STYLES.header}>
+                                        <TableRow>
+                                            <TableCell><b>Status</b></TableCell>
+                                            <TableCell><b>Asset</b></TableCell>
+                                            <TableCell><b>Total Quantity</b></TableCell>
+                                            <TableCell><b>Open Quantity</b></TableCell>
+                                            <TableCell><b>Trade Type</b></TableCell>
+                                            <TableCell><b>Entry Price</b></TableCell>
+                                            <TableCell><b>Average Exit Price</b></TableCell>
+                                            <TableCell><b>LTP</b></TableCell>
+                                            <TableCell><b>Current P/L</b></TableCell>
+                                            <TableCell><b>Unrealized P/L</b></TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {[...stockTrades]
+                                            .sort((a, b) => {
+                                                if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+                                                if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+                                                return 0;
+                                            })
+                                            .map((trade, index) => (
+                                                <TableRow
+                                                    key={index}
+                                                    hover
+                                                    onClick={() => handleTradeSelection(trade)}
+                                                    sx={getRowStyle(selectedTrades.some((t) => t.tradeid === trade.tradeid), index)}
+                                                >
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={trade.status || 'OPEN'}
+                                                            color={trade.status === 'OPEN' ? 'success' : 'error'}
+                                                            size="small"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{trade.asset}</TableCell>
+                                                    <TableCell>{trade.quantity}</TableCell>
+                                                    <TableCell>{trade.openquantity}</TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={trade.tradetype}
+                                                            color={trade.tradetype === 'LONG' ? 'success' : 'error'}
+                                                            size="small"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{trade.entryprice}</TableCell>
+                                                    <TableCell>{trade.exitaverageprice}</TableCell>
+                                                    <TableCell>{trade.ltp}</TableCell>
+                                                    <TableCell>{trade.overallreturn}</TableCell>
+                                                    <TableCell>{trade.unrealizedpl}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+
+                        {optionTrades.length > 0 && (
+                            <TableContainer component={Paper} sx={TABLE_STYLES.container}>
+                                <Typography variant="h6" gutterBottom sx={{ mb: 1, textAlign: "center", color: "primary.main" }}>
+                                    Option Trades
+                                </Typography>
+                                <Table>
+                                    <TableHead sx={TABLE_STYLES.header}>
+                                        <TableRow>
+                                            <TableCell><b>Status</b></TableCell>
+                                            <TableCell><b>Asset</b></TableCell>
+                                            <TableCell><b>Strike Prize</b></TableCell>
+                                            <TableCell><b>Lot Size</b></TableCell>
+                                            <TableCell><b>Total Quantity</b></TableCell>
+                                            <TableCell><b>Open Quantity</b></TableCell>
+                                            <TableCell><b>Trade Type</b></TableCell>
+                                            <TableCell><b>Entry Price</b></TableCell>
+                                            <TableCell><b>Average Exit Price</b></TableCell>
+                                            <TableCell><b>LTP</b></TableCell>
+                                            <TableCell><b>Current P/L</b></TableCell>
+                                            <TableCell><b>Unrealized P/L</b></TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {[...optionTrades]
+                                            .sort((a, b) => {
+                                                if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+                                                if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+                                                return 0;
+                                            })
+                                            .map((trade, index) => (
+                                                <TableRow
+                                                    key={index}
+                                                    hover
+                                                    onClick={() => handleTradeSelection(trade)}
+                                                    sx={getRowStyle(selectedTrades.some((t) => t.tradeid === trade.tradeid), index)}
+                                                >
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={trade.status || 'OPEN'}
+                                                            color={trade.status === 'OPEN' ? 'success' : 'error'}
+                                                            size="small"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{trade.asset}</TableCell>
+                                                    <TableCell>{trade.strikeprize}</TableCell>
+                                                    <TableCell>{trade.lotsize}</TableCell>
+                                                    <TableCell>{trade.quantity / trade.lotsize}</TableCell>
+                                                    <TableCell>{trade.openquantity / trade.lotsize}</TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={trade.tradetype}
+                                                            color={trade.tradetype === 'LONG' ? 'success' : 'error'}
+                                                            size="small"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>{trade.entryprice}</TableCell>
+                                                    <TableCell>{trade.exitaverageprice}</TableCell>
+                                                    <TableCell>{trade.ltp}</TableCell>
+                                                    <TableCell>{trade.overallreturn}</TableCell>
+                                                    <TableCell>{trade.unrealizedpl}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
                     </Box>
 
-                    {/* Price simulation slider */}
-                    {sliderStartValue > 0 &&
-                        <Box sx={{ mb: 3, p: 2, borderRadius: "8px", border: "1px solid #ddd", }}>
-                            <Typography variant="body2" sx={{ mb: 1, color: "black" }}>
-                                Move the slider to update the stock price. Adjusted Value: {sliderValue}
-                            </Typography>
-                            <Slider
-                                value={Number(sliderValue)}
-                                onChange={handleSliderChange}
-                                min={Math.round(sliderStartValue * 0.9)}
-                                max={Math.round(sliderStartValue * 1.1)}
-                                step={1}
-                                marks={[
-                                    { value: Math.round(sliderStartValue * 0.9), label: `${Math.round(sliderStartValue * 0.9)}` },
-                                    { value: sliderStartValue, label: `${sliderStartValue}` },
-                                    { value: Math.round(sliderStartValue * 1.1), label: `${Math.round(sliderStartValue * 1.1)}` },
-                                ]}
-                                valueLabelDisplay="auto"
-                            />
-                        </Box>
-                    }
-
-                    {/* P/L summary */}
-                    <TextField
-                        label="Total Realized P/L"
-                        value={totalPL}
-                        fullWidth
-                        readOnly
-                        sx={{ mb: 3 }}
-                    />
-
-                    <TextField
-                        label="Total Unrealized P/L"
-                        value={totalUnrealizedPL}
-                        fullWidth
-                        readOnly
-                        sx={{ mb: 3 }}
-                    />
-
-                    <TextField
-                        label="Final P/L"
-                        value={totalUnrealizedPL + totalPL}
-                        fullWidth
-                        readOnly
-                        sx={{ mb: 3 }}
-                    />
-
-                    {/* Stock trades table */}
-                    {stockTrades.length > 0 &&
-                        <TableContainer component={Paper} sx={{ mb: 4 }}>
-                            <Typography variant="h6" gutterBottom sx={{ mb: 1, textAlign: "center", color: "blue", backgroundColor: "#f5f5f5" }}>
-                                Stock Trades
-                            </Typography>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell><b>Asset</b></TableCell>
-                                        <TableCell><b>Total Quantity</b></TableCell>
-                                        <TableCell><b>Open Quantity</b></TableCell>
-                                        <TableCell><b>Trade Type</b></TableCell>
-                                        <TableCell><b>Entry Price</b></TableCell>
-                                        <TableCell><b>Average Exit Price</b></TableCell>
-                                        <TableCell><b>LTP</b></TableCell>
-                                        <TableCell><b>Current P/L</b></TableCell>
-                                        <TableCell><b>Unrealized P/L</b></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {stockTrades.map((trade, index) => (
-                                        <TableRow
-                                            key={index}
-                                            hover
-                                            onClick={() => handleTradeSelection(trade)}
-                                            sx={{
-                                                backgroundColor: selectedTrades.some((t) => t.tradeid === trade.tradeid)
-                                                    ? "#b3e5fc"
-                                                    : index % 2 === 0 ? "#f5f5f5" : "#e0e0e0",
-                                                cursor: "pointer",
-                                                "&:hover": { backgroundColor: "lightgreen !important" }
-                                            }}
-                                        >
-                                            <TableCell>{trade.asset}</TableCell>
-                                            <TableCell>{trade.quantity}</TableCell>
-                                            <TableCell>{trade.openquantity}</TableCell>
-                                            <TableCell>{trade.tradetype}</TableCell>
-                                            <TableCell>{trade.entryprice}</TableCell>
-                                            <TableCell>{trade.exitaverageprice}</TableCell>
-                                            <TableCell>{trade.ltp}</TableCell>
-                                            <TableCell>{trade.overallreturn}</TableCell>
-                                            <TableCell>{trade.unrealizedpl}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    }
-
-                    {/* Option trades table */}
-                    {optionTrades.length > 0 &&
-                        <TableContainer component={Paper} >
-                            <Typography variant="h6" gutterBottom sx={{ mb: 1, textAlign: "center", color: "blue", background: "#f5f5f5" }}>
-                                Option Trades
-                            </Typography>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell><b>Asset</b></TableCell>
-                                        <TableCell><b>Strike Prize</b></TableCell>
-                                        <TableCell><b>Lot Size</b></TableCell>
-                                        <TableCell><b>Total Quantity</b></TableCell>
-                                        <TableCell><b>Open Quantity</b></TableCell>
-                                        <TableCell><b>Trade Type</b></TableCell>
-                                        <TableCell><b>Entry Price</b></TableCell>
-                                        <TableCell><b>Average Exit Price</b></TableCell>
-                                        <TableCell><b>LTP</b></TableCell>
-                                        <TableCell><b>Current P/L</b></TableCell>
-                                        <TableCell><b>Unrealized P/L</b></TableCell>
-                                        <TableCell><b>Status</b></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {optionTrades.map((trade, index) => (
-                                        <TableRow
-                                            key={index}
-                                            hover
-                                            onClick={() => handleTradeSelection(trade)}
-                                            sx={{
-                                                backgroundColor: selectedTrades.some((t) => t.tradeid === trade.tradeid)
-                                                    ? "#b3e5fc"
-                                                    : index % 2 === 0 ? "#f5f5f5" : "#e0e0e0",
-                                                cursor: "pointer",
-                                                "&:hover": { backgroundColor: "lightgreen !important" }
-                                            }}
-                                        >
-                                            <TableCell>{trade.asset}</TableCell>
-                                            <TableCell>{trade.strikeprize}</TableCell>
-                                            <TableCell>{trade.lotsize}</TableCell>
-                                            <TableCell>{trade.quantity / trade.lotsize}</TableCell>
-                                            <TableCell>{trade.openquantity / trade.lotsize}</TableCell>
-                                            <TableCell>{trade.tradetype}</TableCell>
-                                            <TableCell>{trade.entryprice}</TableCell>
-                                            <TableCell>{trade.exitaverageprice}</TableCell>
-                                            <TableCell>{trade.ltp}</TableCell>
-                                            <TableCell>{trade.overallreturn}</TableCell>
-                                            <TableCell>{trade.unrealizedpl}</TableCell>
-                                            <TableCell>{trade.status}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    }
-
                     <StrategyNotes strategyId={id} />
-                </Container >
+                </Box>
             )}
 
             {/* Trade update dialogs */}
-            <Dialog open={!!updateTradeDetails} onClose={() => setUpdateTradeDetails(null)}>
+            <Dialog
+                open={!!updateTradeDetails}
+                onClose={() => setUpdateTradeDetails(null)}
+                maxWidth="md"
+                fullWidth
+            >
                 {updateTradeDetails?.lotsize === undefined ? (
-                    <StockTradeForm title="Update Stock Trade" onSubmit={(details) => handleSubmitTrade(details, true, true)} onCancel={() => setUpdateTradeDetails(null)} onDelete={() => getTrades(currentStrategy)} isUpdate currentTrade={updateTradeDetails} strategyid={id} />
+                    <StockTradeForm
+                        title="Update Stock Trade"
+                        onSubmit={(details) => handleSubmitTrade(details, true, true)}
+                        onCancel={() => setUpdateTradeDetails(null)}
+                        onDelete={() => getTrades(currentStrategy)}
+                        isUpdate={true}
+                        currentTrade={updateTradeDetails}
+                        strategyid={id}
+                    />
                 ) : (
-                    <OptionTradeForm title="Update Option Trade" onSubmit={(details) => handleSubmitTrade(details, false, true)} onCancel={() => setUpdateTradeDetails(null)} onDelete={() => getTrades(currentStrategy)} isUpdate currentTrade={updateTradeDetails} strategyid={id} />
+                    <OptionTradeForm
+                        title="Update Option Trade"
+                        onSubmit={(details) => handleSubmitTrade(details, false, true)}
+                        onCancel={() => setUpdateTradeDetails(null)}
+                        onDelete={() => getTrades(currentStrategy)}
+                        isUpdate={true}
+                        currentTrade={updateTradeDetails}
+                        strategyid={id}
+                    />
                 )}
             </Dialog>
-            <Dialog open={showCreateStockTrade} onClose={() => setShowCreateStockTrade(false)}>
-                <StockTradeForm title='Create Stock Trade' onSubmit={(details) => handleSubmitTrade(details, true, false)} onCancel={() => setShowCreateStockTrade(false)} />
+
+            <Dialog
+                open={showCreateStockTrade}
+                onClose={() => setShowCreateStockTrade(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <StockTradeForm
+                    title='Create Stock Trade'
+                    onSubmit={(details) => handleSubmitTrade(details, true)}
+                    onCancel={() => setShowCreateStockTrade(false)}
+                />
             </Dialog>
 
-            <Dialog open={showCreateOptionTrade} onClose={() => setShowCreateOptionTrade(false)}>
-                <OptionTradeForm title='Create Option Trade' onSubmit={(details) => handleSubmitTrade(details, false, false)} onCancel={() => setShowCreateOptionTrade(false)} />
+            <Dialog
+                open={showCreateOptionTrade}
+                onClose={() => setShowCreateOptionTrade(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <OptionTradeForm
+                    title='Create Option Trade'
+                    onSubmit={(details) => handleSubmitTrade(details, false)}
+                    onCancel={() => setShowCreateOptionTrade(false)}
+                />
             </Dialog>
+
             <ConfirmationDialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}

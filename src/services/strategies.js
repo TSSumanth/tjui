@@ -111,19 +111,16 @@ export const addStrategyNote = async (strategyId, content) => {
     }
 };
 
-export const updateStrategyNote = async (noteId, content) => {
+export const updateStrategyNote = async (noteId, noteContent) => {
     try {
-        const response = await axios.patch(API_URLS.STRATEGY_NOTES, {
-            content: content
-        }, {
-            params: {
-                id: noteId
-            }
-        });
-        return response.status === 200;
-    } catch (e) {
-        console.error(e);
-        return false;
+        const response = await axios.patch(API_URLS.STRATEGY_NOTES,
+            { content: noteContent },
+            { params: { id: noteId } }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Error updating strategy note:', error);
+        throw error;
     }
 };
 
@@ -134,7 +131,7 @@ export const deleteStrategyNote = async (noteId) => {
                 id: noteId
             }
         });
-        return response.status === 204;
+        return response.status === 200;
     } catch (e) {
         console.error(e);
         return false;

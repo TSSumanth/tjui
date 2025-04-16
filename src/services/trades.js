@@ -1,16 +1,17 @@
 import axios from "axios";
 import { API_URLS } from '../config/api';
 
-export const addNewStockTrade = async (e) => {
-    console.log(e)
+export const addNewStockTrade = async (tradeDetails) => {
     try {
-        const response = await axios.post(`${API_URLS.TRADES}/stock`, e);
-        if (!(response.status === 201)) {
-            return { "created": false }
-        }
-        return { "created": true, ...response.data };
-    } catch (e) {
-        return { "created": false }
+        const response = await axios.post(`${API_URLS.TRADES}/stock`, tradeDetails);
+        return {
+            created: true,
+            tradeid: response.data.tradeid,
+            ...response.data
+        };
+    } catch (error) {
+        console.error("Error creating stock trade:", error);
+        throw error;
     }
 };
 
@@ -85,16 +86,17 @@ export const deleteStockTrade = async (tradeid) => {
     }
 };
 
-export const addNewOptionTrade = async (e) => {
-    console.log(e)
+export const addNewOptionTrade = async (tradeDetails) => {
     try {
-        const response = await axios.post(`${API_URLS.TRADES}/option`, e);
-        if (!(response.status === 201)) {
-            return { "created": false }
-        }
-        return { "created": true, ...response.data };
-    } catch (e) {
-        return { "created": false }
+        const response = await axios.post(`${API_URLS.TRADES}/option`, tradeDetails);
+        return {
+            created: true,
+            tradeid: response.data.tradeid,
+            ...response.data
+        };
+    } catch (error) {
+        console.error("Error creating option trade:", error);
+        throw error;
     }
 };
 

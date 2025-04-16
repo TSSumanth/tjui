@@ -368,7 +368,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                                     <td>{order.id}</td>
                                                     <td>{order.ordertype}</td>
                                                     <td>{order.quantity}</td>
-                                                    <td>{order.price}</td>
+                                                    <td>{parseFloat(order.price).toFixed(2)}</td>
                                                     <td>{order.date}</td>
                                                     <td className="notes">{order.notes}</td>
                                                     <td className="tags">{order.tags}</td>

@@ -10,10 +10,17 @@ import {
     Checkbox,
     Button,
     Paper,
-    TableContainer
+    TableContainer,
+    Typography,
+    Box,
+    Tooltip,
+    IconButton
 } from "@mui/material";
 import { AssignTradesToStrategy } from "../Strategies/AssignTradesPopup";
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import InfoIcon from '@mui/icons-material/Info';
 
+// Helper function to format dates consistently
 const formatDate = (dateString) => {
     if (!dateString) return "";
     try {
@@ -24,20 +31,60 @@ const formatDate = (dateString) => {
     }
 };
 
+// Constants for table configuration
+const TABLE_STYLES = {
+    container: {
+        padding: 2,
+        borderRadius: 2,
+        boxShadow: 3
+    },
+    header: {
+        backgroundColor: "primary.light",
+        '& th': {
+            fontWeight: 'bold',
+            color: 'primary.contrastText'
+        }
+    },
+    row: {
+        cursor: 'pointer',
+        '&:hover': {
+            backgroundColor: 'action.hover'
+        }
+    },
+    selectedRow: {
+        backgroundColor: 'primary.light',
+        '&:hover': {
+            backgroundColor: 'primary.light'
+        }
+    },
+    evenRow: {
+        backgroundColor: 'background.default'
+    },
+    oddRow: {
+        backgroundColor: 'background.paper'
+    }
+};
+
 function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrade }) {
+    // State management
     const [sortedData, setSortedData] = useState(data);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
     const [selectedTrades, setSelectedTrades] = useState([]);
     const [showAssignTradesPopup, setShowAssignTradesPopup] = useState(false);
 
+    // Update sorted data when data prop changes
     useEffect(() => {
         if (data) {
             setSortedData(data);
         }
     }, [data]);
 
-    const columns = data.length > 0 ? Object.keys(data[0]).filter(col => includeColumns.includes(col)) : [];
+    // Get visible columns based on includeColumns prop
+    const columns = data.length > 0
+        ? Object.keys(data[0]).filter(col => includeColumns.includes(col))
+        : [];
 
+    // Handle sorting of table data
     const handleSort = (key) => {
         let direction = "asc";
         if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -52,6 +99,7 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
         setSortConfig({ key, direction });
     };
 
+    // Handle trade selection
     const handleTradeSelection = (trade) => {
         setSelectedTrades((prev) =>
             prev.some((t) => t.tradeid === trade.tradeid)
@@ -60,20 +108,52 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
         );
     };
 
+    // Get row style based on selection and index
+    const getRowStyle = (isSelected, index) => ({
+        ...TABLE_STYLES.row,
+        ...(isSelected ? TABLE_STYLES.selectedRow : {}),
+        ...(index % 2 === 0 ? TABLE_STYLES.evenRow : TABLE_STYLES.oddRow)
+    });
+
     return (
-        <TableContainer component={Paper} sx={{ padding: 2 }}>
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setShowAssignTradesPopup(true)}
-                disabled={selectedTrades.length === 0}
-                sx={{ marginBottom: 2 }}
-            >
-                Assign to Strategy
-            </Button>
+        <TableContainer component={Paper} sx={TABLE_STYLES.container}>
+            {/* Header section with action buttons */}
+            <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 2
+            }}>
+                <Typography variant="h6" color="primary">
+                    Trades List
+                </Typography>
+                <Box>
+                    <Tooltip title="Assign selected trades to a strategy">
+                        <span>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                startIcon={<AssignmentIcon />}
+                                onClick={() => setShowAssignTradesPopup(true)}
+                                disabled={selectedTrades.length === 0}
+                                sx={{ mr: 1 }}
+                            >
+                                Assign to Strategy
+                            </Button>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Select trades to assign them to a strategy">
+                        <IconButton color="primary">
+                            <InfoIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            </Box>
+
+            {/* Main table */}
             <Table>
-                <TableHead>
-                    <TableRow sx={{ backgroundColor: "lightblue" }}>
+                <TableHead sx={TABLE_STYLES.header}>
+                    <TableRow>
                         <TableCell>Select</TableCell>
                         {columns.map((col) => (
                             <TableCell key={col}>
@@ -96,13 +176,7 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
                                 key={row.tradeid}
                                 hover
                                 onClick={() => handleTradeSelection(row)}
-                                sx={{
-                                    backgroundColor: isSelected ? "#b3e5fc" : index % 2 === 0 ? "#f5f5f5" : "#e0e0e0",
-                                    cursor: "pointer",
-                                    "&:hover": {
-                                        backgroundColor: "lightgreen !important", // Light blue when hovered
-                                    }
-                                }}
+                                sx={getRowStyle(isSelected, index)}
                             >
                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
@@ -114,7 +188,13 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
                                     />
                                 </TableCell>
                                 {columns.map((col) => (
-                                    <TableCell key={col} onClick={(e) => { e.stopPropagation(); updateTrade(row) }}>
+                                    <TableCell
+                                        key={col}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateTrade(row)
+                                        }}
+                                    >
                                         {(col === "entrydate" || col === "exitdate" || col === "lastmodifieddate")
                                             ? formatDate(row[col])
                                             : row[col]}
@@ -125,6 +205,8 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
                     })}
                 </TableBody>
             </Table>
+
+            {/* Assign trades popup */}
             {showAssignTradesPopup && (
                 <AssignTradesToStrategy
                     title="Assign Trades"

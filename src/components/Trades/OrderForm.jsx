@@ -75,6 +75,12 @@ function OrderForm({ title, onSubmit, onCancel, updateOrderdetails, open }) {
                         name="price"
                         value={orderDetails.price}
                         onChange={handleChange}
+                        slotProps={{
+                            input: {
+                                step: "0.01",
+                                min: "0"
+                            }
+                        }}
                         fullWidth
                     />
 
