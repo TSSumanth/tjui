@@ -61,7 +61,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         asset: "",
         lotsize: "",
         premiumamount: 0,
-        tradetype: "Long",
+        tradetype: "LONG",
         quantity: 0,
         entryprice: 0,
         capitalused: 0,
@@ -78,6 +78,15 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         tags: "",
         ltp: 0
     });
+
+    useEffect(() => {
+        if (currentTrade) {
+            setTradeDetails({
+                ...currentTrade,
+                tradetype: currentTrade.tradetype?.toUpperCase() || "LONG"
+            });
+        }
+    }, [currentTrade]);
 
     async function fetchOrders(tradeid) {
         try {
@@ -335,8 +344,8 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                         onChange={handleTextChange}
                                         label="Trade Type"
                                     >
-                                        <MenuItem value="Long">Long</MenuItem>
-                                        <MenuItem value="Short">Short</MenuItem>
+                                        <MenuItem value="LONG">Long</MenuItem>
+                                        <MenuItem value="SHORT">Short</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Box>

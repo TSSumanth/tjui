@@ -237,6 +237,8 @@ const StrategyCard = ({ strategy }) => {
                     await updateStrategy(currentStrategy);
                 }
                 setShowCreateStockTrade(false);
+                // Refresh trades after adding new trade
+                fetchTrades();
             }
         } catch (error) {
             console.error("Error creating stock trade:", error);
@@ -255,6 +257,8 @@ const StrategyCard = ({ strategy }) => {
                     await updateStrategy(currentStrategy);
                 }
                 setShowCreateOptionTrade(false);
+                // Refresh trades after adding new trade
+                fetchTrades();
             }
         } catch (error) {
             console.error("Error creating option trade:", error);
@@ -263,11 +267,11 @@ const StrategyCard = ({ strategy }) => {
 
     const handleTradeClick = (trade) => {
         console.log('Trade clicked:', trade);
-        // Prepare trade data for the update form
+        // Prepare trade data for the update form   
         const tradeData = {
             ...trade,
             tradeid: trade.tradeid || trade.id,
-            tradetype: trade.tradetype || 'Long',
+            tradetype: trade.tradetype || 'LONG',
             quantity: trade.quantity || trade.openquantity,
             entryprice: trade.entryprice || 0,
             capitalused: trade.capitalused || 0,
