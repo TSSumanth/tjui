@@ -35,29 +35,30 @@ const ButtonGroup = () => {
         { label: "Profit Loss Report", path: "/profitlossreport" },
         { label: "My Stratagies", path: "/mystrategies" },
         { label: "Dashboard", path: "/dashboard" },
-        { label: "Tag Management", path: "/tagmanagement" }
+        { label: "Tag Management", path: "/tagmanagement" },
+        { label: "Zerodha Account", path: "/zerodha" }
     ];
 
     return (
         <Box sx={{ display: "flex", gap: 1 }}>
-        {buttons.map((btn, index) => (
-            <Button 
-                key={index}
-                component={Link}
-                to={btn.path}
-                variant="contained"
-                sx={{
-                    backgroundColor: "white",
-                    color: "#1976d2",
-                    minWidth: "100px",
-                    padding: "6px 12px",
-                    "&:hover": { backgroundColor: "#e3f2fd" }
-                }}
-            >
-                {btn.label}
-            </Button>
-        ))}
-    </Box>
+            {buttons.map((btn, index) => (
+                <Button
+                    key={index}
+                    component={Link}
+                    to={btn.path}
+                    variant="contained"
+                    sx={{
+                        backgroundColor: "white",
+                        color: "#1976d2",
+                        minWidth: "100px",
+                        padding: "6px 12px",
+                        "&:hover": { backgroundColor: "#e3f2fd" }
+                    }}
+                >
+                    {btn.label}
+                </Button>
+            ))}
+        </Box>
     );
 };
 

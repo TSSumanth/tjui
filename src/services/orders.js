@@ -1,8 +1,8 @@
 import axios from "axios";
 import { API_URLS } from '../config/api';
 
-const API_URL = "http://localhost:1000/api/orders";
-
+// Use the centralized API configuration
+const API_URL = API_URLS.ORDERS;
 
 export const addStockOrder = async (e) => {
     console.log(e)

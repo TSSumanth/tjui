@@ -32,24 +32,42 @@ export const updateStockTrade = async (e) => {
     }
 };
 
-export const getStockTrades = async (e) => {
-    console.log(e)
+export const getStockTrades = async (params = {}) => {
+    console.log('Fetching stock trades with params:', params);
     try {
         const response = await axios.get(`${API_URLS.TRADES}/stock`, {
             params: {
-                status: e.status,
-                minimumreturn: e.minimumreturn,
-                maximumreturn: e.maximumreturn,
-                tradeid: e.id
+                status: params.status?.toUpperCase(),
+                minimumreturn: params.minimumreturn,
+                maximumreturn: params.maximumreturn,
+                tradeid: params.id,
+                id: params.id
             }
         });
+
         if (response.status === 200) {
-            console.log(response.data)
-            return response.data
+            console.log('Received trades:', response.data);
+            return response.data;
         }
+
+        console.warn('Unexpected response status:', response.status);
         return [];
-    } catch (e) {
-        throw new Error("Unable to get trades")
+    } catch (error) {
+        console.error('Error fetching stock trades:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
+
+        if (error.response?.status === 404) {
+            throw new Error('Trade service endpoint not found. Please check if the backend server is running.');
+        } else if (error.response?.status === 500) {
+            throw new Error('Server error: ' + (error.response.data?.message || 'Unknown error'));
+        } else if (!error.response) {
+            throw new Error('Network error: Unable to connect to the trade service. Please check if the backend server is running.');
+        }
+
+        throw new Error(`Unable to get trades: ${error.response?.data?.message || error.message}`);
     }
 };
 
