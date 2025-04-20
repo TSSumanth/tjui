@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { format, parseISO } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
 import { addStockOrder, getTradeStockOrders, deleteTradeStockOrder, updateStockOrder, deleteAllTradeStockOrders } from '../../services/orders.js'
-import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
+import { updateStrategy, getStrategies } from '../../services/strategies';
 import { deleteStockTrade } from '../../services/trades.js'
 import { AlertPopup, ConfirmPopup } from '../Generic/Popup.jsx'
 import {
@@ -27,9 +26,8 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Typography,
     IconButton,
-    Tooltip
+    Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -48,7 +46,7 @@ const getCurrentDateTime = () => {
 function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
-    const [newTradeId, setNewTradeId] = useState(uuidv4());
+    const [newTradeId] = useState(uuidv4());
     const [activeTab, setActiveTab] = useState(0);
     const [showOrderFailedAlertPopup, setShowOrderFailedAlertPopup] = useState(false);
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
@@ -107,7 +105,6 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
     useEffect(() => {
         updateTradeDetails()
     }, [allorders]);
-
 
     function updateTradeDetails() {
         if (!allorders.length > 0)

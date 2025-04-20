@@ -5,14 +5,12 @@ import {
     Button,
     Alert,
     Container,
-    Stack,
-    Paper
+    Stack
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../../services/zerodha/authentication';
 import Holdings from './Holdings';
 import Positions from './Positions';
-import TotalPnL from './TotalPnL';
 
 const ZerodhaAccount = () => {
     const navigate = useNavigate();
@@ -46,66 +44,38 @@ const ZerodhaAccount = () => {
 
     return (
         <Container maxWidth="lg">
-            <Box sx={{
-                width: '100%',
-                bgcolor: 'background.paper',
-                borderRadius: 1,
-                boxShadow: 1,
-                mt: 3
-            }}>
-                <Box sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    p: 2,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                }}>
-                    <Typography variant="h5" component="h1">
-                        Zerodha Account
-                    </Typography>
-                    <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={handleLogout}
-                        size="small"
-                    >
-                        Logout
-                    </Button>
+            <Box sx={{ p: 3 }}>
+                <Box sx={{ mb: 3 }}>
+                    <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+                        <Typography variant="h4" component="h1">
+                            Zerodha Account
+                        </Typography>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={handleLogout}
+                        >
+                            Logout
+                        </Button>
+                    </Stack>
                 </Box>
 
-                {/* Always show TotalPnL */}
-                <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                    <TotalPnL />
+                <Box sx={{ mb: 3 }}>
+                    <Stack direction="row" spacing={2}>
+                        <Button
+                            variant={activeSection === 'holdings-positions' ? 'contained' : 'outlined'}
+                            onClick={() => setActiveSection('holdings-positions')}
+                        >
+                            Holdings & Positions
+                        </Button>
+                        <Button
+                            variant={activeSection === 'orders' ? 'contained' : 'outlined'}
+                            onClick={() => setActiveSection('orders')}
+                        >
+                            Orders
+                        </Button>
+                    </Stack>
                 </Box>
-
-                <Stack
-                    direction="row"
-                    spacing={2}
-                    sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}
-                >
-                    <Button
-                        variant={activeSection === 'holdings-positions' ? 'contained' : 'outlined'}
-                        onClick={() => setActiveSection('holdings-positions')}
-                        sx={{ flex: 1 }}
-                    >
-                        Holdings & Positions
-                    </Button>
-                    <Button
-                        variant={activeSection === 'orders' ? 'contained' : 'outlined'}
-                        onClick={() => setActiveSection('orders')}
-                        sx={{ flex: 1 }}
-                    >
-                        Orders
-                    </Button>
-                    <Button
-                        variant={activeSection === 'pl-report' ? 'contained' : 'outlined'}
-                        onClick={() => setActiveSection('pl-report')}
-                        sx={{ flex: 1 }}
-                    >
-                        P/L Report
-                    </Button>
-                </Stack>
 
                 <Box sx={{ p: 3 }}>
                     {activeSection === 'holdings-positions' && (
@@ -123,16 +93,6 @@ const ZerodhaAccount = () => {
                             </Typography>
                             <Typography color="textSecondary">
                                 Orders section coming soon...
-                            </Typography>
-                        </Box>
-                    )}
-                    {activeSection === 'pl-report' && (
-                        <Box sx={{ textAlign: 'center', py: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                Profit & Loss Report
-                            </Typography>
-                            <Typography color="textSecondary">
-                                P/L Report section coming soon...
                             </Typography>
                         </Box>
                     )}

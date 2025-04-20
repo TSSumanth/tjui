@@ -11,9 +11,7 @@ import {
     Grid,
     Paper,
     Tooltip,
-    IconButton,
     Chip,
-    LinearProgress
 } from "@mui/material";
 import { addNewStockTrade, getStockTrades, updateStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade } from "../../services/trades.js";
 import { AlertPopup } from "../Generic/Popup.jsx";

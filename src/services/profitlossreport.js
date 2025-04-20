@@ -1,6 +1,14 @@
 import axios from "axios";
 import { API_URLS } from '../config/api';
 
+export const getLastEntryDate = async () => {
+    const response = await axios.get(`${API_URLS.PL_ENTRY}/last-entry-date`);
+    if (!(response.status === 200)) {
+        throw new Error("Failed to get last entry date");
+    }
+    return response.data.last_date;
+};
+
 export const getReportByDateRange = async (startdate, enddate) => {
     const response = await axios.get(API_URLS.PL_ENTRY, {
         params: {

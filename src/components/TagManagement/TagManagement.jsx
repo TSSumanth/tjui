@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getTags, deleteTag, addTag, updateTag } from "../../services/tagmanagement";
 import TagsTable from "./TagManagementTable";
-import { TextField, Button, Typography, Paper, Box, CircularProgress } from "@mui/material";
+import { Button, Typography, Paper, Box, CircularProgress, Alert, Divider } from "@mui/material";
 
 const reportColumns = [
     { accessorKey: "id", header: "Tag ID" },
@@ -9,17 +9,16 @@ const reportColumns = [
     { accessorKey: "description", header: "Tag Description" }
 ];
 
-function TagsSection() {
+function TagManagement() {
     const [tagData, setTagData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [tagSearch, setTagSearch] = useState("");
 
     const fetchTags = async () => {
         setLoading(true);
         setError(null);
         try {
-            const data = await getTags(tagSearch);
+            const data = await getTags();
             setTagData(data);
         } catch (err) {
             console.error("Error fetching data:", err);
@@ -33,44 +32,40 @@ function TagsSection() {
         fetchTags();
     }, []);
 
-    const handleSearchChange = (e) => {
-        setTagSearch(e.target.value);
-    };
-
-    const handleSearchClick = async () => {
-        await fetchTags();
-    };
-
     return (
-        <Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
-            <Typography variant="h5" fontWeight="bold" mb={2}>Tag Management</Typography>
+        <Box p={4}>
+            {/* Title */}
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+                Tag Management
+            </Typography>
 
             {/* Search Section */}
-            <Box display="flex" gap={2} alignItems="center" mb={3}>
-                <TextField
-                    label="Search Tag Name"
-                    variant="outlined"
-                    size="small"
-                    value={tagSearch}
-                    onChange={handleSearchChange}
-                    sx={{ flex: 1 }}
-                />
+            <Paper sx={{ p: 1, mb: 1 }}>
+                <Typography variant="h6" fontWeight="bold" mb={1}>
+                    Search Tags
+                </Typography>
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={handleSearchClick}
+                    onClick={() => fetchTags()}
                     disabled={loading}
+                    sx={{ minWidth: "150px" }}
                 >
-                    {loading ? <CircularProgress size={20} color="inherit" /> : "Get Tags"}
+                    {loading ? <CircularProgress size={24} /> : "Get Tags"}
                 </Button>
-            </Box>
-
-            {/* Error Message */}
-            {error && <Typography color="error" mb={2}>{error}</Typography>}
+            </Paper>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", margin: "10px" }} />
+            {/* Error Handling */}
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
 
             {/* Tags Table */}
             {tagData.length > 0 ? (
                 <TagsTable
+                    key={JSON.stringify(tagData)}
                     columns={reportColumns}
                     initialdata={tagData}
                     DeleteRequest={deleteTag}
@@ -79,11 +74,14 @@ function TagsSection() {
                 />
             ) : (
                 !loading && (
-                    <Typography color="textSecondary">No data available. Click "Get Tags" to load data.</Typography>
+                    <Typography variant="body1" color="textSecondary" align="center">
+                        No data available. Click &quot;Get Tags&quot; to load data.
+                    </Typography>
                 )
             )}
-        </Paper>
+            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", marginTop: "10px" }} />
+        </Box>
     );
 }
 
-export default TagsSection;
+export default TagManagement;

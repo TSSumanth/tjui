@@ -70,6 +70,9 @@ const TotalPnL = () => {
                     </Box>
                 </Stack>
             </Box>
+            <Typography variant="body1" color="textSecondary" align="center">
+                No data available. Click &#39;Get PnL&#39; to load data.
+            </Typography>
         </Paper>
     );
 };

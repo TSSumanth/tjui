@@ -1,8 +1,23 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getPositions, getHoldings } from '../services/zerodha/api';
-import { getAccessToken } from '../services/zerodha/authentication';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { getHoldings, getPositions, getOrders } from '../services/zerodha/api';
+import { isAuthenticated, logout } from '../services/zerodha/authentication';
 
 const ZerodhaContext = createContext();
+
+// Function to check if current time is within market hours
+const isMarketHours = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const currentTime = hours * 100 + minutes; // Convert to HHMM format
+
+    // Check if it's a weekday (Monday-Friday)
+    if (day === 0 || day === 6) return false;
+
+    // Check if time is between 9:00 AM and 3:30 PM
+    return currentTime >= 900 && currentTime <= 1530;
+};
 
 export const useZerodha = () => {
     const context = useContext(ZerodhaContext);
@@ -13,112 +28,102 @@ export const useZerodha = () => {
 };
 
 export const ZerodhaProvider = ({ children }) => {
-    const [positions, setPositions] = useState([]);
-    const [holdings, setHoldings] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [pnl, setPnL] = useState({
-        dayPnL: 0,
-        overallPnL: 0
-    });
+    const [holdings, setHoldings] = useState([]);
+    const [positions, setPositions] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [isAuth, setIsAuth] = useState(isAuthenticated());
+    const [isAutoSync, setIsAutoSync] = useState(false);
 
-    const calculatePnL = (positionsData, holdingsData) => {
-        console.log('Calculating P&L with:', { positionsData, holdingsData }); // Debug log
+    const fetchData = useCallback(async () => {
+        if (!isAuth) return;
 
-        let dayPnL = 0;
-        let overallPnL = 0;
+        setIsLoading(true);
+        setError(null);
 
-        // Calculate positions P&L
-        positionsData.forEach(position => {
-            // For day's P&L, use day_m2m directly from the API
-            const dayPnlValue = Number(position.day_m2m) || 0;
-
-            // For overall P&L, use pnl directly from the API
-            const pnlValue = Number(position.pnl) || 0;
-
-            dayPnL += dayPnlValue;
-            overallPnL += pnlValue;
-
-            console.log('Position P&L:', {
-                symbol: position.tradingsymbol,
-                pnl: pnlValue,
-                dayPnl: dayPnlValue
-            });
-        });
-
-        // Calculate holdings P&L
-        holdingsData.forEach(holding => {
-            // For holdings, use day_change for day's P&L
-            const dayChange = Number(holding.day_change) || 0;
-            // For overall P&L, use pnl directly from the API
-            const totalChange = Number(holding.pnl) || 0;
-
-            dayPnL += dayChange;
-            overallPnL += totalChange;
-
-            console.log('Holding P&L:', {
-                symbol: holding.tradingsymbol,
-                dayChange,
-                totalChange
-            });
-        });
-
-        console.log('Final P&L:', { dayPnL, overallPnL }); // Debug log
-        return { dayPnL, overallPnL };
-    };
-
-    const fetchData = async () => {
         try {
-            const accessToken = getAccessToken();
-            if (!accessToken) {
-                setError('Please log in to view data');
-                setLoading(false);
-                return;
-            }
-
-            console.log('Fetching Zerodha data...'); // Debug log
-            const [positionsResponse, holdingsResponse] = await Promise.all([
+            const [holdingsData, positionsData, ordersData] = await Promise.all([
+                getHoldings(),
                 getPositions(),
-                getHoldings()
+                getOrders()
             ]);
 
-            // Process positions
-            const positionsData = positionsResponse?.data?.data || [];
-            console.log('Positions data:', positionsData); // Debug log
-            setPositions(positionsData);
-
-            // Process holdings
-            const holdingsData = holdingsResponse?.data?.data || [];
-            console.log('Holdings data:', holdingsData); // Debug log
-            setHoldings(holdingsData);
-
-            // Calculate and set P&L
-            const pnlData = calculatePnL(positionsData, holdingsData);
-            setPnL(pnlData);
-
-            setLoading(false);
-            setError(null);
+            setHoldings(holdingsData.data || []);
+            setPositions(positionsData.data || []);
+            setOrders(ordersData.data || []);
         } catch (err) {
-            console.error('Error fetching Zerodha data:', err);
-            setError('Failed to fetch data');
-            setLoading(false);
+            console.error('Error fetching data:', err);
+            setError(err.response?.data?.error || err.message || 'Failed to fetch data');
+            if (err.response?.status === 401) {
+                handleLogout();
+            }
+        } finally {
+            setIsLoading(false);
         }
-    };
+    }, [isAuth]);
 
-    useEffect(() => {
-        console.log('ZerodhaProvider mounted, fetching initial data...'); // Debug log
-        fetchData();
-        const interval = setInterval(fetchData, 60000); // Refresh every minute
-        return () => clearInterval(interval);
+    const handleLogout = useCallback(() => {
+        logout();
+        setIsAuth(false);
+        setHoldings([]);
+        setPositions([]);
+        setOrders([]);
+        setError(null);
+        setIsAutoSync(false);
     }, []);
 
+    // Effect for auto-sync during market hours
+    useEffect(() => {
+        let interval;
+        let isInitialLoad = true;  // Flag to track initial load
+
+        const checkAndFetch = () => {
+            if (isAuth) {
+                if (isInitialLoad) {
+                    // Always fetch on initial load
+                    fetchData();
+                    isInitialLoad = false;
+                    setIsAutoSync(isMarketHours());  // Set auto-sync status based on market hours
+                } else if (isMarketHours()) {
+                    // Only auto-fetch during market hours after initial load
+                    fetchData();
+                    setIsAutoSync(true);
+                } else {
+                    setIsAutoSync(false);
+                }
+            }
+        };
+
+        if (isAuth) {
+            // Initial check and fetch
+            checkAndFetch();
+
+            // Set up interval to check market hours and fetch data
+            interval = setInterval(() => {
+                checkAndFetch();
+            }, 60000); // Check every minute
+        }
+
+        return () => {
+            if (interval) {
+                clearInterval(interval);
+            }
+            setIsAutoSync(false);
+        };
+    }, [isAuth, fetchData]);
+
     const value = {
-        positions,
-        holdings,
-        loading,
+        isLoading,
         error,
-        pnl,
-        refreshData: fetchData
+        holdings,
+        positions,
+        orders,
+        isAuth,
+        setIsAuth,
+        fetchData,
+        handleLogout,
+        isAutoSync // Add this to context so we can show sync status
     };
 
     return (

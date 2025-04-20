@@ -4,7 +4,6 @@ export default function LOVComponent({ options, label, placeholder, onSelect }) 
     const [searchTerm, setSearchTerm] = useState("");
     const [filteredOptions, setFilteredOptions] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
-    const [selectedValue, setSelectedValue] = useState("");
 
     useEffect(() => {
         // Filter options based on search input
@@ -19,7 +18,6 @@ export default function LOVComponent({ options, label, placeholder, onSelect }) 
         if (value === "") {
             value = "No Data available";
         }
-        setSelectedValue(value);
         setSearchTerm(value);
         setShowDropdown(false);
         onSelect(value); // Send selected value to parent

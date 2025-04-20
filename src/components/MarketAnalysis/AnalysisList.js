@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
-import { getmarketanalysis, getmarketanalysisbyid, updateMarketAnalysis } from "../../services/marketanalysis.js";
+import { getmarketanalysis } from "../../services/marketanalysis.js";
 
 const AnalysisList = () => {
-    const [showModal, setShowModal] = useState(false);
-    const [filteredAnalysis, setFilteredAnalysis] = useState([]);
     const [analysis, setAnalysis] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState({
         key: 'asset', // Default sorting by 'asset'
         direction: 'asc',
     });
-    const [editanalysis, seteditAnalysis] = useState({ id: "", premarket_analysis: "", premarket_expectation: "", event_day: "", event_description: "", postmarket_analysis: "", market_movement: "" });
 
     const handleSort = (columnKey) => {
         let direction = 'asc';
@@ -44,24 +41,6 @@ const AnalysisList = () => {
     const fetchTrades = async () => {
         const data = await getmarketanalysis();
         setAnalysis(data);
-    };
-
-    // Handle editing a trade
-    const handleEdit = async (id) => {
-        const response = await getmarketanalysisbyid(id);
-        // const analaysisdata = await response.json();
-        seteditAnalysis(response);
-        setShowModal(true);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        await updateMarketAnalysis(editanalysis.id, editanalysis);
-        seteditAnalysis({ asset: "", trade_type: "", entry_price: "", exit_price: "" });
-        setShowModal(false);
-        const data = await getmarketanalysis();
-        setAnalysis(data);
-        setFilteredAnalysis(data);
     };
 
     // Filter trades based on the search query
@@ -113,7 +92,7 @@ const AnalysisList = () => {
                     {filteredTrades.length > 0 ? (
                         filteredTrades.map((analysis, index) => (
                             <tr key={index}>
-                                <td style={styles.numTd}>  <a href="#" onClick={() => handleEdit(analysis.id)}>{analysis.id}</a></td>
+                                <td style={styles.numTd}>{analysis.id}</td>
                                 <td style={styles.numTd}>{analysis.date}</td>
                                 <td style={styles.td}>{analysis.premarket_analysis}</td>
                                 <td style={styles.td}>{analysis.premarket_expectation}</td>

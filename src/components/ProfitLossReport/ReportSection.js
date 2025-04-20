@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Button, Typography, Paper, CircularProgress, Alert, Stack, Divider } from "@mui/material";
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
 import PagenationTable from "./ProfitLossTable";
@@ -39,7 +39,7 @@ const ReportSection = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
     useEffect(() => {
         fetchReport();
@@ -101,7 +101,7 @@ const ReportSection = () => {
             ) : (
                 !loading && (
                     <Typography variant="body1" color="textSecondary" align="center">
-                        No data available. Click "Get Report" to load data.
+                        No data available. Click &quot;Get Report&quot; to load data.
                     </Typography>
                 )
             )}

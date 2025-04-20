@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Table,
     TableBody,
@@ -12,50 +12,257 @@ import {
     Alert,
     Box,
     Chip,
-    Stack
+    Stack,
+    IconButton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
+import { ExpandLess, ExpandMore } from '@mui/icons-material';
+
+// Utility functions
+const formatCurrency = (value) => {
+    if (value === null || value === undefined || isNaN(value)) {
+        return '₹0.00';
+    }
+    return `₹${Number(value).toFixed(2)}`;
+};
+
+const formatPercentage = (value) => {
+    if (value === null || value === undefined || isNaN(value)) {
+        return '0.00%';
+    }
+    return `${Number(value).toFixed(2)}%`;
+};
+
+const getPositionType = (tradingsymbol) => {
+    if (!tradingsymbol) return 'Stock';
+
+    const symbol = tradingsymbol.toUpperCase();
+    if (symbol.endsWith('FUT')) {
+        return 'Future';
+    } else if (symbol.endsWith('CE') || symbol.endsWith('PE')) {
+        return 'Option';
+    }
+    return 'Stock';
+};
+
+const calculateChangePercentage = (position) => {
+    const { last_price, close_price } = position;
+    if (!last_price || !close_price || close_price === 0) return 0;
+    return ((last_price - close_price) / close_price) * 100;
+};
+
+const PositionTable = ({ positions, underlying }) => {
+    const [expanded, setExpanded] = useState(true);
+
+    // Calculate total P&L for this underlying
+    const calculateTotalPnL = () => {
+        return positions.reduce((total, position) => {
+            const pnl = Number(position.pnl) || 0;
+            return total + pnl;
+        }, 0);
+    };
+
+    // Calculate day's P&L for this underlying
+    const calculateDayPnL = () => {
+        return positions.reduce((total, position) => {
+            const dayPnl = Number(position.day_m2m) || 0;
+            return total + dayPnl;
+        }, 0);
+    };
+
+    return (
+        <Box sx={{ mb: 3 }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    mb: 1,
+                    cursor: 'pointer'
+                }}
+                onClick={() => setExpanded(!expanded)}
+            >
+                <Typography variant="h6">
+                    {underlying}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography variant="subtitle1" color={calculateDayPnL() >= 0 ? 'success.main' : 'error.main'}>
+                        Day: {formatCurrency(calculateDayPnL())}
+                    </Typography>
+                    <Typography variant="subtitle1" color={calculateTotalPnL() >= 0 ? 'success.main' : 'error.main'}>
+                        Total: {formatCurrency(calculateTotalPnL())}
+                    </Typography>
+                    <IconButton size="small">
+                        {expanded ? <ExpandLess /> : <ExpandMore />}
+                    </IconButton>
+                </Box>
+            </Box>
+
+            {expanded && (
+                <TableContainer component={Paper} elevation={0}>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Symbol</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Position Type</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Quantity</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Avg. Price</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>LTP</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day's P&L</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Total P&L</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Change %</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {positions.map((position) => {
+                                const isNegativeQuantity = position.quantity < 0;
+
+                                return (
+                                    <TableRow
+                                        key={position.tradingsymbol}
+                                        sx={{
+                                            backgroundColor: 'white',
+                                            '&:hover': {
+                                                backgroundColor: '#f5f5f5'
+                                            },
+                                            '&:last-child td': {
+                                                borderBottom: 0
+                                            }
+                                        }}
+                                    >
+                                        <TableCell sx={{ fontSize: '0.875rem' }}>{position.tradingsymbol}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={getPositionType(position.tradingsymbol)}
+                                                size="small"
+                                                sx={{
+                                                    backgroundColor: getPositionType(position.tradingsymbol) === 'Future' ? '#e3f2fd' : '#f3e5f5',
+                                                    color: getPositionType(position.tradingsymbol) === 'Future' ? '#1976d2' : '#9c27b0',
+                                                    fontSize: '0.75rem',
+                                                    height: '24px'
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                color: isNegativeQuantity ? 'error.main' : 'inherit',
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {position.quantity}
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {formatCurrency(position.average_price)}
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {formatCurrency(position.last_price)}
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                color: position.day_m2m >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 'bold',
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {formatCurrency(position.day_m2m)}
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                color: position.pnl >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 'bold',
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {formatCurrency(position.pnl)}
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{
+                                                color: position.pnl >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 'bold',
+                                                fontSize: '0.875rem',
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {formatPercentage(calculateChangePercentage(position))}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+        </Box>
+    );
+};
 
 const Positions = () => {
     const { positions, loading, error } = useZerodha();
 
-    // Debug log to see position data structure
-    React.useEffect(() => {
-        if (positions && positions.length > 0) {
-            console.log('Position data structure:', positions[0]);
-        }
+    const getUnderlyingSymbol = (tradingsymbol) => {
+        if (!tradingsymbol) return '';
+
+        const symbol = tradingsymbol.toUpperCase();
+        const match = symbol.match(/([A-Z]+)/);
+        return match ? match[1] : symbol;
+    };
+
+    // Group positions by underlying symbol and sort by position type
+    const groupedPositions = React.useMemo(() => {
+        const groups = {};
+        positions.forEach(position => {
+            const underlying = getUnderlyingSymbol(position.tradingsymbol);
+            if (!groups[underlying]) {
+                groups[underlying] = [];
+            }
+            groups[underlying].push(position);
+        });
+
+        // Sort positions within each group
+        Object.values(groups).forEach(group => {
+            group.sort((a, b) => {
+                const typeA = getPositionType(a.tradingsymbol);
+                const typeB = getPositionType(b.tradingsymbol);
+                if (typeA === typeB) {
+                    return a.tradingsymbol.localeCompare(b.tradingsymbol);
+                }
+                const typeOrder = { Future: 1, Option: 2, Stock: 3 };
+                return typeOrder[typeA] - typeOrder[typeB];
+            });
+        });
+
+        return groups;
     }, [positions]);
 
-    const formatCurrency = (value) => {
-        if (value === null || value === undefined || isNaN(value)) {
-            return '₹0.00';
-        }
-        return `₹${Number(value).toFixed(2)}`;
-    };
+    // Calculate overall total P&L
+    const totalPnL = positions.reduce((sum, pos) => {
+        const pnl = Number(pos.pnl) || 0;
+        return sum + (isNaN(pnl) ? 0 : pnl);
+    }, 0);
 
-    const formatPercentage = (value) => {
-        if (value === null || value === undefined || isNaN(value)) {
-            return '0.00%';
-        }
-        return `${Number(value).toFixed(2)}%`;
-    };
-
-    const calculateDayPnL = (position) => {
-        // Use day_m2m for day's P&L
-        return Number(position.day_m2m) || 0;
-    };
-
-    const calculateTotalPnL = (position) => {
-        // Use pnl (Profit and Loss) value directly from the API
-        return Number(position.pnl) || 0;
-    };
-
-    const calculateChangePercentage = (position) => {
-        const { last_price, close_price } = position;
-        if (!last_price || !close_price || close_price === 0) return 0;
-
-        return ((last_price - close_price) / close_price) * 100;
-    };
+    const dayPnL = positions.reduce((sum, pos) => {
+        const dayPnl = Number(pos.day_m2m) || 0;
+        return sum + (isNaN(dayPnl) ? 0 : dayPnl);
+    }, 0);
 
     if (loading) {
         return (
@@ -79,135 +286,35 @@ const Positions = () => {
                 <Typography variant="h5" component="h2" gutterBottom>
                     Open Positions
                 </Typography>
-                <Typography variant="body1" color="textSecondary">
-                    No open positions found.
+                <Typography variant="body1" color="textSecondary" align="center">
+                    No data available. Click &#39;Get Positions&#39; to load data.
                 </Typography>
             </Box>
         );
     }
 
-    const totalPnL = positions.reduce((sum, pos) => {
-        const pnl = calculateTotalPnL(pos);
-        return sum + (isNaN(pnl) ? 0 : pnl);
-    }, 0);
-
-    const dayPnL = positions.reduce((sum, pos) => {
-        const dayPnl = calculateDayPnL(pos);
-        return sum + (isNaN(dayPnl) ? 0 : dayPnl);
-    }, 0);
-
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" component="h2">
+            <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+                pb: 2,
+                borderBottom: '1px solid #e0e0e0'
+            }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 500 }}>
                     Open Positions
                 </Typography>
-                <Stack direction="row" spacing={2}>
-                    <Chip
-                        label={`Day's P&L: ${formatCurrency(dayPnL)}`}
-                        color={dayPnL >= 0 ? "success" : "error"}
-                        sx={{ fontWeight: 'bold' }}
-                    />
-                    <Chip
-                        label={`Total P&L: ${formatCurrency(totalPnL)}`}
-                        color={totalPnL >= 0 ? "success" : "error"}
-                        sx={{ fontWeight: 'bold' }}
-                    />
-                </Stack>
             </Box>
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Symbol</TableCell>
-                            <TableCell align="right">Quantity</TableCell>
-                            <TableCell align="right">Avg. Price</TableCell>
-                            <TableCell align="right">LTP</TableCell>
-                            <TableCell align="right">Current Value</TableCell>
-                            <TableCell align="right">Day's P&L</TableCell>
-                            <TableCell align="right">Total P&L</TableCell>
-                            <TableCell align="right">Change %</TableCell>
-                            <TableCell align="right">Product</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {positions.map((position) => {
-                            // Log each position's P&L related fields
-                            console.log(`P&L fields for ${position.tradingsymbol}:`, {
-                                m2m: position.m2m,
-                                pnl: position.pnl
-                            });
 
-                            const dayPnL = calculateDayPnL(position);
-                            const totalPnL = calculateTotalPnL(position);
-                            const changePercentage = calculateChangePercentage(position);
-                            const currentValue = Math.abs(position.quantity * position.last_price) || 0;
-
-                            return (
-                                <TableRow
-                                    key={`${position.tradingsymbol}-${position.product}`}
-                                    sx={{
-                                        backgroundColor: Number(position.quantity) < 0 ? 'error.lighter' : 'inherit'
-                                    }}
-                                >
-                                    <TableCell component="th" scope="row">
-                                        {position.tradingsymbol}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{
-                                        color: Number(position.quantity) < 0 ? 'error.main' : 'inherit',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        {position.quantity || 0}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {formatCurrency(position.average_price)}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {formatCurrency(position.last_price)}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        {formatCurrency(currentValue)}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {formatCurrency(dayPnL)}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: totalPnL >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {formatCurrency(totalPnL)}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: changePercentage >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        {formatPercentage(changePercentage)}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Chip
-                                            label={position.product}
-                                            size="small"
-                                            color={position.product === 'MIS' ? 'warning' : 'default'}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            {Object.entries(groupedPositions).map(([underlying, positions]) => (
+                <PositionTable
+                    key={underlying}
+                    positions={positions}
+                    underlying={underlying}
+                />
+            ))}
         </Box>
     );
 };

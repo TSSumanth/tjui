@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Table,
     TableBody,
@@ -15,9 +15,10 @@ import {
     Stack
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
+import PropTypes from 'prop-types';
 
 const Holdings = () => {
-    const { holdings, loading, error } = useZerodha();
+    const { holdings, isLoading, error } = useZerodha();
 
     const formatCurrency = (value) => {
         if (typeof value !== 'number' || isNaN(value)) {
@@ -38,14 +39,30 @@ const Holdings = () => {
         return `${value.toFixed(2)}%`;
     };
 
-    const calculateDayPnL = (holding) => {
-        const lastPrice = Number(holding.last_price) || 0;
-        const prevClose = Number(holding.previous_close) || lastPrice;
-        const quantity = Number(holding.quantity) || 0;
-        return (lastPrice - prevClose) * quantity;
-    };
+    const calculateDayPnL = useMemo(() => (holding) => {
+        try {
+            const lastPrice = Number(holding.last_price) || 0;
+            const prevClose = Number(holding.previous_close) || lastPrice;
+            const quantity = Number(holding.quantity) || 0;
+            return (lastPrice - prevClose) * quantity;
+        } catch (error) {
+            console.error('Error calculating day P&L:', error);
+            return 0;
+        }
+    }, []);
 
-    if (loading) {
+    const { totalPnL, dayPnL } = useMemo(() => {
+        return holdings.reduce((acc, holding) => {
+            const pnl = Number(holding.pnl) || 0;
+            const dayChange = calculateDayPnL(holding);
+            return {
+                totalPnL: acc.totalPnL + pnl,
+                dayPnL: acc.dayPnL + dayChange
+            };
+        }, { totalPnL: 0, dayPnL: 0 });
+    }, [holdings, calculateDayPnL]);
+
+    if (isLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
                 <CircularProgress />
@@ -61,85 +78,116 @@ const Holdings = () => {
         );
     }
 
-    if (!holdings.length) {
+    if (!holdings?.length) {
         return (
             <Box sx={{ textAlign: 'center', py: 3 }}>
                 <Typography variant="h5" component="h2" gutterBottom>
                     Stock Holdings
                 </Typography>
-                <Typography variant="body1" color="textSecondary">
-                    No holdings found.
+                <Typography variant="body1" color="textSecondary" align="center">
+                    No data available. Click Get Holdings to load data.
                 </Typography>
             </Box>
         );
     }
 
-    const totalPnL = holdings.reduce((sum, holding) => {
-        const pnl = Number(holding.pnl) || 0;
-        return sum + pnl;
-    }, 0);
-
-    const dayPnL = holdings.reduce((sum, holding) => {
-        const dayChange = calculateDayPnL(holding);
-        return sum + dayChange;
-    }, 0);
-
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" component="h2">
+            <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 3,
+                pb: 2,
+                borderBottom: '1px solid #e0e0e0'
+            }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 500 }}>
                     Stock Holdings
                 </Typography>
-                <Stack direction="row" spacing={2}>
-                    <Chip
-                        label={`Day's P&L: ${formatCurrency(dayPnL)}`}
-                        color={dayPnL >= 0 ? "success" : "error"}
-                        sx={{ fontWeight: 'bold' }}
-                    />
-                    <Chip
-                        label={`Total P&L: ${formatCurrency(totalPnL)}`}
-                        color={totalPnL >= 0 ? "success" : "error"}
-                        sx={{ fontWeight: 'bold' }}
-                    />
-                </Stack>
             </Box>
-            <TableContainer component={Paper}>
-                <Table>
+            <TableContainer component={Paper} elevation={0}>
+                <Table size="small">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Symbol</TableCell>
-                            <TableCell align="right">Quantity</TableCell>
-                            <TableCell align="right">Avg. Cost</TableCell>
-                            <TableCell align="right">LTP</TableCell>
-                            <TableCell align="right">Current Value</TableCell>
-                            <TableCell align="right">Day's P&L</TableCell>
-                            <TableCell align="right">Total P&L</TableCell>
-                            <TableCell align="right">Day Change %</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Symbol</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Quantity</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Avg. Cost</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>LTP</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Current Value</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day's P&L</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Total P&L</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day Change %</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {holdings.map((holding) => {
                             const dayPnL = calculateDayPnL(holding);
+                            const currentValue = Number(holding.quantity) * Number(holding.last_price);
+                            const dayChangePercentage = Number(holding.day_change_percentage);
+
                             return (
-                                <TableRow key={holding.tradingsymbol}>
-                                    <TableCell component="th" scope="row">
+                                <TableRow
+                                    key={holding.tradingsymbol}
+                                    sx={{
+                                        backgroundColor: 'white',
+                                        '&:hover': {
+                                            backgroundColor: '#f5f5f5'
+                                        },
+                                        '&:last-child td': {
+                                            borderBottom: 0
+                                        }
+                                    }}
+                                >
+                                    <TableCell
+                                        component="th"
+                                        scope="row"
+                                        sx={{ fontSize: '0.875rem' }}
+                                    >
                                         {holding.tradingsymbol}
                                     </TableCell>
-                                    <TableCell align="right">{holding.quantity}</TableCell>
-                                    <TableCell align="right">
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
+                                        }}
+                                    >
+                                        {holding.quantity}
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
+                                        }}
+                                    >
                                         {formatCurrency(Number(holding.average_price))}
                                     </TableCell>
-                                    <TableCell align="right">
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
+                                        }}
+                                    >
                                         {formatCurrency(Number(holding.last_price))}
                                     </TableCell>
-                                    <TableCell align="right">
-                                        {formatCurrency(Number(holding.quantity) * Number(holding.last_price))}
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
+                                        }}
+                                    >
+                                        {formatCurrency(currentValue)}
                                     </TableCell>
                                     <TableCell
                                         align="right"
                                         sx={{
                                             color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold'
+                                            fontWeight: 'bold',
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
                                         }}
                                     >
                                         {formatCurrency(dayPnL)}
@@ -148,7 +196,9 @@ const Holdings = () => {
                                         align="right"
                                         sx={{
                                             color: Number(holding.pnl) >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold'
+                                            fontWeight: 'bold',
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
                                         }}
                                     >
                                         {formatCurrency(Number(holding.pnl))}
@@ -156,13 +206,13 @@ const Holdings = () => {
                                     <TableCell
                                         align="right"
                                         sx={{
-                                            color: Number(holding.day_change_percentage) >= 0
-                                                ? 'success.main'
-                                                : 'error.main',
-                                            fontWeight: 'bold'
+                                            color: dayChangePercentage >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 'bold',
+                                            fontSize: '0.875rem',
+                                            fontFamily: 'monospace'
                                         }}
                                     >
-                                        {formatPercentage(Number(holding.day_change_percentage))}
+                                        {formatPercentage(dayChangePercentage)}
                                     </TableCell>
                                 </TableRow>
                             );
@@ -172,6 +222,18 @@ const Holdings = () => {
             </TableContainer>
         </Box>
     );
+};
+
+Holdings.propTypes = {
+    holdings: PropTypes.arrayOf(PropTypes.shape({
+        tradingsymbol: PropTypes.string.isRequired,
+        quantity: PropTypes.number.isRequired,
+        average_price: PropTypes.number.isRequired,
+        last_price: PropTypes.number.isRequired,
+        pnl: PropTypes.number,
+        day_change_percentage: PropTypes.number,
+        previous_close: PropTypes.number
+    }))
 };
 
 export default Holdings; 

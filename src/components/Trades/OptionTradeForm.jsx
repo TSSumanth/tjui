@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { format, parseISO } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
-import { addOptionOrder, getTradeOptionOrders, updateOptionOrder, deleteAllTradeOptionOrders, deleteTradeOptionOrder } from '../../services/orders.js'
-import { updateStrategy, getStrategies, deleteStrategy } from '../../services/strategies';
+import { addOptionOrder, getTradeOptionOrders, deleteTradeOptionOrder, updateOptionOrder, deleteAllTradeOptionOrders } from '../../services/orders.js'
+import { updateStrategy, getStrategies } from '../../services/strategies';
 import { deleteOptionTrade } from '../../services/trades.js'
 import { AlertPopup, ConfirmPopup } from '../Generic/Popup.jsx'
 import {
@@ -27,9 +26,8 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Typography,
     IconButton,
-    Tooltip
+    Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -48,7 +46,7 @@ const getCurrentDateTime = () => {
 function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
-    const [newTradeId, setNewTradeId] = useState(uuidv4());
+    const [newTradeId] = useState(uuidv4());
     const [activeTab, setActiveTab] = useState(0);
     const [showOrderFailedAlertPopup, setShowOrderFailedAlertPopup] = useState(false);
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
@@ -59,9 +57,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
     const [tradeDetails, setTradeDetails] = useState(currentTrade || {
         tradeid: "",
         asset: "",
-        lotsize: "",
-        premiumamount: 0,
-        tradetype: "LONG",
+        tradetype: "Long",
         quantity: 0,
         entryprice: 0,
         capitalused: 0,
@@ -76,7 +72,11 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         lastmodifieddate: "",
         notes: "",
         tags: "",
-        ltp: 0
+        ltp: 0,
+        lotsize: 0,
+        strike: 0,
+        expiry: "",
+        optiontype: "Call"
     });
 
     useEffect(() => {

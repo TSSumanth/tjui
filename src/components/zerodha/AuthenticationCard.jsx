@@ -6,7 +6,7 @@ import {
     Box,
     Chip
 } from '@mui/material';
-import { getLoginUrl, isAuthenticated, logout } from '../../services/zerodha/authentication';
+import { isAuthenticated, logout, getLoginUrl, handleLoginCallback } from '../../services/zerodha/authentication';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 
@@ -18,14 +18,25 @@ const AuthenticationCard = () => {
     React.useEffect(() => {
         setIsLoggedIn(isAuthenticated());
 
-        const handleMessage = (event) => {
+        const handleMessage = async (event) => {
             if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
-                const { access_token, public_token } = event.data.data;
-                console.log('Authentication successful:', { access_token, public_token });
-                localStorage.setItem('zerodha_access_token', access_token);
-                localStorage.setItem('zerodha_public_token', public_token);
-                setIsLoggedIn(true);
-                setIsLoading(false);
+                try {
+                    const { access_token, public_token } = event.data.data;
+                    console.log('Authentication successful:', { access_token, public_token });
+
+                    // Store tokens and update state
+                    localStorage.setItem('zerodha_access_token', access_token);
+                    localStorage.setItem('zerodha_public_token', public_token);
+                    setIsLoggedIn(true);
+                    setIsLoading(false);
+
+                    // Handle the login callback
+                    await handleLoginCallback({ request_token: access_token });
+                } catch (error) {
+                    console.error('Error handling authentication:', error);
+                    setError('Failed to complete authentication');
+                    setIsLoading(false);
+                }
             } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
                 console.error('Authentication failed:', event.data.error);
                 setError(event.data.error || 'Authentication failed');

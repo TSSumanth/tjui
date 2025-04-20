@@ -10,104 +10,20 @@ import {
     Alert,
     Chip,
     Divider,
-    IconButton,
-    Tooltip,
     useTheme,
-    useMediaQuery,
     Dialog,
-    List,
-    ListItem,
-    ListItemText,
-    CardActions
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
-import { getOpenStrategies, updateStrategy, getStrategies } from '../../services/strategies';
+import { updateStrategy, getOpenStrategies } from '../../services/strategies';
 import { getStockTradesbyId, getOptionTradesbyId, addNewOptionTrade, addNewStockTrade, updateStockTrade, updateOptionTrade } from '../../services/trades';
 import { StockTradeForm } from "../Trades/StockTradeForm.jsx";
 import OptionTradeForm from "../Trades/OptionTradeForm.jsx";
 
-const AssetCard = ({ asset }) => {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    const isPLPositive = asset.realizedPL >= 0;
-    const displayQuantity = asset.lotSize ? (asset.openQuantity / asset.lotSize) : asset.openQuantity;
-    const isOpen = asset.status === 'OPEN';
-
-    return (
-        <Box
-            sx={{
-                p: 2.5,
-                bgcolor: theme.palette.background.paper,
-                borderRadius: 2,
-                boxShadow: 1,
-                height: '100%',
-                minHeight: '120px',
-                width: '100%',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 3,
-                }
-            }}
-        >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                <ShowChartIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: "bold", flexGrow: 1, mr: 2 }}>
-                    {asset.assetName}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip
-                        label={`${displayQuantity} units`}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        sx={{ minWidth: '80px' }}
-                    />
-                    <Chip
-                        label={isOpen ? "Open" : "Closed"}
-                        size="small"
-                        color={isOpen ? "success" : "error"}
-                        variant="outlined"
-                        sx={{ minWidth: '70px' }}
-                    />
-                </Box>
-            </Box>
-            <Divider sx={{ my: 1.5 }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                    Realized P/L
-                </Typography>
-                <Typography
-                    variant="body1"
-                    sx={{
-                        fontWeight: 'bold',
-                        color: isPLPositive ? theme.palette.success.main : theme.palette.error.main
-                    }}
-                >
-                    {isPLPositive ? '+' : ''}₹{asset.realizedPL.toLocaleString('en-IN')}
-                </Typography>
-            </Box>
-            {asset.lotSize && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
-                    <Typography variant="body2" color="text.secondary">
-                        Lot Size
-                    </Typography>
-                    <Typography variant="body2">
-                        {asset.lotSize} units
-                    </Typography>
-                </Box>
-            )}
-        </Box>
-    );
-};
-
 const StrategyCard = ({ strategy }) => {
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [showCreateStockTrade, setShowCreateStockTrade] = useState(false);
     const [showCreateOptionTrade, setShowCreateOptionTrade] = useState(false);
     const [showUpdateTrade, setShowUpdateTrade] = useState(false);
@@ -115,12 +31,10 @@ const StrategyCard = ({ strategy }) => {
     const [trades, setTrades] = useState([]);
     const [loading, setLoading] = useState(true);
     const [overallReturn, setOverallReturn] = useState(0);
-    const [error, setError] = useState(null);
 
     const fetchTrades = async () => {
         try {
             setLoading(true);
-            setError(null);
 
             // Get trade IDs from the strategy object
             const stockTradeIds = strategy.stock_trades || [];
@@ -215,29 +129,17 @@ const StrategyCard = ({ strategy }) => {
             }, 0));
         } catch (error) {
             console.error('Error in fetchTrades:', error);
-            setError('Failed to fetch trades. Please try again later.');
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchTrades();
-    }, [strategy]);
-
     const handleStockTradeSubmit = async (tradeDetails) => {
         try {
             const response = await addNewStockTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
-                // Update strategy with new stock trade ID
-                const updatedStrategy = await getStrategies({ id: strategy.id });
-                if (updatedStrategy && updatedStrategy.length > 0) {
-                    const currentStrategy = updatedStrategy[0];
-                    currentStrategy.stock_trades = [...(currentStrategy.stock_trades || []), response.data.tradeid];
-                    await updateStrategy(currentStrategy);
-                }
+                await updateStrategy(strategy.id, { stock_trades: [...(strategy.stock_trades || []), response.data.tradeid] });
                 setShowCreateStockTrade(false);
-                // Refresh trades after adding new trade
                 fetchTrades();
             }
         } catch (error) {
@@ -249,15 +151,8 @@ const StrategyCard = ({ strategy }) => {
         try {
             const response = await addNewOptionTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
-                // Update strategy with new option trade ID
-                const updatedStrategy = await getStrategies({ id: strategy.id });
-                if (updatedStrategy && updatedStrategy.length > 0) {
-                    const currentStrategy = updatedStrategy[0];
-                    currentStrategy.option_trades = [...(currentStrategy.option_trades || []), response.data.tradeid];
-                    await updateStrategy(currentStrategy);
-                }
+                await updateStrategy(strategy.id, { option_trades: [...(strategy.option_trades || []), response.data.tradeid] });
                 setShowCreateOptionTrade(false);
-                // Refresh trades after adding new trade
                 fetchTrades();
             }
         } catch (error) {

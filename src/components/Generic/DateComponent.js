@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { format, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, getYear, getMonth, parseISO, isValid } from 'date-fns';
+import { format, getDaysInMonth, startOfMonth, getDay, addMonths, subMonths, getYear, getMonth } from 'date-fns';
 import './DateComponent.css'; // Create a CSS file for styling
 
 const DateComponent = ({ initialDate, onDateSelect }) => {

@@ -6,15 +6,15 @@ import {
     DialogActions,
     Button,
     TextField,
-    Select,
     MenuItem,
+    Box,
     FormControl,
     InputLabel,
-    Box
+    Select,
 } from "@mui/material";
 import DateTimePicker from "../Generic/DateTimeComponent";
 
-function OrderForm({ title, onSubmit, onCancel, updateOrderdetails, open }) {
+function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
     const [orderDetails, setOrderDetails] = useState(updateOrderdetails || {
         ordertype: "Buy",
         quantity: "",

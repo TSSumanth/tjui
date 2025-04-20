@@ -32,12 +32,11 @@ const NotesEditor = ({ initialValue = '', onChange }) => {
         'size'
     ];
 
-    const handleNotesChange = (content, delta, source, editor) => {
+    const handleChange = (content) => {
         setNotes(content);
-        if (onChange) {
-            onChange(content); // Notify parent component of changes
-        }
+        onChange(content);
     };
+
     useEffect(() => {
         if (quillRef.current) {
             const quill = quillRef.current.getEditor();
@@ -49,7 +48,7 @@ const NotesEditor = ({ initialValue = '', onChange }) => {
         <ReactQuill
             ref={quillRef}
             value={notes}
-            onChange={handleNotesChange}
+            onChange={handleChange}
             modules={modules}
             formats={formats}
             // style={{ height: '100px', marginBottom: '10px' }} // Adjusted height

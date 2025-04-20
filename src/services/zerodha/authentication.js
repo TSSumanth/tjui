@@ -8,11 +8,8 @@ const apiKey = process.env.REACT_APP_ZERODHA_API_KEY;
 export const getLoginUrl = async () => {
     try {
         // Get the login URL from our backend
-        await zerodhaApi.getLoginUrl();
-
-        // Construct the Zerodha login URL with our callback
-        const redirectUrl = encodeURIComponent('http://localhost:5001/api/zerodha/login');
-        return `https://kite.trade/connect/login?api_key=${apiKey}&redirect_url=${redirectUrl}`;
+        const response = await zerodhaApi.getLoginUrl();
+        return response.data.loginUrl;
     } catch (error) {
         console.error('Error generating login URL:', error);
         throw error;
@@ -26,6 +23,7 @@ export const handleLoginCallback = async (params) => {
         if (response.data.access_token) {
             localStorage.setItem('zerodha_access_token', response.data.access_token);
             localStorage.setItem('zerodha_public_token', response.data.public_token);
+            window.location.reload(); // Reload to update the UI
         }
         return response.data;
     } catch (error) {
@@ -48,6 +46,7 @@ export const isAuthenticated = () => {
 export const logout = () => {
     localStorage.removeItem('zerodha_access_token');
     localStorage.removeItem('zerodha_public_token');
+    window.location.reload(); // Reload to update the UI
 };
 
 // Function to initialize KiteConnect with stored access token

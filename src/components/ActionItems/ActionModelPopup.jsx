@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import LovComponent from '../Generic/LOVComponent'
 import './ActionModelPopup.css'
 
@@ -28,7 +28,7 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                         <form className='action-items-model-form'>
                             <div>
                                 <label className="label-field" name='status'>Status </label>
-                                <LovComponent type="text" name="name" className="form-input" options={["TODO", "COMPLETED"]} placeholder="Select a Status" onSelect={setStatus}/>
+                                <LovComponent type="text" name="name" className="form-input" options={["TODO", "COMPLETED"]} placeholder="Select a Status" onSelect={setStatus} />
                             </div>
                             <div>
                                 <label className="label-field" name='description'>Description </label>

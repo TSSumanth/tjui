@@ -1,34 +1,75 @@
 import axios from 'axios';
-import { getAccessToken } from './authentication';
 
-const BASE_URL = 'http://localhost:5001/api/zerodha';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
 
-const zerodhaApi = axios.create({
+// Create axios instance with base configuration
+const api = axios.create({
     baseURL: BASE_URL,
     headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
     },
-    withCredentials: true // Important for handling cookies if needed
+    withCredentials: true,
+    mode: 'cors'
 });
 
-// Add authorization header interceptor
-zerodhaApi.interceptors.request.use(
-    (config) => {
-        const token = getAccessToken();
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
+// Add request interceptor to include auth tokens
+api.interceptors.request.use((config) => {
+    const accessToken = localStorage.getItem('zerodha_access_token');
+    const publicToken = localStorage.getItem('zerodha_public_token');
+
+    if (accessToken && publicToken) {
+        config.headers['Authorization'] = `Bearer ${accessToken}`;
+        config.headers['X-Zerodha-Public-Token'] = publicToken;
+    }
+
+    return config;
+});
+
+// Add response interceptor to handle errors
+api.interceptors.response.use(
+    (response) => response,
     (error) => {
+        if (error.response?.status === 403) {
+            console.error('Access denied:', error.response.data);
+        }
         return Promise.reject(error);
     }
 );
 
-export const getLoginUrl = () => zerodhaApi.get('/login-url');
-export const handleCallback = (params) => zerodhaApi.get(`/login?${new URLSearchParams(params)}`);
-export const getProfile = () => zerodhaApi.get('/profile');
-export const getHoldings = () => zerodhaApi.get('/holdings');
-export const getPositions = () => zerodhaApi.get('/positions');
+// API endpoints
+export const getLoginUrl = async () => {
+    const response = await api.get('/api/zerodha/login-url');
+    return response.data;
+};
 
-export default zerodhaApi; 
+export const handleCallback = async (params) => {
+    const response = await api.get('/api/zerodha/login', { params });
+    return response.data;
+};
+
+export const getHoldings = async () => {
+    const response = await api.get('/api/zerodha/holdings');
+    return response.data;
+};
+
+export const getPositions = async () => {
+    const response = await api.get('/api/zerodha/positions');
+    return response.data;
+};
+
+export const getOrders = async () => {
+    const response = await api.get('/api/zerodha/orders');
+    return response.data;
+};
+
+export const isAuthenticated = () => {
+    return !!(localStorage.getItem('zerodha_access_token') && localStorage.getItem('zerodha_public_token'));
+};
+
+export const logout = () => {
+    localStorage.removeItem('zerodha_access_token');
+    localStorage.removeItem('zerodha_public_token');
+};
+
+export default api; 
