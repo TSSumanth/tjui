@@ -226,43 +226,19 @@ const Positions = () => {
         return match ? match[1] : symbol;
     };
 
-    // Group positions by underlying symbol and sort by position type
-    const groupedPositions = React.useMemo(() => {
-        const groups = {};
-        positions.forEach(position => {
-            const underlying = getUnderlyingSymbol(position.tradingsymbol);
-            if (!groups[underlying]) {
-                groups[underlying] = [];
-            }
-            groups[underlying].push(position);
-        });
-
-        // Sort positions within each group
-        Object.values(groups).forEach(group => {
-            group.sort((a, b) => {
-                const typeA = getPositionType(a.tradingsymbol);
-                const typeB = getPositionType(b.tradingsymbol);
-                if (typeA === typeB) {
-                    return a.tradingsymbol.localeCompare(b.tradingsymbol);
-                }
-                const typeOrder = { Future: 1, Option: 2, Stock: 3 };
-                return typeOrder[typeA] - typeOrder[typeB];
-            });
-        });
-
+    // Group positions by underlying
+    const groupedPositions = positions.reduce((groups, position) => {
+        const underlying = getUnderlyingSymbol(position.tradingsymbol);
+        if (!groups[underlying]) {
+            groups[underlying] = [];
+        }
+        groups[underlying].push(position);
         return groups;
-    }, [positions]);
+    }, {});
 
-    // Calculate overall total P&L
-    const totalPnL = positions.reduce((sum, pos) => {
-        const pnl = Number(pos.pnl) || 0;
-        return sum + (isNaN(pnl) ? 0 : pnl);
-    }, 0);
-
-    const dayPnL = positions.reduce((sum, pos) => {
-        const dayPnl = Number(pos.day_m2m) || 0;
-        return sum + (isNaN(dayPnl) ? 0 : dayPnl);
-    }, 0);
+    // Calculate overall P&L
+    const overallPnL = positions.reduce((total, position) => total + (Number(position.pnl) || 0), 0);
+    const overallDayPnL = positions.reduce((total, position) => total + (Number(position.day_m2m) || 0), 0);
 
     if (loading) {
         return (
@@ -284,10 +260,10 @@ const Positions = () => {
         return (
             <Box sx={{ textAlign: 'center', py: 3 }}>
                 <Typography variant="h5" component="h2" gutterBottom>
-                    Open Positions
+                    Positions
                 </Typography>
                 <Typography variant="body1" color="textSecondary" align="center">
-                    No data available. Click &#39;Get Positions&#39; to load data.
+                    No positions available.
                 </Typography>
             </Box>
         );
@@ -304,7 +280,7 @@ const Positions = () => {
                 borderBottom: '1px solid #e0e0e0'
             }}>
                 <Typography variant="h5" component="h2" sx={{ fontWeight: 500 }}>
-                    Open Positions
+                    Positions
                 </Typography>
             </Box>
 

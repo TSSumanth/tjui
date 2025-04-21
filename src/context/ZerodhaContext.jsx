@@ -28,7 +28,7 @@ export const useZerodha = () => {
 };
 
 export const ZerodhaProvider = ({ children }) => {
-    const [isLoading, setIsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState([]);
@@ -39,7 +39,7 @@ export const ZerodhaProvider = ({ children }) => {
     const fetchData = useCallback(async () => {
         if (!isAuth) return;
 
-        setIsLoading(true);
+        setLoading(true);
         setError(null);
 
         try {
@@ -59,7 +59,7 @@ export const ZerodhaProvider = ({ children }) => {
                 handleLogout();
             }
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     }, [isAuth]);
 
@@ -80,16 +80,27 @@ export const ZerodhaProvider = ({ children }) => {
 
         const checkAndFetch = () => {
             if (isAuth) {
+                const isMarketOpen = isMarketHours();
+                console.log('Market status check:', {
+                    isMarketOpen,
+                    currentTime: new Date().toLocaleTimeString(),
+                    isInitialLoad,
+                    isAutoSync
+                });
+
                 if (isInitialLoad) {
                     // Always fetch on initial load
+                    console.log('Performing initial data fetch');
                     fetchData();
                     isInitialLoad = false;
-                    setIsAutoSync(isMarketHours());  // Set auto-sync status based on market hours
-                } else if (isMarketHours()) {
+                    setIsAutoSync(isMarketOpen);
+                } else if (isMarketOpen) {
                     // Only auto-fetch during market hours after initial load
+                    console.log('Auto-fetching data during market hours');
                     fetchData();
                     setIsAutoSync(true);
                 } else {
+                    console.log('Market is closed, stopping auto-sync');
                     setIsAutoSync(false);
                 }
             }
@@ -102,7 +113,7 @@ export const ZerodhaProvider = ({ children }) => {
             // Set up interval to check market hours and fetch data
             interval = setInterval(() => {
                 checkAndFetch();
-            }, 60000); // Check every minute
+            }, 30000); // Check every 30 seconds instead of every minute
         }
 
         return () => {
@@ -111,10 +122,10 @@ export const ZerodhaProvider = ({ children }) => {
             }
             setIsAutoSync(false);
         };
-    }, [isAuth, fetchData]);
+    }, [isAuth, fetchData, isAutoSync]);
 
     const value = {
-        isLoading,
+        loading,
         error,
         holdings,
         positions,
@@ -123,7 +134,7 @@ export const ZerodhaProvider = ({ children }) => {
         setIsAuth,
         fetchData,
         handleLogout,
-        isAutoSync // Add this to context so we can show sync status
+        isAutoSync
     };
 
     return (

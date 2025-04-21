@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5001/api";
+const BASE_URL = "http://localhost:5003/api";
 
 export const API_URLS = {
     STRATEGIES: `${BASE_URL}/strategies`,

@@ -46,19 +46,25 @@ export const getStrategies = async (filter) => {
     }
 };
 
-export const updateStrategy = async (e) => {
+export const updateStrategy = async (id, data = null) => {
     try {
-        const response = await axios.patch(API_URLS.STRATEGIES, e, {
+        // If only one argument is passed and it's an object, use it as the data
+        const updateData = data || id;
+        const strategyId = data ? id : updateData.id;
+
+        const response = await axios.patch(API_URLS.STRATEGIES, updateData, {
             params: {
-                id: e.id
+                id: strategyId
             }
         });
-        if (!(response.status === 200)) {
-            return false;
+
+        if (response.status === 200) {
+            return true;
         }
-        return true;
-    } catch (e) {
-        throw new Error(e)
+        return false;
+    } catch (error) {
+        console.error('Error updating strategy:', error);
+        throw error;
     }
 };
 

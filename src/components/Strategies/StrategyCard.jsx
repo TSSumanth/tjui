@@ -31,10 +31,18 @@ const StrategyCard = ({ strategy }) => {
     const [trades, setTrades] = useState([]);
     const [loading, setLoading] = useState(true);
     const [overallReturn, setOverallReturn] = useState(0);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        if (strategy?.id) {
+            fetchTrades();
+        }
+    }, [strategy?.id]);
 
     const fetchTrades = async () => {
         try {
             setLoading(true);
+            setError(null);
 
             // Get trade IDs from the strategy object
             const stockTradeIds = strategy.stock_trades || [];
@@ -129,6 +137,7 @@ const StrategyCard = ({ strategy }) => {
             }, 0));
         } catch (error) {
             console.error('Error in fetchTrades:', error);
+            setError("Failed to fetch trades. Please try again later.");
         } finally {
             setLoading(false);
         }
@@ -136,27 +145,35 @@ const StrategyCard = ({ strategy }) => {
 
     const handleStockTradeSubmit = async (tradeDetails) => {
         try {
+            setError(null);
             const response = await addNewStockTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
                 await updateStrategy(strategy.id, { stock_trades: [...(strategy.stock_trades || []), response.data.tradeid] });
                 setShowCreateStockTrade(false);
                 fetchTrades();
+            } else {
+                setError("Failed to create stock trade. Please try again.");
             }
         } catch (error) {
             console.error("Error creating stock trade:", error);
+            setError(error.response?.data?.message || "Failed to create stock trade. Please try again.");
         }
     };
 
     const handleOptionTradeSubmit = async (tradeDetails) => {
         try {
+            setError(null);
             const response = await addNewOptionTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
                 await updateStrategy(strategy.id, { option_trades: [...(strategy.option_trades || []), response.data.tradeid] });
                 setShowCreateOptionTrade(false);
                 fetchTrades();
+            } else {
+                setError("Failed to create option trade. Please try again.");
             }
         } catch (error) {
             console.error("Error creating option trade:", error);
+            setError(error.response?.data?.message || "Failed to create option trade. Please try again.");
         }
     };
 
@@ -189,17 +206,23 @@ const StrategyCard = ({ strategy }) => {
 
     const handleUpdateTrade = async (updatedTrade) => {
         try {
+            setError(null);
             console.log('Updating trade:', updatedTrade);
+            let response;
             if (selectedTrade.lotsize === undefined) {
-                await updateStockTrade(updatedTrade);
+                response = await updateStockTrade(updatedTrade);
             } else {
-                await updateOptionTrade(updatedTrade);
+                response = await updateOptionTrade(updatedTrade);
             }
-            // Refresh trades after update
-            fetchTrades();
-            setShowUpdateTrade(false);
+            if (response?.created) {
+                fetchTrades();
+                setShowUpdateTrade(false);
+            } else {
+                setError("Failed to update trade. Please try again.");
+            }
         } catch (error) {
             console.error('Error updating trade:', error);
+            setError(error.response?.data?.message || "Failed to update trade. Please try again.");
         }
     };
 
@@ -362,6 +385,11 @@ const StrategyCard = ({ strategy }) => {
                             </Button>
                         </Box>
                     </Box>
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 3 }}>
+                            {error}
+                        </Alert>
+                    )}
                     {loading ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                             <CircularProgress size={24} />

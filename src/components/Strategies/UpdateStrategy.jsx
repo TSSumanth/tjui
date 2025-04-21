@@ -10,17 +10,27 @@ import {
 import { getStrategies, updateStrategy } from "../../services/strategies";
 import StrategyForm from "./StrategyForm";
 
-function UpdateStrategy() {
+function UpdateStrategy({ id }) {
     const [strategy, setStrategy] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const fetchStrategy = async () => {
+        if (!id) {
+            setError("No strategy ID provided");
+            return;
+        }
+
         setLoading(true);
         setError(null);
         try {
             const data = await getStrategies();
-            setStrategy(data[0]);
+            const foundStrategy = data.find(s => s.id === parseInt(id));
+            if (foundStrategy) {
+                setStrategy(foundStrategy);
+            } else {
+                setError("Strategy not found");
+            }
         } catch (err) {
             console.error("Error fetching data:", err);
             setError("Failed to load strategy data.");
@@ -31,44 +41,42 @@ function UpdateStrategy() {
 
     useEffect(() => {
         fetchStrategy();
-    }, []);
+    }, [id]); // Add id as a dependency
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Box p={4}>
+                <Alert severity="error">{error}</Alert>
+            </Box>
+        );
+    }
 
     return (
         <Box p={4}>
-            {/* Title */}
             <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Update Strategy
             </Typography>
 
-            {/* Search Section */}
-            <Paper sx={{ p: 1, mb: 1 }}>
-                <Typography variant="h6" fontWeight="bold" mb={1}>
-                    Search Strategy
-                </Typography>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => fetchStrategy()}
-                    disabled={loading}
-                    sx={{ minWidth: "150px" }}
-                >
-                    {loading ? <CircularProgress size={24} /> : "Get Strategy"}
-                </Button>
-            </Paper>
-            {/* Error Handling */}
-            {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
-                    {error}
-                </Alert>
-            )}
-
-            {/* Strategy Form */}
-            {strategy && (
+            {strategy ? (
                 <StrategyForm
                     key={JSON.stringify(strategy)}
                     initialData={strategy}
                     onSubmit={updateStrategy}
                 />
+            ) : (
+                <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography color="text.secondary">
+                        No strategy data available
+                    </Typography>
+                </Paper>
             )}
         </Box>
     );

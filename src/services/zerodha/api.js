@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5003';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -60,6 +60,11 @@ export const getPositions = async () => {
 
 export const getOrders = async () => {
     const response = await api.get('/api/zerodha/orders');
+    return response.data;
+};
+
+export const getInstruments = async () => {
+    const response = await api.get('/api/zerodha/instruments');
     return response.data;
 };
 

@@ -18,7 +18,15 @@ import { useZerodha } from '../../context/ZerodhaContext';
 import PropTypes from 'prop-types';
 
 const Holdings = () => {
-    const { holdings, isLoading, error } = useZerodha();
+    const { holdings, loading, error } = useZerodha();
+
+    // Add debug logging
+    console.log('Holdings Component:', {
+        loading,
+        error,
+        holdingsData: holdings,
+        holdingsCount: holdings?.length
+    });
 
     const formatCurrency = (value) => {
         if (typeof value !== 'number' || isNaN(value)) {
@@ -44,15 +52,25 @@ const Holdings = () => {
             const lastPrice = Number(holding.last_price) || 0;
             const prevClose = Number(holding.previous_close) || lastPrice;
             const quantity = Number(holding.quantity) || 0;
-            return (lastPrice - prevClose) * quantity;
+            const dayPnL = (lastPrice - prevClose) * quantity;
+
+            console.log('Day P&L calculation:', {
+                symbol: holding.tradingsymbol,
+                lastPrice,
+                prevClose,
+                quantity,
+                dayPnL
+            });
+
+            return dayPnL;
         } catch (error) {
             console.error('Error calculating day P&L:', error);
             return 0;
         }
     }, []);
 
-    const { totalPnL, dayPnL } = useMemo(() => {
-        return holdings.reduce((acc, holding) => {
+    const { totalPnL: calculatedTotalPnL, dayPnL: calculatedDayPnL } = useMemo(() => {
+        const result = holdings.reduce((acc, holding) => {
             const pnl = Number(holding.pnl) || 0;
             const dayChange = calculateDayPnL(holding);
             return {
@@ -60,9 +78,17 @@ const Holdings = () => {
                 dayPnL: acc.dayPnL + dayChange
             };
         }, { totalPnL: 0, dayPnL: 0 });
+
+        console.log('Total P&L calculations:', {
+            holdingsCount: holdings.length,
+            totalPnL: result.totalPnL,
+            dayPnL: result.dayPnL
+        });
+
+        return result;
     }, [holdings, calculateDayPnL]);
 
-    if (isLoading) {
+    if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
                 <CircularProgress />
