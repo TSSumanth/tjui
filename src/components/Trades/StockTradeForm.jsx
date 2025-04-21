@@ -253,8 +253,10 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             }
             if (strategyid !== undefined) {
                 let response2 = await getStrategies({ id: strategyid })
-                response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
-                await updateStrategy(response2[0])
+                if (response2 && response2[0] && Array.isArray(response2[0].option_trades)) {
+                    response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
+                    await updateStrategy(response2[0])
+                }
             }
         } else {
             setShowTradeDeleteConfirmPopup(false)

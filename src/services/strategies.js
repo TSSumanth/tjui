@@ -36,13 +36,20 @@ export const getStrategies = async (filter) => {
         const response = await axios.get(API_URLS.STRATEGIES, {
             params: filter
         });
-        if (!(response.status === 200)) {
-            return [];
+
+        if (response.status === 200) {
+            console.log('Raw API response:', response.data);
+            return response.data;
         }
-        return response.data;
-    } catch (e) {
-        console.error(e)
-        return []
+
+        console.warn('Unexpected response status:', response.status);
+        return null;
+    } catch (error) {
+        console.error('Error fetching strategies:', error);
+        if (error.response?.status === 404) {
+            return null;
+        }
+        throw error;
     }
 };
 

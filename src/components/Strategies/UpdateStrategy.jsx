@@ -114,69 +114,69 @@ function UpdateStrategy({ id }) {
         }
     }, []);
 
-    const fetchTrades = useCallback(async (strategyData) => {
-        if (!strategyData) return;
+    const fetchTrades = useCallback(async () => {
+        console.log('fetchTrades called with strategy:', strategy);
+        if (!strategy) {
+            console.log('No strategy data available, skipping trade fetch');
+            return;
+        }
 
         try {
-            const stockTradeIds = strategyData.stock_trades || [];
-            const optionTradeIds = strategyData.option_trades || [];
-            console.log('Fetching trades for strategy:', strategyData.id);
-            console.log('Stock trade IDs:', stockTradeIds);
-            console.log('Option trade IDs:', optionTradeIds);
+            const stockTradeIds = Array.isArray(strategy.stock_trades) ? strategy.stock_trades : [];
+            const optionTradeIds = Array.isArray(strategy.option_trades) ? strategy.option_trades : [];
 
-            let allTrades = [];
-            let totalReturn = 0;
+            console.log('Fetching trades with IDs:', { stockTradeIds, optionTradeIds });
+
+            let stockTradesData = [];
+            let optionTradesData = [];
+            let overallReturn = 0;
 
             if (stockTradeIds.length > 0) {
-                const stockTrades = await getStockTradesbyId(stockTradeIds);
-                const formattedStockTrades = stockTrades.map(trade => ({
-                    ...trade,
-                    entrydate: moment(trade.entrydate).format("YYYY-MM-DD"),
-                    exitdate: trade.exitdate ? moment(trade.exitdate).format("YYYY-MM-DD") : null,
-                    lastmodifieddate: trade.lastmodifieddate ? moment(trade.lastmodifieddate).format("YYYY-MM-DD") : null,
-                    type: 'stock'
-                }));
-                setStockTrades(formattedStockTrades);
-                allTrades = [...allTrades, ...formattedStockTrades];
-                totalReturn += formattedStockTrades.reduce((sum, trade) => sum + (parseFloat(trade.overallreturn) || 0), 0);
+                stockTradesData = await getStockTradesbyId(stockTradeIds);
+                console.log('Fetched stock trades:', stockTradesData);
+                if (Array.isArray(stockTradesData)) {
+                    overallReturn += stockTradesData.reduce((sum, trade) => sum + (Number(trade.return) || 0), 0);
+                }
             }
 
             if (optionTradeIds.length > 0) {
-                const optionTrades = await getOptionTradesbyId(optionTradeIds);
-                const formattedOptionTrades = optionTrades.map(trade => ({
-                    ...trade,
-                    entrydate: moment(trade.entrydate).format("YYYY-MM-DD"),
-                    exitdate: trade.exitdate ? moment(trade.exitdate).format("YYYY-MM-DD") : null,
-                    lastmodifieddate: trade.lastmodifieddate ? moment(trade.lastmodifieddate).format("YYYY-MM-DD") : null,
-                    type: 'option'
-                }));
-                setOptionTrades(formattedOptionTrades);
-                allTrades = [...allTrades, ...formattedOptionTrades];
-                totalReturn += formattedOptionTrades.reduce((sum, trade) => sum + (parseFloat(trade.overallreturn) || 0), 0);
+                optionTradesData = await getOptionTradesbyId(optionTradeIds);
+                console.log('Fetched option trades:', optionTradesData);
+                if (Array.isArray(optionTradesData)) {
+                    overallReturn += optionTradesData.reduce((sum, trade) => sum + (Number(trade.return) || 0), 0);
+                }
             }
 
-            console.log('All trades:', allTrades);
-            setTrades(allTrades);
-            setTotalUnrealizedPL(totalReturn);
+            // Format dates for all trades
+            const formatTrades = (trades) => {
+                if (!Array.isArray(trades)) return [];
+                return trades.map(trade => ({
+                    ...trade,
+                    entrydate: trade.entrydate ? moment(trade.entrydate).format('YYYY-MM-DD HH:mm:ss') : null,
+                    exitdate: trade.exitdate ? moment(trade.exitdate).format('YYYY-MM-DD HH:mm:ss') : null,
+                    lastmodifieddate: trade.lastmodifieddate ? moment(trade.lastmodifieddate).format('YYYY-MM-DD HH:mm:ss') : null,
+                    return: Number(trade.return) || 0,
+                    overallreturn: Number(trade.overallreturn) || 0
+                }));
+            };
 
-            // Create option assets array for price updates
-            const optionAssetsMap = new Map();
-            optionTrades.forEach(trade => {
-                if (trade && trade.asset && trade.status !== "CLOSED") {
-                    const price = trade.ltp || (strategyData.option_prices || []).find(p => p && p.name === trade.asset)?.price || 0;
-                    optionAssetsMap.set(trade.asset, {
-                        name: trade.asset,
-                        price
-                    });
-                }
+            const formattedStockTrades = formatTrades(stockTradesData || []);
+            const formattedOptionTrades = formatTrades(optionTradesData || []);
+
+            console.log('Setting trades state with:', {
+                stockTrades: formattedStockTrades,
+                optionTrades: formattedOptionTrades,
+                overallReturn
             });
-            setOptionAssets(Array.from(optionAssetsMap.values()));
-            setOptionPriceErrors(Array(optionAssetsMap.size).fill(false));
+
+            setStockTrades(formattedStockTrades);
+            setOptionTrades(formattedOptionTrades);
+            setTotalUnrealizedPL(overallReturn);
         } catch (error) {
-            console.error("Error fetching trades:", error);
-            setError("Failed to load trades data.");
+            console.error('Error fetching trades:', error);
+            setError('Failed to fetch trades. Please try again later.');
         }
-    }, []);
+    }, [strategy]);
 
     const fetchStrategy = useCallback(async () => {
         if (!id) {
@@ -187,26 +187,41 @@ function UpdateStrategy({ id }) {
         setLoading(true);
         setError(null);
         try {
-            const strategies = await getStrategies();
-            setExistingStrategies(strategies);
+            // Get strategy by ID
+            const response = await getStrategies({ id });
+            console.log('Strategy API Response:', response);
 
-            const foundStrategy = strategies.find(s => s.id === parseInt(id));
-            if (foundStrategy) {
-                console.log('Found strategy:', foundStrategy);
-                setStrategy(foundStrategy);
-                setCurrentStockPrice(foundStrategy.current_stock_price || "");
-                await fetchTrades(foundStrategy);
-                await fetchNotes(foundStrategy.id);
+            if (response) {
+                // Handle both array and single object responses
+                const strategyData = Array.isArray(response) ? response[0] : response;
+
+                if (strategyData && strategyData.id) {
+                    console.log('Strategy data:', strategyData);
+                    console.log('Stock trades:', strategyData.stock_trades);
+                    console.log('Option trades:', strategyData.option_trades);
+
+                    // Ensure trades are arrays
+                    if (!Array.isArray(strategyData.stock_trades)) {
+                        strategyData.stock_trades = [];
+                    }
+                    if (!Array.isArray(strategyData.option_trades)) {
+                        strategyData.option_trades = [];
+                    }
+
+                    setStrategy(strategyData);
+                } else {
+                    setError("Strategy not found");
+                }
             } else {
-                setError("Strategy not found");
+                setError("No response from server");
             }
-        } catch (err) {
-            console.error("Error fetching data:", err);
-            setError("Failed to load strategy data.");
+        } catch (error) {
+            console.error('Error fetching strategy:', error);
+            setError("Failed to load strategy data");
         } finally {
             setLoading(false);
         }
-    }, [id, fetchTrades, fetchNotes]);
+    }, [id]);
 
     const handleTradeClick = (trade) => {
         setSelectedTrade(trade);
@@ -220,7 +235,7 @@ function UpdateStrategy({ id }) {
                 : await updateOptionTrade(updatedTrade);
 
             if (response) {
-                await fetchTrades(strategy);
+                await fetchTrades();
                 setShowUpdateTrade(false);
             }
         } catch (error) {
@@ -231,27 +246,52 @@ function UpdateStrategy({ id }) {
 
     const handleSubmitTrade = async (tradeDetails, isStock) => {
         try {
+            console.log('Submitting trade:', tradeDetails, 'isStock:', isStock);
             const response = isStock
                 ? await addNewStockTrade({ ...tradeDetails, strategy_id: id })
                 : await addNewOptionTrade({ ...tradeDetails, strategy_id: id });
 
+            console.log('Trade submission response:', response);
+
             if (response?.tradeid) {
+                // Create a new array of trade IDs
                 const updatedStrategy = {
                     ...strategy,
                     [isStock ? 'stock_trades' : 'option_trades']: [
-                        ...(strategy[isStock ? 'stock_trades' : 'option_trades'] || []),
+                        ...(Array.isArray(strategy[isStock ? 'stock_trades' : 'option_trades'])
+                            ? strategy[isStock ? 'stock_trades' : 'option_trades']
+                            : []),
                         response.tradeid
                     ]
                 };
-                await updateStrategy(updatedStrategy);
-                setStrategy(updatedStrategy);
-                await fetchTrades(updatedStrategy);
 
-                isStock ? setShowCreateStockTrade(false) : setShowCreateOptionTrade(false);
+                console.log('Updating strategy with new trade:', updatedStrategy);
+
+                // Update the strategy in the database
+                const updateResponse = await updateStrategy(updatedStrategy);
+                console.log('Strategy update response:', updateResponse);
+
+                if (updateResponse) {
+                    // Fetch the updated strategy to ensure we have the latest data
+                    const refreshedStrategy = await getStrategies({ id });
+                    const strategyData = Array.isArray(refreshedStrategy) ? refreshedStrategy[0] : refreshedStrategy;
+
+                    if (strategyData) {
+                        console.log('Refreshed strategy data:', strategyData);
+                        setStrategy(strategyData);
+                        await fetchTrades();
+                    }
+
+                    isStock ? setShowCreateStockTrade(false) : setShowCreateOptionTrade(false);
+                } else {
+                    setError("Failed to update strategy with new trade");
+                }
+            } else {
+                setError("Failed to create trade");
             }
         } catch (error) {
             console.error("Error creating trade:", error);
-            setError("Failed to create trade.");
+            setError("Failed to create trade: " + error.message);
         }
     };
 
@@ -278,7 +318,7 @@ function UpdateStrategy({ id }) {
     const handleUpdateStrategy = async () => {
         try {
             await updateStrategy(strategy);
-            await fetchTrades(strategy);
+            await fetchTrades();
         } catch (error) {
             console.error("Strategy update failed:", error);
             setError("Failed to update strategy.");
@@ -286,17 +326,27 @@ function UpdateStrategy({ id }) {
     };
 
     const handleLTPInputChange = (tradeId, value) => {
-        setOpenTradesLTP(prev => ({
-            ...prev,
-            [tradeId]: value
-        }));
+        // Only update if value is not empty
+        if (value === '') {
+            const newLTPs = { ...openTradesLTP };
+            delete newLTPs[tradeId];
+            setOpenTradesLTP(newLTPs);
+        } else {
+            setOpenTradesLTP(prev => ({
+                ...prev,
+                [tradeId]: value
+            }));
+        }
     };
 
     const calculateUnrealizedPL = useCallback((trade) => {
         if (!trade || trade.status !== 'OPEN' || !trade.ltp || !trade.openquantity) return 0;
 
-        const quantity = parseInt(trade.openquantity);
         const ltp = parseFloat(trade.ltp);
+        // Return 0 if LTP is 0 or 0.00
+        if (ltp === 0 || ltp === 0.00) return 0;
+
+        const quantity = parseInt(trade.openquantity);
         const entryPrice = parseFloat(trade.entryprice);
 
         // For options, quantity is already adjusted with lot size in the database
@@ -311,123 +361,66 @@ function UpdateStrategy({ id }) {
     const handleGenerateUnrealizedPL = async () => {
         try {
             let totalUnrealized = 0;
-            const updatePromises = [];
+            const updatedStockTrades = [];
+            const updatedOptionTrades = [];
 
-            // Update stock trades
-            for (const trade of stockTrades) {
+            // Prepare stock trades updates
+            stockTrades.forEach(trade => {
                 if (trade.status === 'OPEN' && openTradesLTP[trade.tradeid]) {
                     const updatedTrade = {
                         ...trade,
-                        ltp: openTradesLTP[trade.tradeid],
-                        unrealizedpl: calculateUnrealizedPL(trade)
+                        ltp: openTradesLTP[trade.tradeid]
                     };
-                    totalUnrealized += updatedTrade.unrealizedpl;
-                    updatePromises.push(updateStockTrade(updatedTrade));
+                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                    updatedTrade.unrealizedpl = unrealizedPL;
+                    totalUnrealized += unrealizedPL;
+                    updatedStockTrades.push(updatedTrade);
                 }
-            }
+            });
 
-            // Update option trades
-            for (const trade of optionTrades) {
+            // Prepare option trades updates
+            optionTrades.forEach(trade => {
                 if (trade.status === 'OPEN' && openTradesLTP[trade.tradeid]) {
                     const updatedTrade = {
                         ...trade,
-                        ltp: openTradesLTP[trade.tradeid],
-                        unrealizedpl: calculateUnrealizedPL(trade)
+                        ltp: openTradesLTP[trade.tradeid]
                     };
-                    totalUnrealized += updatedTrade.unrealizedpl;
-                    updatePromises.push(updateOptionTrade(updatedTrade));
+                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                    updatedTrade.unrealizedpl = unrealizedPL;
+                    totalUnrealized += unrealizedPL;
+                    updatedOptionTrades.push(updatedTrade);
                 }
-            }
+            });
+
+            // Batch update all trades
+            const updatePromises = [
+                ...updatedStockTrades.map(trade => updateStockTrade(trade)),
+                ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
+            ];
 
             await Promise.all(updatePromises);
+
+            // Update local state
             setTotalUnrealizedPL(totalUnrealized);
-            await fetchTrades(strategy);
+            setStockTrades(prevTrades =>
+                prevTrades.map(trade => {
+                    const updatedTrade = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
+                    return updatedTrade || trade;
+                })
+            );
+            setOptionTrades(prevTrades =>
+                prevTrades.map(trade => {
+                    const updatedTrade = updatedOptionTrades.find(t => t.tradeid === trade.tradeid);
+                    return updatedTrade || trade;
+                })
+            );
+
             setShowLTPDialog(false);
+            calculatePLSummary();
         } catch (error) {
             console.error('Error updating LTPs:', error);
             setError("Failed to update LTPs.");
         }
-    };
-
-    const LTPUpdateDialog = () => {
-        const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
-        const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
-
-        const hasOpenTrades = openStockTrades.length > 0 || openOptionTrades.length > 0;
-
-        return (
-            <Dialog
-                open={showLTPDialog}
-                onClose={() => setShowLTPDialog(false)}
-                maxWidth="md"
-                fullWidth
-            >
-                <Box sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                        Update Last Traded Prices
-                    </Typography>
-
-                    {!hasOpenTrades && (
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                            No open positions found.
-                        </Alert>
-                    )}
-
-                    {openStockTrades.length > 0 && (
-                        <>
-                            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                                Stock Trades
-                            </Typography>
-                            {openStockTrades.map(trade => (
-                                <Box key={trade.tradeid} sx={{ mb: 2 }}>
-                                    <TextField
-                                        label={`${trade.asset} (Entry: ${trade.entryprice})`}
-                                        type="number"
-                                        value={openTradesLTP[trade.tradeid] || ''}
-                                        onChange={(e) => handleLTPInputChange(trade.tradeid, e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                    />
-                                </Box>
-                            ))}
-                        </>
-                    )}
-
-                    {openOptionTrades.length > 0 && (
-                        <>
-                            <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                                Option Trades
-                            </Typography>
-                            {openOptionTrades.map(trade => (
-                                <Box key={trade.tradeid} sx={{ mb: 2 }}>
-                                    <TextField
-                                        label={`${trade.asset} ${trade.strikeprize} (Entry: ${trade.entryprice})`}
-                                        type="number"
-                                        value={openTradesLTP[trade.tradeid] || ''}
-                                        onChange={(e) => handleLTPInputChange(trade.tradeid, e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                    />
-                                </Box>
-                            ))}
-                        </>
-                    )}
-
-                    <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                        <Button onClick={() => setShowLTPDialog(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={handleGenerateUnrealizedPL}
-                            disabled={!hasOpenTrades}
-                        >
-                            Generate Unrealized P/L
-                        </Button>
-                    </Box>
-                </Box>
-            </Dialog>
-        );
     };
 
     const checkAllTradesHaveLTP = useCallback(() => {
@@ -484,8 +477,24 @@ function UpdateStrategy({ id }) {
     }, []);
 
     useEffect(() => {
+        console.log('Initial load - fetching strategy');
         fetchStrategy();
-    }, [fetchStrategy]);
+    }, [id, fetchStrategy]);
+
+    useEffect(() => {
+        if (strategy && strategy.id) {
+            console.log('Strategy updated, fetching trades and notes');
+            fetchTrades();
+            fetchNotes(strategy.id);
+        }
+    }, [strategy, fetchTrades, fetchNotes]);
+
+    useEffect(() => {
+        if (strategy && strategy.id) {
+            console.log('Strategy loaded, fetching trades');
+            fetchTrades();
+        }
+    }, [strategy?.id, fetchTrades]);
 
     useEffect(() => {
         calculatePLSummary();
@@ -493,6 +502,16 @@ function UpdateStrategy({ id }) {
 
     const PLSummaryCard = () => {
         const hasOpenTrades = [...stockTrades, ...optionTrades].some(trade => trade.status === 'OPEN');
+        const hasOpenTradesWithZeroLTP = React.useMemo(() => {
+            const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
+            return openTrades.some(trade => !trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00);
+        }, [stockTrades, optionTrades]);
+
+        const tradesNeedingUpdate = React.useMemo(() => {
+            return [...stockTrades, ...optionTrades]
+                .filter(trade => trade.status === 'OPEN' && (!trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00))
+                .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
+        }, [stockTrades, optionTrades]);
 
         return (
             <Card sx={{ mb: 3 }}>
@@ -501,78 +520,272 @@ function UpdateStrategy({ id }) {
                         P/L Summary
                     </Typography>
 
-                    {hasOpenTrades && !plSummary.hasAllLTP ? (
+                    {hasOpenTrades && hasOpenTradesWithZeroLTP && (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            Please update LTP for: {tradesNeedingUpdate.join(', ')}
+                        </Alert>
+                    )}
+
+                    {hasOpenTrades && !plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP && (
                         <Alert severity="info" sx={{ mb: 2 }}>
                             Please update LTP of all open positions to view complete P/L Summary
                         </Alert>
-                    ) : (
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={4}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Realized P/L
-                                </Typography>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        color: plSummary.realizedPL >= 0 ? 'success.main' : 'error.main',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {plSummary.realizedPL >= 0 ? '+' : ''}
-                                    ₹{plSummary.realizedPL.toFixed(2)}
-                                </Typography>
-                            </Grid>
-
-                            <Grid item xs={12} md={4}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Unrealized P/L
-                                </Typography>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        color: plSummary.unrealizedPL >= 0 ? 'success.main' : 'error.main',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {plSummary.hasAllLTP ? (
-                                        <>
-                                            {plSummary.unrealizedPL >= 0 ? '+' : ''}
-                                            ₹{plSummary.unrealizedPL.toFixed(2)}
-                                        </>
-                                    ) : '-'}
-                                </Typography>
-                            </Grid>
-
-                            <Grid item xs={12} md={4}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Total P/L
-                                </Typography>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        color: (plSummary.realizedPL + plSummary.unrealizedPL) >= 0
-                                            ? 'success.main'
-                                            : 'error.main',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {plSummary.hasAllLTP ? (
-                                        <>
-                                            {(plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? '+' : ''}
-                                            ₹{(plSummary.realizedPL + plSummary.unrealizedPL).toFixed(2)}
-                                        </>
-                                    ) : (
-                                        <>
-                                            {plSummary.realizedPL >= 0 ? '+' : ''}
-                                            ₹{plSummary.realizedPL.toFixed(2)} + Unrealized
-                                        </>
-                                    )}
-                                </Typography>
-                            </Grid>
-                        </Grid>
                     )}
+
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Realized P/L
+                            </Typography>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    color: plSummary.realizedPL >= 0 ? 'success.main' : 'error.main',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {plSummary.realizedPL >= 0 ? '+' : ''}
+                                ₹{plSummary.realizedPL.toFixed(2)}
+                            </Typography>
+                        </Grid>
+
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Unrealized P/L
+                            </Typography>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    color: plSummary.unrealizedPL >= 0 ? 'success.main' : 'error.main',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP ? (
+                                    <>
+                                        {plSummary.unrealizedPL >= 0 ? '+' : ''}
+                                        ₹{plSummary.unrealizedPL.toFixed(2)}
+                                    </>
+                                ) : '-'}
+                            </Typography>
+                        </Grid>
+
+                        <Grid item xs={12} md={4}>
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Total P/L
+                            </Typography>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    color: plSummary.realizedPL >= 0 ? 'success.main' : 'error.main',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP ? (
+                                    <>
+                                        {(plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? '+' : ''}
+                                        ₹{(plSummary.realizedPL + plSummary.unrealizedPL).toFixed(2)}
+                                    </>
+                                ) : (
+                                    <>
+                                        ₹{plSummary.realizedPL.toFixed(2)}
+                                        {hasOpenTrades && !hasOpenTradesWithZeroLTP && <span style={{ color: 'text.secondary' }}> (+ Unrealized P/L)</span>}
+                                    </>
+                                )}
+                            </Typography>
+                        </Grid>
+                    </Grid>
                 </CardContent>
             </Card>
+        );
+    };
+
+    const LTPInput = React.memo(({ trade, value, onValueChange }) => {
+        const handleChange = React.useCallback((e) => {
+            onValueChange(trade.tradeid, e.target.value);
+        }, [trade.tradeid, onValueChange]);
+
+        return (
+            <Box sx={{ mb: 2 }}>
+                <TextField
+                    label={`${trade.asset} ${trade.strikeprize ? trade.strikeprize : ''} (Entry: ${trade.entryprice})`}
+                    type="number"
+                    value={value || ''}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                />
+            </Box>
+        );
+    });
+    LTPInput.displayName = 'LTPInput';
+
+    const TradeSection = React.memo(({ trades, title, values, onValueChange }) => {
+        if (trades.length === 0) return null;
+
+        return (
+            <>
+                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                    {title}
+                </Typography>
+                {trades.map(trade => (
+                    <LTPInput
+                        key={trade.tradeid}
+                        trade={trade}
+                        value={values[trade.tradeid]}
+                        onValueChange={onValueChange}
+                    />
+                ))}
+            </>
+        );
+    });
+    TradeSection.displayName = 'TradeSection';
+
+    const LTPUpdateDialog = () => {
+        const [ltpValues, setLtpValues] = React.useState({});
+
+        const openStockTrades = React.useMemo(() =>
+            stockTrades.filter(trade => trade.status === 'OPEN'),
+            [stockTrades]
+        );
+
+        const openOptionTrades = React.useMemo(() =>
+            optionTrades.filter(trade => trade.status === 'OPEN'),
+            [optionTrades]
+        );
+
+        const hasOpenTrades = openStockTrades.length > 0 || openOptionTrades.length > 0;
+
+        const handleClose = React.useCallback(() => {
+            setShowLTPDialog(false);
+            setLtpValues({});
+        }, []);
+
+        const handleValueChange = React.useCallback((tradeId, value) => {
+            setLtpValues(prev => ({
+                ...prev,
+                [tradeId]: value
+            }));
+        }, []);
+
+        const handleSubmit = React.useCallback(async () => {
+            try {
+                let totalUnrealized = 0;
+                const updatedStockTrades = [];
+                const updatedOptionTrades = [];
+
+                // Update stock trades
+                for (const trade of openStockTrades) {
+                    if (ltpValues[trade.tradeid]) {
+                        const updatedTrade = {
+                            ...trade,
+                            ltp: ltpValues[trade.tradeid]
+                        };
+                        const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                        updatedTrade.unrealizedpl = unrealizedPL;
+                        totalUnrealized += unrealizedPL;
+                        updatedStockTrades.push(updatedTrade);
+                    }
+                }
+
+                // Update option trades
+                for (const trade of openOptionTrades) {
+                    if (ltpValues[trade.tradeid]) {
+                        const updatedTrade = {
+                            ...trade,
+                            ltp: ltpValues[trade.tradeid]
+                        };
+                        const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                        updatedTrade.unrealizedpl = unrealizedPL;
+                        totalUnrealized += unrealizedPL;
+                        updatedOptionTrades.push(updatedTrade);
+                    }
+                }
+
+                // Update trades in database
+                await Promise.all([
+                    ...updatedStockTrades.map(trade => updateStockTrade(trade)),
+                    ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
+                ]);
+
+                // Update local state
+                setStockTrades(prevTrades =>
+                    prevTrades.map(trade => {
+                        const updated = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
+                        return updated || trade;
+                    })
+                );
+
+                setOptionTrades(prevTrades =>
+                    prevTrades.map(trade => {
+                        const updated = updatedOptionTrades.find(t => t.tradeid === trade.tradeid);
+                        return updated || trade;
+                    })
+                );
+
+                setTotalUnrealizedPL(totalUnrealized);
+                setOpenTradesLTP(ltpValues);
+                calculatePLSummary();
+                handleClose();
+            } catch (error) {
+                console.error('Error updating LTPs:', error);
+                setError("Failed to update LTPs and calculate P/L.");
+            }
+        }, [openStockTrades, openOptionTrades, ltpValues, calculateUnrealizedPL, calculatePLSummary, handleClose]);
+
+        // Reset form when dialog opens
+        React.useEffect(() => {
+            if (showLTPDialog) {
+                setLtpValues({});
+            }
+        }, [showLTPDialog]);
+
+        return (
+            <Dialog
+                open={showLTPDialog}
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
+                keepMounted={false}
+            >
+                <Box sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Update Last Traded Prices
+                    </Typography>
+
+                    {!hasOpenTrades && (
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                            No open positions found.
+                        </Alert>
+                    )}
+
+                    <TradeSection
+                        trades={openStockTrades}
+                        title="Stock Trades"
+                        values={ltpValues}
+                        onValueChange={handleValueChange}
+                    />
+
+                    <TradeSection
+                        trades={openOptionTrades}
+                        title="Option Trades"
+                        values={ltpValues}
+                        onValueChange={handleValueChange}
+                    />
+
+                    <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                        <Button onClick={handleClose}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                            disabled={!hasOpenTrades || Object.keys(ltpValues).length === 0}
+                        >
+                            Generate Unrealized P/L
+                        </Button>
+                    </Box>
+                </Box>
+            </Dialog>
         );
     };
 
