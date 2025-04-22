@@ -7,7 +7,6 @@ import {
     Paper,
     Grid,
     Divider,
-    Alert,
     CircularProgress,
     Stack,
     Chip,
@@ -28,23 +27,12 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import InfoIcon from '@mui/icons-material/Info';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import { formatCurrency } from '../utils/formatters';
 
-const formatDate = (dateString) => {
-    if (!dateString) return 'Not available';
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleString();
-    } catch (error) {
-        return 'Invalid date';
-    }
-};
-
 const ZerodhaAccount = () => {
-    const { isAuth, fetchData, loading, error, disconnect } = useZerodha();
+    const { isAuth, fetchData, disconnect } = useZerodha();
     const [accountInfo, setAccountInfo] = useState(null);
     const [sessionStatus, setSessionStatus] = useState('checking');
     const theme = useTheme();
@@ -146,7 +134,6 @@ const ZerodhaAccount = () => {
                             variant="outlined"
                             startIcon={<RefreshIcon />}
                             onClick={checkSession}
-                            disabled={loading}
                         >
                             Refresh
                         </Button>
@@ -160,19 +147,6 @@ const ZerodhaAccount = () => {
                         </Button>
                     </Stack>
                 </Box>
-
-                {error && (
-                    <Alert
-                        severity="error"
-                        sx={{
-                            mb: 3,
-                            borderRadius: 2,
-                            boxShadow: 1
-                        }}
-                    >
-                        {error}
-                    </Alert>
-                )}
 
                 {sessionStatus === 'checking' ? (
                     <Box sx={{

@@ -9,11 +9,9 @@ import {
     Paper,
     List,
     ListItem,
-    ListItemText,
-    ListItemSecondaryAction,
+    Divider,
     IconButton,
-    Chip,
-    Divider
+    Chip
 } from "@mui/material";
 import { getActionItems, updateActionItem, addActionItem, deleteActionItem } from "../../services/actionitems.js";
 import { CreateActionItem } from "./ActionModelPopup.jsx";
@@ -129,11 +127,9 @@ const ActionItems = () => {
                                             onClick={() => markComplete(item)}
                                         />
                                     </Box>
-                                    <ListItemSecondaryAction>
-                                        <IconButton edge="end" onClick={() => handleDelete(item.id)}>
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </ListItemSecondaryAction>
+                                    <IconButton edge="end" onClick={() => handleDelete(item.id)}>
+                                        <DeleteIcon />
+                                    </IconButton>
                                 </ListItem>
                                 <Divider />
                             </React.Fragment>

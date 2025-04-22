@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Box, Button, Typography, Paper, CircularProgress, Alert, Stack, Divider } from "@mui/material";
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
 import PagenationTable from "./ProfitLossTable";
@@ -24,7 +24,7 @@ const ReportSection = () => {
     const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
     // Fetch report data
-    async function fetchReport() {
+    const fetchReport = useCallback(async () => {
         setLoading(true);
         setError(null);
         const formattedStartDate = formatDate(startDate, "yyyy-MM-dd");
@@ -39,11 +39,11 @@ const ReportSection = () => {
         } finally {
             setLoading(false);
         }
-    }
+    }, [startDate, endDate]);
 
     useEffect(() => {
         fetchReport();
-    }, []);
+    }, [fetchReport]);
 
     return (
         <Box p={4}>
@@ -73,7 +73,7 @@ const ReportSection = () => {
                 <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => fetchReport()}
+                    onClick={fetchReport}
                     disabled={loading}
                     sx={{ minWidth: "150px", marginTop: 1 }}
                 >
@@ -99,13 +99,10 @@ const ReportSection = () => {
                     CreateRequest={addEntry}
                 />
             ) : (
-                !loading && (
-                    <Typography variant="body1" color="textSecondary" align="center">
-                        No data available. Click &quot;Get Report&quot; to load data.
-                    </Typography>
-                )
+                <Typography variant="body1" color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
+                    No report data available for the selected date range.
+                </Typography>
             )}
-            <Divider sx={{ borderBottomWidth: 1, borderColor: "black", marginTop: "10px" }} />
         </Box>
     );
 };

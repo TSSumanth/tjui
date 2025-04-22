@@ -12,11 +12,11 @@ import {
     Alert,
     Box,
     Chip,
-    IconButton,
-    Button
+    IconButton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import { formatCurrency } from '../../utils/formatters';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -24,13 +24,6 @@ const getUnderlyingSymbol = (tradingsymbol) => {
     const symbol = tradingsymbol.toUpperCase();
     const match = symbol.match(/([A-Z]+)/);
     return match ? match[1] : symbol;
-};
-
-const formatCurrency = (value) => {
-    if (value === null || value === undefined || isNaN(value)) {
-        return '₹0.00';
-    }
-    return `₹${Number(value).toFixed(2)}`;
 };
 
 const formatPercentage = (value) => {
@@ -55,48 +48,6 @@ const calculateChangePercentage = (position) => {
     const { last_price, close_price } = position;
     if (!last_price || !close_price || close_price === 0) return 0;
     return ((last_price - close_price) / close_price) * 100;
-};
-
-const calculatePositionsSummary = (positions) => {
-    let totalPnL = 0;
-    let dayPnL = 0;
-
-    positions.forEach(position => {
-        const lastPrice = Number(position.last_price) || 0;
-        const closePrice = Number(position.close_price) || lastPrice;
-        const quantity = Number(position.quantity) || 0;
-        const isLong = position.buy_quantity > 0;
-
-        console.log('Position calculation:', {
-            symbol: position.tradingsymbol,
-            lastPrice,
-            closePrice,
-            quantity,
-            isLong,
-            rawData: position
-        });
-
-        // Calculate day P&L
-        if (isLong) {
-            dayPnL += (lastPrice - closePrice) * quantity;
-        } else {
-            dayPnL += (closePrice - lastPrice) * quantity;
-        }
-
-        // Use the pnl field provided by Zerodha for total P&L
-        totalPnL += Number(position.pnl) || 0;
-    });
-
-    console.log('Positions summary:', {
-        totalPnL,
-        dayPnL,
-        positionsCount: positions.length
-    });
-
-    return {
-        totalPnL,
-        dayPnL
-    };
 };
 
 const PositionTable = ({ positions, underlying }) => {
