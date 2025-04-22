@@ -1,6 +1,21 @@
 import React, { useState } from "react";
-import LovComponent from '../Generic/LOVComponent'
-import './ActionModelPopup.css'
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    Box,
+    IconButton,
+    Typography,
+    CircularProgress,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel
+} from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close';
 
 function CreateActionItem({ isOpen, onClose, onSave }) {
     const [status, setStatus] = useState('');
@@ -8,41 +23,139 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSave = () => {
+        if (!status || !description) return;
+
+        setIsSubmitting(true);
         onSave({
             "status": status,
             "description": description
         });
-        setIsSubmitting(false)
+        setIsSubmitting(false);
         onClose();
     };
 
-    if (!isOpen) return null;
+    const handleClose = () => {
+        setStatus('');
+        setDescription('');
+        onClose();
+    };
 
     return (
-        <div >
-            <section className='action-items-container' id='modelcontainer'>
-                <section className='action-items-model' id='model'>
-                    <button onClick={onClose} className='action-items-close-btn' id='action-items-close-button'>X</button>
-                    <div className='action-items-model-content'>
-                        <h1>Create Action Item</h1>
-                        <form className='action-items-model-form'>
-                            <div>
-                                <label className="label-field" name='status'>Status </label>
-                                <LovComponent type="text" name="name" className="form-input" options={["TODO", "COMPLETED"]} placeholder="Select a Status" onSelect={setStatus} />
-                            </div>
-                            <div>
-                                <label className="label-field" name='description'>Description </label>
-                                <textarea id="action-items-noteseditor" type="text" name="description" value={description} onChange={(e) => setDescription(e.target.value)} className="action-items-notes-editor" />
-                            </div>
-                            <button onClick={handleSave} className='action-items-submit-btn' id='action-items-submit-button' type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Saving...' : 'Save'}</button>
-                        </form>
-                    </div>
-                </section>
+        <Dialog
+            open={isOpen}
+            onClose={handleClose}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={{
+                sx: {
+                    borderRadius: 2,
+                    minHeight: '400px'
+                }
+            }}
+        >
+            <DialogTitle sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 2
+            }}>
+                <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
+                    Create Action Item
+                </Typography>
+                <IconButton
+                    edge="end"
+                    color="inherit"
+                    onClick={handleClose}
+                    aria-label="close"
+                >
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
 
-            </section>
-        </div>
-    )
+            <DialogContent sx={{ pt: 3 }}>
+                <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <FormControl fullWidth>
+                        <InputLabel id="status-label">Status</InputLabel>
+                        <Select
+                            labelId="status-label"
+                            value={status}
+                            label="Status"
+                            onChange={(e) => setStatus(e.target.value)}
+                            sx={{
+                                '& .MuiSelect-select': {
+                                    color: 'text.primary'
+                                }
+                            }}
+                        >
+                            <MenuItem value="TODO">TODO</MenuItem>
+                            <MenuItem value="COMPLETED">COMPLETED</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <Box>
+                        <Typography variant="subtitle1" component="div" sx={{ mb: 1, fontWeight: 'medium' }}>
+                            Description
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Enter description"
+                            variant="outlined"
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    '&:hover fieldset': {
+                                        borderColor: 'primary.main',
+                                    },
+                                },
+                            }}
+                        />
+                    </Box>
+                </Box>
+            </DialogContent>
+
+            <DialogActions sx={{
+                px: 3,
+                py: 2,
+                borderTop: '1px solid',
+                borderColor: 'divider'
+            }}>
+                <Button
+                    onClick={handleClose}
+                    color="inherit"
+                    sx={{ mr: 1 }}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    onClick={handleSave}
+                    variant="contained"
+                    color="primary"
+                    disabled={isSubmitting || !status || !description}
+                    sx={{
+                        minWidth: '100px',
+                        '&:disabled': {
+                            backgroundColor: 'action.disabledBackground',
+                            color: 'action.disabled'
+                        }
+                    }}
+                >
+                    {isSubmitting ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress size={20} color="inherit" />
+                            <Typography variant="button" component="span">
+                                Saving...
+                            </Typography>
+                        </Box>
+                    ) : 'Save'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
 }
 
-export { CreateActionItem }
+export { CreateActionItem };

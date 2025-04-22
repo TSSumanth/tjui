@@ -25,6 +25,7 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    Snackbar,
 } from "@mui/material";
 import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
@@ -80,7 +81,6 @@ function UpdateStrategy({ id }) {
     const [strategy, setStrategy] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [trades, setTrades] = useState([]);
     const [stockTrades, setStockTrades] = useState([]);
     const [optionTrades, setOptionTrades] = useState([]);
     const [notes, setNotes] = useState([]);
@@ -90,18 +90,17 @@ function UpdateStrategy({ id }) {
     const [showUpdateTrade, setShowUpdateTrade] = useState(false);
     const [selectedTrade, setSelectedTrade] = useState(null);
     const [totalUnrealizedPL, setTotalUnrealizedPL] = useState(0);
-    const [currentStockPrice, setCurrentStockPrice] = useState("");
-    const [stockPriceError, setStockPriceError] = useState("");
-    const [optionAssets, setOptionAssets] = useState([]);
-    const [optionPriceErrors, setOptionPriceErrors] = useState([]);
     const [nameError, setNameError] = useState("");
-    const [existingStrategies, setExistingStrategies] = useState([]);
-    const [openTradesLTP, setOpenTradesLTP] = useState({});
     const [showLTPDialog, setShowLTPDialog] = useState(false);
     const [plSummary, setPlSummary] = useState({
         realizedPL: 0,
         unrealizedPL: 0,
         hasAllLTP: true
+    });
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success'
     });
 
     const fetchNotes = useCallback(async (strategyId) => {
@@ -297,10 +296,7 @@ function UpdateStrategy({ id }) {
 
     const handleNameChange = (event) => {
         const newName = event.target.value.trim();
-        const nameExists = existingStrategies.some(
-            (s) => s.name === newName && s.id !== strategy?.id
-        );
-        setNameError(nameExists ? "Strategy name is already in use" : "");
+        setNameError(newName === strategy?.name ? "Strategy name is already in use" : "");
 
         setStrategy((prev) => ({
             ...prev,
@@ -319,24 +315,23 @@ function UpdateStrategy({ id }) {
         try {
             await updateStrategy(strategy);
             await fetchTrades();
+            setSnackbar({
+                open: true,
+                message: 'Strategy updated successfully!',
+                severity: 'success'
+            });
         } catch (error) {
             console.error("Strategy update failed:", error);
-            setError("Failed to update strategy.");
+            setSnackbar({
+                open: true,
+                message: 'Failed to update strategy. Please try again.',
+                severity: 'error'
+            });
         }
     };
 
-    const handleLTPInputChange = (tradeId, value) => {
-        // Only update if value is not empty
-        if (value === '') {
-            const newLTPs = { ...openTradesLTP };
-            delete newLTPs[tradeId];
-            setOpenTradesLTP(newLTPs);
-        } else {
-            setOpenTradesLTP(prev => ({
-                ...prev,
-                [tradeId]: value
-            }));
-        }
+    const handleCloseSnackbar = () => {
+        setSnackbar(prev => ({ ...prev, open: false }));
     };
 
     const calculateUnrealizedPL = useCallback((trade) => {
@@ -366,10 +361,10 @@ function UpdateStrategy({ id }) {
 
             // Prepare stock trades updates
             stockTrades.forEach(trade => {
-                if (trade.status === 'OPEN' && openTradesLTP[trade.tradeid]) {
+                if (trade.status === 'OPEN') {
                     const updatedTrade = {
                         ...trade,
-                        ltp: openTradesLTP[trade.tradeid]
+                        ltp: trade.ltp
                     };
                     const unrealizedPL = calculateUnrealizedPL(updatedTrade);
                     updatedTrade.unrealizedpl = unrealizedPL;
@@ -380,10 +375,10 @@ function UpdateStrategy({ id }) {
 
             // Prepare option trades updates
             optionTrades.forEach(trade => {
-                if (trade.status === 'OPEN' && openTradesLTP[trade.tradeid]) {
+                if (trade.status === 'OPEN') {
                     const updatedTrade = {
                         ...trade,
-                        ltp: openTradesLTP[trade.tradeid]
+                        ltp: trade.ltp
                     };
                     const unrealizedPL = calculateUnrealizedPL(updatedTrade);
                     updatedTrade.unrealizedpl = unrealizedPL;
@@ -723,7 +718,7 @@ function UpdateStrategy({ id }) {
                 );
 
                 setTotalUnrealizedPL(totalUnrealized);
-                setOpenTradesLTP(ltpValues);
+                setShowLTPDialog(false);
                 calculatePLSummary();
                 handleClose();
             } catch (error) {
@@ -843,7 +838,7 @@ function UpdateStrategy({ id }) {
                                             label="Status"
                                         >
                                             <MenuItem value="OPEN">OPEN</MenuItem>
-                                            <MenuItem value="CLOSED">CLOSED</MenuItem>
+                                            <MenuItem value="CLOSE">CLOSE</MenuItem>
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -1137,6 +1132,21 @@ function UpdateStrategy({ id }) {
             </Dialog>
 
             <LTPUpdateDialog />
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

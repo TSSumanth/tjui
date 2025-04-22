@@ -1,18 +1,16 @@
 import React, { useMemo } from 'react';
 import {
+    Box,
+    Typography,
+    Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
-    Typography,
     CircularProgress,
-    Alert,
-    Box,
-    Chip,
-    Stack
+    Alert
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import PropTypes from 'prop-types';

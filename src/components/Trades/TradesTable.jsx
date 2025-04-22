@@ -22,12 +22,22 @@ import InfoIcon from '@mui/icons-material/Info';
 
 // Helper function to format dates consistently
 const formatDate = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString) return "-";
     try {
-        return format(parseISO(dateString), "yyyy-MM-dd HH:mm");
+        // First try parsing as ISO string
+        const date = parseISO(dateString);
+        if (isNaN(date.getTime())) {
+            // If invalid, try parsing as timestamp
+            const timestamp = parseInt(dateString);
+            if (!isNaN(timestamp)) {
+                return format(new Date(timestamp), "yyyy-MM-dd HH:mm");
+            }
+            return "-";
+        }
+        return format(date, "yyyy-MM-dd HH:mm");
     } catch (error) {
-        console.error("Invalid date:", dateString);
-        return "Invalid Date";
+        console.error("Invalid date:", dateString, error);
+        return "-";
     }
 };
 

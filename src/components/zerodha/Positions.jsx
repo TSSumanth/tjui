@@ -12,8 +12,8 @@ import {
     Alert,
     Box,
     Chip,
-    Stack,
-    IconButton
+    IconButton,
+    Button
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
@@ -49,6 +49,21 @@ const calculateChangePercentage = (position) => {
     const { last_price, close_price } = position;
     if (!last_price || !close_price || close_price === 0) return 0;
     return ((last_price - close_price) / close_price) * 100;
+};
+
+const calculatePositionsSummary = (positions) => {
+    let totalPnL = 0;
+    let dayPnL = 0;
+
+    positions.forEach(position => {
+        totalPnL += parseFloat(position.pnl || 0);
+        dayPnL += parseFloat(position.day_pnl || 0);
+    });
+
+    return {
+        totalPnL,
+        dayPnL
+    };
 };
 
 const PositionTable = ({ positions, underlying }) => {
@@ -235,10 +250,6 @@ const Positions = () => {
         groups[underlying].push(position);
         return groups;
     }, {});
-
-    // Calculate overall P&L
-    const overallPnL = positions.reduce((total, position) => total + (Number(position.pnl) || 0), 0);
-    const overallDayPnL = positions.reduce((total, position) => total + (Number(position.day_m2m) || 0), 0);
 
     if (loading) {
         return (

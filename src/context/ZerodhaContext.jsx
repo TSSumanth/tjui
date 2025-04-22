@@ -36,6 +36,16 @@ export const ZerodhaProvider = ({ children }) => {
     const [isAuth, setIsAuth] = useState(isAuthenticated());
     const [isAutoSync, setIsAutoSync] = useState(false);
 
+    const handleLogout = useCallback(() => {
+        logout();
+        setIsAuth(false);
+        setHoldings([]);
+        setPositions([]);
+        setOrders([]);
+        setError(null);
+        setIsAutoSync(false);
+    }, []);
+
     const fetchData = useCallback(async () => {
         if (!isAuth) return;
 
@@ -61,17 +71,7 @@ export const ZerodhaProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [isAuth]);
-
-    const handleLogout = useCallback(() => {
-        logout();
-        setIsAuth(false);
-        setHoldings([]);
-        setPositions([]);
-        setOrders([]);
-        setError(null);
-        setIsAutoSync(false);
-    }, []);
+    }, [isAuth, handleLogout]);
 
     // Effect for auto-sync during market hours
     useEffect(() => {
