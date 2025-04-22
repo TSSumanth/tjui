@@ -6,8 +6,6 @@ import {
     Box,
     Menu,
     MenuItem,
-    Typography,
-    Divider,
     IconButton,
     Badge
 } from '@mui/material';
@@ -24,7 +22,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import ReceiptIcon from '@mui/icons-material/Receipt';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';

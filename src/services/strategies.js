@@ -33,8 +33,15 @@ export const getOpenStrategies = async () => {
 
 export const getStrategies = async (filter) => {
     try {
+        // Format date parameters if they exist
+        const formattedFilter = {
+            ...filter,
+            createdbefore: filter.createdbefore ? filter.createdbefore.toISOString() : undefined,
+            createdafter: filter.createdafter ? filter.createdafter.toISOString() : undefined
+        };
+
         const response = await axios.get(API_URLS.STRATEGIES, {
-            params: filter
+            params: formattedFilter
         });
 
         if (response.status === 200) {

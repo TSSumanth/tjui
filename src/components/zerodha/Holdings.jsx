@@ -69,8 +69,8 @@ const Holdings = () => {
     }, []);
 
     // Calculate total P&L and day P&L
-    const { totalPnL, dayPnL } = useMemo(() => {
-        const result = holdings.reduce((acc, holding) => {
+    useMemo(() => {
+        holdings.reduce((acc, holding) => {
             const lastPrice = Number(holding.last_price) || 0;
             const avgPrice = Number(holding.average_price) || 0;
             const quantity = Number(holding.quantity) || 0;
@@ -95,14 +95,6 @@ const Holdings = () => {
                 dayPnL: acc.dayPnL + dayChange
             };
         }, { totalPnL: 0, dayPnL: 0 });
-
-        console.log('Total P&L calculations:', {
-            holdingsCount: holdings.length,
-            totalPnL: result.totalPnL,
-            dayPnL: result.dayPnL
-        });
-
-        return result;
     }, [holdings]);
 
     if (loading) {
