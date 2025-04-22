@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Box, Typography, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { format } from "date-fns";
+import { format as formatDate } from "date-fns";
 import DateComponent from "../Generic/DateComponent";
 
 const ProfitLossForm = ({ isOpen, onClose, record, onSave, isUpdate }) => {
     const [updatedRecord, setUpdatedRecord] = useState(record || {
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: formatDate(new Date(), "yyyy-MM-dd"),
         stocks_realised: "",
         stocks_unrealised: "",
         fo_realised: "",
@@ -30,7 +30,7 @@ const ProfitLossForm = ({ isOpen, onClose, record, onSave, isUpdate }) => {
     };
 
     const handleDateChange = (date) => {
-        setUpdatedRecord((prev) => ({ ...prev, date: format(date, "yyyy-MM-dd") }));
+        setUpdatedRecord((prev) => ({ ...prev, date: formatDate(date, "yyyy-MM-dd") }));
     };
 
     const handleSave = () => {

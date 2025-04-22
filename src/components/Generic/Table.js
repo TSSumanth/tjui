@@ -1,15 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
-import './Table.css'
-import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Checkbox,
+    Button,
+    TableSortLabel,
+    Box,
+    Typography
+} from "@mui/material";
+import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
 
 const formatDate = (dateString) => {
-    if (!dateString) return ""; // Handle empty or undefined values
+    if (!dateString) return "-";
     try {
-        return format(parseISO(dateString), "yyyy-MM-dd HH:mm"); // Converts to "YYYY-MM-DD HH:MM"
+        return format(parseISO(dateString), "yyyy-MM-dd HH:mm");
     } catch (error) {
         console.error("Invalid date:", dateString);
-        return "Invalid Date"; // Fallback value
+        return "-";
     }
 };
 
@@ -19,26 +32,22 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
     const [selectedTrades, setSelectedTrades] = useState([]);
     const [showAssignTradesPopup, setShowAssignTradesPopup] = useState(false);
 
-    // Handle selection toggle
     const handleTradeSelection = (trade) => {
         setSelectedTrades((prev) =>
             prev.includes(trade)
-                ? prev.filter((currenttrade) => currenttrade.tradeid !== trade.tradeid) // Remove if already selected
-                : [...prev, trade] // Add if not selected
+                ? prev.filter((currenttrade) => currenttrade.tradeid !== trade.tradeid)
+                : [...prev, trade]
         );
     };
 
-    // Whenever 'data' changes, update tableData
     useEffect(() => {
         if (data) {
-            setSortedData(data); // Reset with new data
+            setSortedData(data);
         }
-    }, [data]); // ✅ Runs only when 'data' changes
+    }, [data]);
 
-    // Extract column headers dynamically
     const columns = data.length > 0 ? Object.keys(data[0]).filter(col => includeColumns.includes(col)) : [];
 
-    // Sorting logic
     const handleSort = (key) => {
         let direction = "asc";
         if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -53,54 +62,81 @@ function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrad
         setSortConfig({ key, direction });
     };
 
-    const assignToStrategy = async () => {
-        setShowAssignTradesPopup(true)
-    }
+    const assignToStrategy = () => {
+        setShowAssignTradesPopup(true);
+    };
 
     return (
-        <div className="trades-table-container">
-            <button
-                onClick={() => assignToStrategy(selectedTrades)}
+        <Box sx={{ width: '100%', mb: 4 }}>
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={assignToStrategy}
                 disabled={selectedTrades.length === 0}
+                sx={{ mb: 2 }}
             >
                 Assign to Strategy
-            </button>
-            <table className="trades-table">
-                <thead className="trades-header">
-                    <tr>
-                        <th>Select</th>
-                        {columns.map((col) => (
-                            <th key={col} onClick={() => handleSort(col)} style={{ cursor: "pointer" }} >
-                                {columnAliases[col] || col.toUpperCase()}  {sortConfig.key === col ? (sortConfig.direction === "asc" ? "🔼" : "🔽") : ""}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {sortedData.map((row, rowIndex) => (
-                        <tr key={rowIndex} className='table-rows' id='traderows' onClick={() => updateTrade(row)}>
-                            <td onClick={(e) => e.stopPropagation()}>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedTrades.includes(row)}
-                                    onChange={(e) => {
-                                        e.stopPropagation(); // Prevents triggering row click
-                                        handleTradeSelection(row);
-                                    }}
-                                />
-                            </td>
+            </Button>
+            <TableContainer component={Paper} sx={{ boxShadow: 3 }}>
+                <Table sx={{ minWidth: 650 }} aria-label="trades table">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell padding="checkbox">
+                                <Typography variant="subtitle2">Select</Typography>
+                            </TableCell>
                             {columns.map((col) => (
-                                <td key={col}>
-                                    {col === "entrydate" || col === "exitdate" || col === 'lastmodifieddate' ? formatDate(row[col]) : row[col]}
-                                </td>
+                                <TableCell key={col}>
+                                    <TableSortLabel
+                                        active={sortConfig.key === col}
+                                        direction={sortConfig.key === col ? sortConfig.direction : 'asc'}
+                                        onClick={() => handleSort(col)}
+                                    >
+                                        <Typography variant="subtitle2">
+                                            {columnAliases[col] || col.toUpperCase()}
+                                        </Typography>
+                                    </TableSortLabel>
+                                </TableCell>
                             ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {showAssignTradesPopup && <AssignTradesToStrategy title = {"Link Trades to Strategy"} tradeDetails = {selectedTrades} onSubmit={() =>setShowAssignTradesPopup(false)}/>}
-        </div>
-    )
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {sortedData.map((row, rowIndex) => (
+                            <TableRow
+                                key={rowIndex}
+                                hover
+                                onClick={() => updateTrade(row)}
+                                sx={{ cursor: 'pointer' }}
+                            >
+                                <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                        checked={selectedTrades.includes(row)}
+                                        onChange={(e) => {
+                                            e.stopPropagation();
+                                            handleTradeSelection(row);
+                                        }}
+                                    />
+                                </TableCell>
+                                {columns.map((col) => (
+                                    <TableCell key={col}>
+                                        {col === "entrydate" || col === "exitdate" || col === 'lastmodifieddate'
+                                            ? formatDate(row[col])
+                                            : row[col]}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+            {showAssignTradesPopup && (
+                <AssignTradesToStrategy
+                    title="Link Trades to Strategy"
+                    tradeDetails={selectedTrades}
+                    onSubmit={() => setShowAssignTradesPopup(false)}
+                />
+            )}
+        </Box>
+    );
 }
 
 export default TradesTable;

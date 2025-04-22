@@ -26,15 +26,26 @@ const formatDate = (dateString) => {
     try {
         // First try parsing as ISO string
         const date = parseISO(dateString);
-        if (isNaN(date.getTime())) {
-            // If invalid, try parsing as timestamp
-            const timestamp = parseInt(dateString);
-            if (!isNaN(timestamp)) {
-                return format(new Date(timestamp), "yyyy-MM-dd HH:mm");
-            }
-            return "-";
+        if (!isNaN(date.getTime())) {
+            return format(date, "yyyy-MM-dd HH:mm");
         }
-        return format(date, "yyyy-MM-dd HH:mm");
+
+        // If not ISO, try parsing as timestamp
+        const timestamp = parseInt(dateString);
+        if (!isNaN(timestamp)) {
+            const dateFromTimestamp = new Date(timestamp);
+            if (!isNaN(dateFromTimestamp.getTime())) {
+                return format(dateFromTimestamp, "yyyy-MM-dd HH:mm");
+            }
+        }
+
+        // If not timestamp, try parsing as date string
+        const dateFromString = new Date(dateString);
+        if (!isNaN(dateFromString.getTime())) {
+            return format(dateFromString, "yyyy-MM-dd HH:mm");
+        }
+
+        return "-";
     } catch (error) {
         console.error("Invalid date:", dateString, error);
         return "-";

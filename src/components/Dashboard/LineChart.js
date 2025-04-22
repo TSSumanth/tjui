@@ -2,14 +2,6 @@ import React from "react";
 import { Card, CardContent, Typography } from "@mui/material";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-// Sample Data
-// const data = [
-//     { date: "2025-03-20", value: 100 },
-//     { date: "2025-03-21", value: 300 },
-//     { date: "2025-03-22", value: 250 },
-//     { date: "2025-03-23", value: 400 },
-//     { date: "2025-03-24", value: 350 },
-// ];
 
 const LineChartMUI = ({ data, title }) => {
     const fieldNames = Object.keys(data[0] || {}).filter((key) => key !== "date");

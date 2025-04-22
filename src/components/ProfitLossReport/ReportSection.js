@@ -3,7 +3,7 @@ import { Box, Button, Typography, Paper, CircularProgress, Alert, Stack, Divider
 import { getReportByDateRange, deleteEntry, updateEntry, addEntry } from "../../services/profitlossreport";
 import PagenationTable from "./ProfitLossTable";
 import DateComponent from "../Generic/DateComponent";
-import { subDays, format } from "date-fns";
+import { subDays as subtractDays, format as formatDate } from "date-fns";
 
 const reportColumns = [
     { accessorKey: "date", header: "Report Date" },
@@ -20,15 +20,15 @@ const ReportSection = () => {
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [startDate, setStartDate] = useState(subDays(new Date(), 90)); // Default: 90 days ago
+    const [startDate, setStartDate] = useState(subtractDays(new Date(), 90)); // Default: 90 days ago
     const [endDate, setEndDate] = useState(new Date()); // Default: Today
 
     // Fetch report data
     async function fetchReport() {
         setLoading(true);
         setError(null);
-        const formattedStartDate = format(startDate, "yyyy-MM-dd");
-        const formattedEndDate = format(endDate, "yyyy-MM-dd");
+        const formattedStartDate = formatDate(startDate, "yyyy-MM-dd");
+        const formattedEndDate = formatDate(endDate, "yyyy-MM-dd");
 
         try {
             const data = await getReportByDateRange(formattedStartDate, formattedEndDate);
