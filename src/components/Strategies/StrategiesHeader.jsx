@@ -16,7 +16,12 @@ import {
     Paper,
     Alert,
     CircularProgress,
-    IconButton
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Grid
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -25,6 +30,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import { CreateStrategy } from './CreateStrategyPopup';
 import { getStrategies } from '../../services/strategies';
 import { useNavigate } from "react-router-dom";
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 
 const SearchForm = ({ searchData, onSearchDataChange, onSearch, onClear, onClose }) => (
     <Container maxWidth={false} sx={{
@@ -207,61 +214,108 @@ const StrategyHeader = () => {
     };
 
     return (
-        <Stack spacing={3}>
-            <Container sx={{ p: 2 }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        gap: 2,
-                        alignItems: { xs: 'stretch', sm: 'center' }
-                    }}
-                >
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => setShowCreateStrategy(true)}
-                        sx={{ flex: { xs: 1, sm: 'none' } }}
-                    >
-                        Create Strategy
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => setViewSearchFilter(true)}
-                        sx={{ flex: { xs: 1, sm: 'none' } }}
-                    >
-                        View Strategies
-                    </Button>
-                </Box>
-            </Container>
-
-            {error && (
-                <Alert severity="error" sx={{ mx: 3 }}>
-                    {error}
-                </Alert>
-            )}
+        <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setShowCreateStrategy(true)}
+                startIcon={<AddIcon />}
+                sx={{
+                    minWidth: '160px',
+                    textTransform: 'none',
+                    fontWeight: 'medium'
+                }}
+            >
+                Create Strategy
+            </Button>
+            <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setViewSearchFilter(true)}
+                startIcon={<SearchIcon />}
+                sx={{
+                    minWidth: '160px',
+                    textTransform: 'none',
+                    fontWeight: 'medium'
+                }}
+            >
+                Search Strategies
+            </Button>
 
             {viewSearchFilter && (
-                <SearchForm
-                    searchData={searchData}
-                    onSearchDataChange={handleSearchDataChange}
-                    onSearch={handleSearch}
-                    onClear={handleClear}
+                <Dialog
+                    open={viewSearchFilter}
                     onClose={() => setViewSearchFilter(false)}
-                />
-            )}
-
-            {loading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", my: 6 }}>
-                    <CircularProgress />
-                </Box>
-            ) : strategies.length > 0 && (
-                <StrategyTable
-                    strategies={strategies}
-                    onStrategyClick={handleStrategyClick}
-                    onClose={() => setStrategies([])}
-                />
+                    maxWidth="md"
+                    fullWidth
+                >
+                    <DialogTitle>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="h6">Search Strategies</Typography>
+                            <IconButton onClick={() => setViewSearchFilter(false)}>
+                                <CloseIcon />
+                            </IconButton>
+                        </Box>
+                    </DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ mt: 2 }}>
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        label="Name"
+                                        name="name"
+                                        fullWidth
+                                        value={searchData.name}
+                                        onChange={handleSearchDataChange}
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        select
+                                        label="Status"
+                                        name="status"
+                                        fullWidth
+                                        value={searchData.status}
+                                        onChange={handleSearchDataChange}
+                                        size="small"
+                                    >
+                                        <MenuItem value="OPEN">OPEN</MenuItem>
+                                        <MenuItem value="CLOSE">CLOSE</MenuItem>
+                                    </TextField>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="Created After"
+                                            value={searchData.createdafter}
+                                            onChange={(date) => handleSearchDataChange({ target: { name: "createdafter", value: date } })}
+                                            renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                                        />
+                                    </LocalizationProvider>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="Created Before"
+                                            value={searchData.createdbefore}
+                                            onChange={(date) => handleSearchDataChange({ target: { name: "createdbefore", value: date } })}
+                                            renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                                        />
+                                    </LocalizationProvider>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleClear} color="inherit">
+                            Clear
+                        </Button>
+                        <Button onClick={handleSearch} variant="contained" color="primary">
+                            Search
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             )}
 
             {showCreateStrategy && (
@@ -271,7 +325,60 @@ const StrategyHeader = () => {
                     onCancel={() => setShowCreateStrategy(false)}
                 />
             )}
-        </Stack>
+
+            {strategies.length > 0 && (
+                <Dialog
+                    open={strategies.length > 0}
+                    onClose={() => setStrategies([])}
+                    maxWidth="md"
+                    fullWidth
+                >
+                    <DialogTitle>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Typography variant="h6">Search Results</Typography>
+                            <IconButton onClick={() => setStrategies([])}>
+                                <CloseIcon />
+                            </IconButton>
+                        </Box>
+                    </DialogTitle>
+                    <DialogContent>
+                        <TableContainer>
+                            <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><b>ID</b></TableCell>
+                                        <TableCell><b>Name</b></TableCell>
+                                        <TableCell><b>Description</b></TableCell>
+                                        <TableCell><b>Status</b></TableCell>
+                                        <TableCell><b>Created Date</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {strategies.map((strategy, index) => (
+                                        <TableRow
+                                            key={strategy.id}
+                                            hover
+                                            onClick={() => handleStrategyClick(strategy)}
+                                            sx={{
+                                                cursor: "pointer",
+                                                "&:hover": { backgroundColor: "action.hover" },
+                                                backgroundColor: index % 2 === 0 ? "background.paper" : "background.default"
+                                            }}
+                                        >
+                                            <TableCell>{strategy.id}</TableCell>
+                                            <TableCell>{strategy.name}</TableCell>
+                                            <TableCell>{strategy.description}</TableCell>
+                                            <TableCell>{strategy.status}</TableCell>
+                                            <TableCell>{strategy.created_at}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </Box>
     );
 };
 

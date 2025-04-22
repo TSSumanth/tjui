@@ -13,10 +13,12 @@ import {
     useTheme,
     Dialog,
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { updateStrategy, getOpenStrategies } from '../../services/strategies';
 import { getStockTradesbyId, getOptionTradesbyId, addNewOptionTrade, addNewStockTrade, updateStockTrade, updateOptionTrade } from '../../services/trades';
 import { StockTradeForm } from "../Trades/StockTradeForm.jsx";
@@ -24,6 +26,7 @@ import OptionTradeForm from "../Trades/OptionTradeForm.jsx";
 
 const StrategyCard = ({ strategy }) => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const [showCreateStockTrade, setShowCreateStockTrade] = useState(false);
     const [showCreateOptionTrade, setShowCreateOptionTrade] = useState(false);
     const [showUpdateTrade, setShowUpdateTrade] = useState(false);
@@ -85,7 +88,7 @@ const StrategyCard = ({ strategy }) => {
                 }))
             ]);
 
-            // Process and sort trades
+            // Process and sort trades - Only include OPEN trades
             const processedTrades = [
                 ...stockTrades
                     .filter(trade => trade && (Array.isArray(trade) ? trade.length > 0 : true))
@@ -101,7 +104,8 @@ const StrategyCard = ({ strategy }) => {
                                 ? (tradeData.openquantity / tradeData.lotsize)
                                 : tradeData.openquantity
                         };
-                    }),
+                    })
+                    .filter(trade => trade.status === 'OPEN'), // Filter only OPEN trades
                 ...optionTrades
                     .filter(trade => trade && (Array.isArray(trade) ? trade.length > 0 : true))
                     .map(trade => {
@@ -117,24 +121,25 @@ const StrategyCard = ({ strategy }) => {
                                 : tradeData.openquantity
                         };
                     })
-            ].sort((a, b) => {
-                // Sort by status (OPEN first) and then by entry date
-                if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
-                if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
-                return new Date(b.entrydate || 0) - new Date(a.entrydate || 0);
-            });
+                    .filter(trade => trade.status === 'OPEN') // Filter only OPEN trades
+            ].sort((a, b) => new Date(b.entrydate || 0) - new Date(a.entrydate || 0)); // Sort by entry date since all trades are OPEN
 
-            console.log('Final processed trades:', processedTrades);
+            console.log('Final processed trades (OPEN only):', processedTrades);
 
             if (processedTrades.length === 0) {
-                console.log('No trades found after processing');
+                console.log('No open trades found after processing');
             }
 
             setTrades(processedTrades);
-            setOverallReturn(processedTrades.reduce((sum, trade) => {
-                const pl = parseFloat(trade.realizedpl || trade.overallreturn || 0);
-                return sum + pl;
-            }, 0));
+
+            // Calculate overall return only for open trades
+            const totalReturn = processedTrades.reduce((sum, trade) => {
+                const unrealizedPL = parseFloat(trade.unrealizedpl || 0);
+                const realizedPL = parseFloat(trade.realizedpl || 0);
+                return sum + unrealizedPL + realizedPL;
+            }, 0);
+
+            setOverallReturn(totalReturn);
         } catch (error) {
             console.error('Error in fetchTrades:', error);
             setError("Failed to fetch trades. Please try again later.");
@@ -224,6 +229,11 @@ const StrategyCard = ({ strategy }) => {
             console.error('Error updating trade:', error);
             setError(error.response?.data?.message || "Failed to update trade. Please try again.");
         }
+    };
+
+    const handleViewDetails = () => {
+        navigate(`/updatestrategy/${strategy.id}`);
+        window.scrollTo(0, 0);
     };
 
     const TradeCard = ({ trade }) => {
@@ -404,13 +414,13 @@ const StrategyCard = ({ strategy }) => {
                                 display: 'grid',
                                 gridTemplateColumns: {
                                     xs: '1fr',
-                                    sm: 'repeat(2, minmax(0, 1fr))',
-                                    md: 'repeat(3, minmax(0, 1fr))',
-                                    lg: 'repeat(4, minmax(0, 1fr))',
-                                    xl: 'repeat(5, minmax(0, 1fr))'
+                                    sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                    md: 'repeat(auto-fill, minmax(300px, 1fr))',
+                                    lg: 'repeat(auto-fill, minmax(320px, 1fr))'
                                 },
                                 gap: 3,
-                                width: '100%'
+                                width: '100%',
+                                mt: 3
                             }}
                         >
                             {trades.map((trade) => (
@@ -425,27 +435,95 @@ const StrategyCard = ({ strategy }) => {
                 <Box
                     sx={{
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
+                        flexDirection: 'column',
+                        gap: 2,
                         p: 3,
                         borderRadius: 2,
-                        bgcolor: overallReturn >= 0 ? theme.palette.success.light : theme.palette.error.light,
-                        color: overallReturn >= 0 ? theme.palette.success.contrastText : theme.palette.error.contrastText
+                        bgcolor: 'rgba(255, 255, 255, 0.9)',
+                        border: `1px solid ${theme.palette.divider}`,
                     }}
                 >
-                    <Typography variant="h6" sx={{ fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
-                        {overallReturn >= 0 ? <TrendingUpIcon sx={{ mr: 1.5 }} /> : <TrendingDownIcon sx={{ mr: 1.5 }} />}
-                        Overall Realized P/L
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                        {overallReturn >= 0 ? '+' : ''}₹{overallReturn.toLocaleString('en-IN')}
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                        <Alert
+                            severity="info"
+                            sx={{
+                                mb: 1,
+                                py: 0.5,
+                                '& .MuiAlert-icon': {
+                                    alignItems: 'center'
+                                }
+                            }}
+                        >
+                            <Typography variant="caption">
+                                Open Strategy and Update Last Traded Price of your Positions to get updated P/L.
+                            </Typography>
+                        </Alert>
+
+                        <Box sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: 1,
+                            p: 1,
+                            bgcolor: 'background.paper',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider'
+                        }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    <AttachMoneyIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
+                                    Realized
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color={Number(strategy.realized_pl || 0) >= 0 ? 'success.main' : 'error.main'}
+                                >
+                                    {new Intl.NumberFormat('en-IN', {
+                                        style: 'currency',
+                                        currency: 'INR'
+                                    }).format(Number(strategy.realized_pl || 0))}
+                                </Typography>
+                            </Box>
+
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    <TrendingUpIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
+                                    Unrealized
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color={Number(strategy.unrealized_pl || 0) >= 0 ? 'success.main' : 'error.main'}
+                                >
+                                    {new Intl.NumberFormat('en-IN', {
+                                        style: 'currency',
+                                        currency: 'INR'
+                                    }).format(Number(strategy.unrealized_pl || 0))}
+                                </Typography>
+                            </Box>
+
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    <AccountBalanceWalletIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
+                                    Overall
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color={(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0)) >= 0 ? 'success.main' : 'error.main'}
+                                    sx={{ fontWeight: 'bold' }}
+                                >
+                                    {new Intl.NumberFormat('en-IN', {
+                                        style: 'currency',
+                                        currency: 'INR'
+                                    }).format(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0))}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Box>
                 </Box>
 
                 <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
-                        component={Link}
-                        to={`/updatestrategy/${strategy.id}`}
+                        onClick={handleViewDetails}
                         variant="contained"
                         color="primary"
                         sx={{
@@ -542,7 +620,9 @@ const StrategyCards = () => {
                             name: element.name,
                             description: element.description,
                             stock_trades: element.stock_trades || [],
-                            option_trades: element.option_trades || []
+                            option_trades: element.option_trades || [],
+                            realized_pl: element.realized_pl || 0,
+                            unrealized_pl: element.unrealized_pl || 0
                         };
                     })
                 );
@@ -561,7 +641,7 @@ const StrategyCards = () => {
     }, []);
 
     return (
-        <Stack spacing={4}>
+        <Stack spacing={4} sx={{ width: '100%' }}>
             <Typography variant="h4" sx={{
                 fontWeight: "bold",
                 textAlign: "center",
@@ -588,8 +668,10 @@ const StrategyCards = () => {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 4,
-                        px: 3,
-                        pb: 4
+                        width: '100%',
+                        '& > *': {
+                            width: '100%'
+                        }
                     }}
                 >
                     {openStrategies.length > 0 ? (
@@ -603,7 +685,8 @@ const StrategyCards = () => {
                                 textAlign: 'center',
                                 bgcolor: 'background.paper',
                                 borderRadius: 2,
-                                boxShadow: 1
+                                boxShadow: 1,
+                                width: '100%'
                             }}
                         >
                             <Typography variant="h6" color="text.secondary">
@@ -620,4 +703,5 @@ const StrategyCards = () => {
     );
 };
 
+export { StrategyCard };
 export default StrategyCards;

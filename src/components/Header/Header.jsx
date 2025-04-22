@@ -1,64 +1,227 @@
-import React from "react";
-import { AppBar, Toolbar, Button, Box } from "@mui/material";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { AppBar, Toolbar, Button, Box, Menu, MenuItem, Typography, Divider } from "@mui/material";
+import { Link, useLocation } from "react-router-dom";
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import HomeIcon from '@mui/icons-material/Home';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 
 const Header = () => {
     return (
-        <AppBar
-            position="static" // Keeps the header fixed at the top
-            sx={{ backgroundColor: "#1976d2", top: 0, margin: 0, padding: 0, boxShadow: "none" }}
-        >
-            <Toolbar sx={{ display: "flex", justifyContent: "space-between", minHeight: "60px", padding: "10px 10px" }}>
-                <Box>
-                    <Link to="/">
-                        <img
-                            src="/logo.png"  // Replace with your actual logo path
-                            alt="Logo"
-                            style={{ height: 50 }}
-                        />
-                    </Link>
-                </Box>
+        <>
+            <AppBar
+                position="fixed"
+                sx={{
+                    backgroundColor: "#1976d2",
+                    top: 0,
+                    margin: 0,
+                    padding: 0,
+                    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+                    zIndex: 1000
+                }}
+            >
+                <Toolbar sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    minHeight: "60px",
+                    padding: "10px 10px",
+                    maxWidth: "1400px",
+                    margin: "0 auto",
+                    width: "100%"
+                }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Link to="/" style={{ textDecoration: "none" }}>
+                            <img
+                                src="/logo.png"
+                                alt="Logo"
+                                style={{ height: 40 }}
+                            />
+                        </Link>
+                        <Button
+                            component={Link}
+                            to="/"
+                            variant="contained"
+                            startIcon={<HomeIcon />}
+                            sx={{
+                                backgroundColor: "white",
+                                color: "#1976d2",
+                                minWidth: "100px",
+                                padding: "6px 12px",
+                                "&:hover": { backgroundColor: "#e3f2fd" }
+                            }}
+                        >
+                            Home
+                        </Button>
+                    </Box>
 
-                <Box>
-                    <ButtonGroup />
-                </Box>
-            </Toolbar>
-        </AppBar>
+                    <Box>
+                        <ButtonGroup />
+                    </Box>
+                </Toolbar>
+            </AppBar>
+            {/* Spacer div to prevent content overlap */}
+            <Box sx={{ height: "80px" }} />
+        </>
     );
 };
 
 const ButtonGroup = () => {
-    const buttons = [
-        { label: "Home", path: "/" },
-        { label: "Daily Market Analysis", path: "/marketanalysis" },
-        { label: "Trades", path: "/trades" },
-        { label: "Profit Loss Report", path: "/profitlossreport" },
-        { label: "My Stratagies", path: "/mystrategies" },
-        { label: "Dashboard", path: "/dashboard" },
-        { label: "Tag Management", path: "/tagmanagement" },
-        { label: "Zerodha Account", path: "/zerodha" }
-    ];
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [activeMenu, setActiveMenu] = useState(null);
+    const [showCreateStrategy, setShowCreateStrategy] = useState(false);
+    const location = useLocation();
+
+    const menuItems = {
+        "Trading": {
+            icon: <TrendingUpIcon />,
+            items: {
+                "Daily Market Analysis": { path: "/marketanalysis", icon: <AssessmentIcon /> },
+                "Trades": { path: "/trades", icon: <ListAltIcon /> },
+                "Profit Loss Report": { path: "/profitlossreport", icon: <AssessmentIcon /> }
+            }
+        },
+        "Strategies": {
+            icon: <PsychologyIcon />,
+            items: {
+                "My Strategies": { path: "/mystrategies", icon: <ListAltIcon /> },
+                "Create Strategy": {
+                    path: "#",
+                    icon: <PsychologyIcon />,
+                    onClick: () => {
+                        handleClose();
+                        setShowCreateStrategy(true);
+                    }
+                }
+            }
+        },
+        "Management": {
+            icon: <SettingsIcon />,
+            items: {
+                "Tag Management": { path: "/tagmanagement", icon: <LocalOfferIcon /> },
+                "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> }
+            }
+        },
+        "Zerodha": {
+            icon: <AccountBalanceIcon />,
+            items: {
+                "Account": { path: "/zerodha", icon: <AccountCircleIcon /> },
+                "Portfolio": { path: "/portfolio", icon: <AccountBalanceWalletIcon /> },
+                "Orders": { path: "/zerodha/orders", icon: <ReceiptIcon /> }
+            }
+        }
+    };
+
+    const handleClick = (event, menuName) => {
+        setAnchorEl(event.currentTarget);
+        setActiveMenu(menuName);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+        setActiveMenu(null);
+    };
+
+    const isActive = (path) => {
+        return location.pathname === path;
+    };
+
+    const handleCreateStrategySubmit = () => {
+        setShowCreateStrategy(false);
+        // Optionally refresh the strategies list or navigate to My Strategies
+    };
 
     return (
-        <Box sx={{ display: "flex", gap: 1 }}>
-            {buttons.map((btn, index) => (
-                <Button
-                    key={index}
-                    component={Link}
-                    to={btn.path}
-                    variant="contained"
-                    sx={{
-                        backgroundColor: "white",
-                        color: "#1976d2",
-                        minWidth: "100px",
-                        padding: "6px 12px",
-                        "&:hover": { backgroundColor: "#e3f2fd" }
-                    }}
-                >
-                    {btn.label}
-                </Button>
-            ))}
-        </Box>
+        <>
+            <Box sx={{ display: "flex", gap: 1 }}>
+                {Object.entries(menuItems).map(([menuName, { icon, items }]) => (
+                    <React.Fragment key={menuName}>
+                        <Button
+                            onClick={(e) => handleClick(e, menuName)}
+                            variant="contained"
+                            startIcon={icon}
+                            endIcon={<KeyboardArrowDownIcon />}
+                            sx={{
+                                backgroundColor: "white",
+                                color: "#1976d2",
+                                minWidth: "120px",
+                                padding: "6px 12px",
+                                "&:hover": { backgroundColor: "#e3f2fd" }
+                            }}
+                        >
+                            {menuName}
+                        </Button>
+                        <Menu
+                            anchorEl={anchorEl}
+                            open={activeMenu === menuName}
+                            onClose={handleClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'left',
+                            }}
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    mt: 1,
+                                    minWidth: "200px",
+                                    boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
+                                    "& .MuiMenuItem-root": {
+                                        padding: "8px 16px",
+                                        "&:hover": {
+                                            backgroundColor: "#e3f2fd"
+                                        }
+                                    }
+                                }
+                            }}
+                        >
+                            {Object.entries(items).map(([label, { path, icon, onClick }]) => (
+                                <MenuItem
+                                    key={path}
+                                    component={onClick ? 'button' : Link}
+                                    to={onClick ? undefined : path}
+                                    onClick={onClick || handleClose}
+                                    selected={isActive(path)}
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        color: isActive(path) ? "#1976d2" : "inherit",
+                                        fontWeight: isActive(path) ? 600 : 400,
+                                        width: "100%",
+                                        border: "none",
+                                        background: "none",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    {icon}
+                                    {label}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </React.Fragment>
+                ))}
+            </Box>
+
+            {showCreateStrategy && (
+                <CreateStrategy
+                    title="Create New Strategy"
+                    onCancel={() => setShowCreateStrategy(false)}
+                    onSubmit={handleCreateStrategySubmit}
+                />
+            )}
+        </>
     );
 };
 

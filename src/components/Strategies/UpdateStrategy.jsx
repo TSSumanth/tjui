@@ -40,6 +40,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import moment from 'moment';
+import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const TABLE_STYLES = {
     container: {
@@ -89,7 +91,6 @@ function UpdateStrategy({ id }) {
     const [showCreateOptionTrade, setShowCreateOptionTrade] = useState(false);
     const [showUpdateTrade, setShowUpdateTrade] = useState(false);
     const [selectedTrade, setSelectedTrade] = useState(null);
-    const [totalUnrealizedPL, setTotalUnrealizedPL] = useState(0);
     const [nameError, setNameError] = useState("");
     const [showLTPDialog, setShowLTPDialog] = useState(false);
     const [plSummary, setPlSummary] = useState({
@@ -102,6 +103,12 @@ function UpdateStrategy({ id }) {
         message: '',
         severity: 'success'
     });
+    const navigate = useNavigate();
+
+    const hasOpenTradesWithZeroLTP = React.useMemo(() => {
+        const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
+        return openTrades.some(trade => !trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00);
+    }, [stockTrades, optionTrades]);
 
     const fetchNotes = useCallback(async (strategyId) => {
         try {
@@ -170,7 +177,6 @@ function UpdateStrategy({ id }) {
 
             setStockTrades(formattedStockTrades);
             setOptionTrades(formattedOptionTrades);
-            setTotalUnrealizedPL(overallReturn);
         } catch (error) {
             console.error('Error fetching trades:', error);
             setError('Failed to fetch trades. Please try again later.');
@@ -313,7 +319,14 @@ function UpdateStrategy({ id }) {
 
     const handleUpdateStrategy = async () => {
         try {
-            await updateStrategy(strategy);
+            // Include P/L values in the strategy update
+            const updatedStrategy = {
+                ...strategy,
+                realized_pl: plSummary.realizedPL,
+                unrealized_pl: plSummary.unrealizedPL
+            };
+
+            await updateStrategy(updatedStrategy);
             await fetchTrades();
             setSnackbar({
                 open: true,
@@ -396,7 +409,6 @@ function UpdateStrategy({ id }) {
             await Promise.all(updatePromises);
 
             // Update local state
-            setTotalUnrealizedPL(totalUnrealized);
             setStockTrades(prevTrades =>
                 prevTrades.map(trade => {
                     const updatedTrade = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
@@ -451,12 +463,22 @@ function UpdateStrategy({ id }) {
             }
         });
 
+        // Update local state
         setPlSummary({
             realizedPL,
             unrealizedPL,
             hasAllLTP
         });
-    }, [stockTrades, optionTrades, calculateUnrealizedPL, checkAllTradesHaveLTP]);
+
+        // Update strategy with new P/L values
+        if (strategy && (strategy.realized_pl !== realizedPL || strategy.unrealized_pl !== unrealizedPL)) {
+            setStrategy(prev => ({
+                ...prev,
+                realized_pl: realizedPL,
+                unrealized_pl: unrealizedPL
+            }));
+        }
+    }, [stockTrades, optionTrades, calculateUnrealizedPL, checkAllTradesHaveLTP, strategy]);
 
     const sortTrades = useCallback((trades) => {
         return [...trades].sort((a, b) => {
@@ -478,18 +500,10 @@ function UpdateStrategy({ id }) {
 
     useEffect(() => {
         if (strategy && strategy.id) {
-            console.log('Strategy updated, fetching trades and notes');
             fetchTrades();
             fetchNotes(strategy.id);
         }
     }, [strategy, fetchTrades, fetchNotes]);
-
-    useEffect(() => {
-        if (strategy && strategy.id) {
-            console.log('Strategy loaded, fetching trades');
-            fetchTrades();
-        }
-    }, [strategy?.id, fetchTrades]);
 
     useEffect(() => {
         calculatePLSummary();
@@ -497,11 +511,6 @@ function UpdateStrategy({ id }) {
 
     const PLSummaryCard = () => {
         const hasOpenTrades = [...stockTrades, ...optionTrades].some(trade => trade.status === 'OPEN');
-        const hasOpenTradesWithZeroLTP = React.useMemo(() => {
-            const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
-            return openTrades.some(trade => !trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00);
-        }, [stockTrades, optionTrades]);
-
         const tradesNeedingUpdate = React.useMemo(() => {
             return [...stockTrades, ...optionTrades]
                 .filter(trade => trade.status === 'OPEN' && (!trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00))
@@ -717,7 +726,6 @@ function UpdateStrategy({ id }) {
                     })
                 );
 
-                setTotalUnrealizedPL(totalUnrealized);
                 setShowLTPDialog(false);
                 calculatePLSummary();
                 handleClose();
@@ -801,23 +809,46 @@ function UpdateStrategy({ id }) {
     }
 
     return (
-        <Box p={4}>
-            <Grid container spacing={3}>
-                {/* Strategy Details Section */}
+        <Box sx={{ p: 3 }}>
+            <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                mb: 4,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 2
+            }}>
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate('/mystrategies')}
+                    sx={{
+                        mr: 3,
+                        color: 'text.primary',
+                        '&:hover': {
+                            backgroundColor: 'action.hover',
+                        }
+                    }}
+                >
+                    Back to Strategies
+                </Button>
+            </Box>
+
+            <Grid container spacing={4}>
+                {/* Combined Strategy Details and P/L Summary Section */}
                 <Grid item xs={12}>
-                    <Card>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="h5" fontWeight="bold">
+                    <Card elevation={2}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Box sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mb: 3
+                            }}>
+                                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
                                     {strategy?.name || 'Strategy Details'}
                                 </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                    {totalUnrealizedPL >= 0 ? <TrendingUpIcon color="success" /> : <TrendingDownIcon color="error" />}
-                                    <Typography variant="h6" sx={{ ml: 1 }}>
-                                        {totalUnrealizedPL >= 0 ? '+' : ''}₹{totalUnrealizedPL.toLocaleString('en-IN')}
-                                    </Typography>
-                                </Box>
                             </Box>
+
                             <Grid container spacing={3}>
                                 <Grid item xs={12} md={6}>
                                     <TextField
@@ -827,10 +858,11 @@ function UpdateStrategy({ id }) {
                                         onChange={handleNameChange}
                                         error={!!nameError}
                                         helperText={nameError}
+                                        size="small"
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={6}>
-                                    <FormControl fullWidth>
+                                    <FormControl fullWidth size="small">
                                         <InputLabel>Status</InputLabel>
                                         <Select
                                             value={strategy?.status || ""}
@@ -843,12 +875,40 @@ function UpdateStrategy({ id }) {
                                     </FormControl>
                                 </Grid>
                             </Grid>
-                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+
+                            <Box sx={{ mt: 3 }}>
+                                <PLSummaryCard />
+                            </Box>
+
+                            <Box sx={{
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                alignItems: 'center',
+                                mt: 3,
+                                gap: 2
+                            }}>
+                                {hasOpenTradesWithZeroLTP ? (
+                                    <Typography
+                                        variant="body2"
+                                        color="error"
+                                    >
+                                        Please update LTP for open trades before saving
+                                    </Typography>
+                                ) : (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Click Update Strategy to save P/L details
+                                    </Typography>
+                                )}
                                 <Button
                                     variant="contained"
                                     color="primary"
                                     onClick={handleUpdateStrategy}
                                     startIcon={<SaveIcon />}
+                                    size="large"
+                                    disabled={hasOpenTradesWithZeroLTP}
                                 >
                                     Update Strategy
                                 </Button>
@@ -857,27 +917,39 @@ function UpdateStrategy({ id }) {
                     </Card>
                 </Grid>
 
-                {/* Add P/L Summary Section */}
-                <Grid item xs={12}>
-                    <PLSummaryCard />
-                </Grid>
-
                 {/* Tabs Section */}
                 <Grid item xs={12}>
-                    <Paper>
-                        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+                    <Paper elevation={2}>
+                        <Tabs
+                            value={activeTab}
+                            onChange={(e, newValue) => setActiveTab(newValue)}
+                            sx={{
+                                borderBottom: 1,
+                                borderColor: 'divider',
+                                '& .MuiTab-root': {
+                                    textTransform: 'none',
+                                    fontWeight: 'medium',
+                                    minHeight: 48
+                                }
+                            }}
+                        >
                             <Tab label="Trades" />
                             <Tab label="Notes" />
                         </Tabs>
-                        <Divider />
 
                         {/* Trades Tab */}
                         {activeTab === 0 && (
-                            <Box p={3}>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2 }}>
+                            <Box sx={{ p: 3 }}>
+                                <Box sx={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    gap: 2,
+                                    mb: 3
+                                }}>
                                     <Button
                                         variant="outlined"
                                         onClick={() => setShowLTPDialog(true)}
+                                        size="large"
                                     >
                                         Update LTP
                                     </Button>
@@ -885,6 +957,7 @@ function UpdateStrategy({ id }) {
                                         variant="contained"
                                         startIcon={<AddIcon />}
                                         onClick={() => setShowCreateStockTrade(true)}
+                                        size="large"
                                     >
                                         Add Stock Trade
                                     </Button>
@@ -893,6 +966,7 @@ function UpdateStrategy({ id }) {
                                         color="secondary"
                                         startIcon={<AddIcon />}
                                         onClick={() => setShowCreateOptionTrade(true)}
+                                        size="large"
                                     >
                                         Add Option Trade
                                     </Button>
