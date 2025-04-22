@@ -517,12 +517,12 @@ function UpdateStrategy({ id }) {
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
 
-        return (
+    return (
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="h6" gutterBottom>
                         P/L Summary
-                    </Typography>
+            </Typography>
 
                     {hasOpenTrades && hasOpenTradesWithZeroLTP && (
                         <Alert severity="warning" sx={{ mb: 2 }}>

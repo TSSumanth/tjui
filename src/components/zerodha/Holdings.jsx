@@ -48,16 +48,17 @@ const Holdings = () => {
     const calculateDayPnL = useMemo(() => (holding) => {
         try {
             const lastPrice = Number(holding.last_price) || 0;
-            const prevClose = Number(holding.previous_close) || lastPrice;
+            const closePrice = Number(holding.close_price) || lastPrice;
             const quantity = Number(holding.quantity) || 0;
-            const dayPnL = (lastPrice - prevClose) * quantity;
+            const dayPnL = (lastPrice - closePrice) * quantity;
 
             console.log('Day P&L calculation:', {
                 symbol: holding.tradingsymbol,
                 lastPrice,
-                prevClose,
+                closePrice,
                 quantity,
-                dayPnL
+                dayPnL,
+                rawData: holding
             });
 
             return dayPnL;
@@ -67,10 +68,28 @@ const Holdings = () => {
         }
     }, []);
 
-    const { totalPnL: calculatedTotalPnL, dayPnL: calculatedDayPnL } = useMemo(() => {
+    // Calculate total P&L and day P&L
+    const { totalPnL, dayPnL } = useMemo(() => {
         const result = holdings.reduce((acc, holding) => {
-            const pnl = Number(holding.pnl) || 0;
-            const dayChange = calculateDayPnL(holding);
+            const lastPrice = Number(holding.last_price) || 0;
+            const avgPrice = Number(holding.average_price) || 0;
+            const quantity = Number(holding.quantity) || 0;
+            const closePrice = Number(holding.close_price) || lastPrice;
+
+            const pnl = (lastPrice - avgPrice) * quantity;
+            const dayChange = (lastPrice - closePrice) * quantity;
+
+            console.log('Holdings calculation:', {
+                symbol: holding.tradingsymbol,
+                lastPrice,
+                closePrice,
+                avgPrice,
+                quantity,
+                pnl,
+                dayChange,
+                rawData: holding
+            });
+
             return {
                 totalPnL: acc.totalPnL + pnl,
                 dayPnL: acc.dayPnL + dayChange
@@ -84,7 +103,7 @@ const Holdings = () => {
         });
 
         return result;
-    }, [holdings, calculateDayPnL]);
+    }, [holdings]);
 
     if (loading) {
         return (
