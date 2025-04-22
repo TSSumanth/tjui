@@ -17,6 +17,7 @@ import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ZerodhaProvider } from './context/ZerodhaContext';
 import Portfolio from './pages/Portfolio';
+import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
 
 function App() {
     return (
@@ -34,6 +35,7 @@ function App() {
                     <Route path="/zerodha" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/fno-instruments" element={<FNOInstrumentsPage />} />
                     <Route path="/zerodha/portfolio" element={<PortfolioDetailsPage />} />
+                    <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
                     <Route path="/actionitems" element={<ActionItemsPage />} />
                     <Route path="/portfolio" element={<Portfolio />} />
                     <Route path="*" element={<Home />} />

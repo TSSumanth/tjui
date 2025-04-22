@@ -28,6 +28,7 @@ import { Link } from 'react-router-dom';
 import Header from '../components/Header/Header';
 import { getStockTrades, getOptionTrades } from '../services/trades';
 import { getOpenStrategies } from '../services/strategies';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 function Home() {
     const [loading, setLoading] = useState(true);
@@ -106,6 +107,8 @@ function Home() {
         { title: 'Market Analysis', icon: <AssessmentIcon />, path: '/marketanalysis' },
         { title: 'Portfolio', icon: <AccountBalanceIcon />, path: '/zerodha/portfolio' }
     ];
+
+    useScrollToTop();
 
     if (loading) {
         return (

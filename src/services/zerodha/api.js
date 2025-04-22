@@ -68,6 +68,11 @@ export const getInstruments = async () => {
     return response.data;
 };
 
+export const getAccountInfo = async () => {
+    const response = await api.get('/api/zerodha/account');
+    return response.data;
+};
+
 export const isAuthenticated = () => {
     return !!(localStorage.getItem('zerodha_access_token') && localStorage.getItem('zerodha_public_token'));
 };

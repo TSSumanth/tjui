@@ -145,7 +145,7 @@ const ButtonGroup = () => {
             items: {
                 "Account": { path: "/zerodha", icon: <AccountCircleIcon /> },
                 "Portfolio": { path: "/portfolio", icon: <AccountBalanceWalletIcon /> },
-                "Orders": { path: "/zerodha/orders", icon: <ReceiptIcon /> }
+                "My Algo Strategies": { path: "/zerodha/algo-strategies", icon: <PsychologyIcon /> }
             }
         }
     };

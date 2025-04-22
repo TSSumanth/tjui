@@ -5,6 +5,7 @@ import Header from '../components/Header/Header';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
 import Orders from '../components/zerodha/Orders';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -21,6 +22,7 @@ const formatCurrency = (value) => {
 const PortfolioDetailsPage = () => {
     const { holdings, positions, fetchData, loading, error, isAutoSync } = useZerodha();
     const [activeTab, setActiveTab] = useState(0);
+    useScrollToTop();
 
     // Calculate P&L components
     const { holdingsPnL, positionsPnL, holdingsDayPnL, positionsDayPnL, totalPnL, totalDayPnL } = React.useMemo(() => {

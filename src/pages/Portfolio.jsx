@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper } from '@mui/material';
+import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import Header from '../components/Header/Header';
 import Holdings from '../components/zerodha/Holdings';
@@ -7,6 +7,9 @@ import Positions from '../components/zerodha/Positions';
 import Orders from '../components/zerodha/Orders';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import useScrollToTop from '../hooks/useScrollToTop';
 
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -32,8 +35,12 @@ const getPositionType = (tradingsymbol) => {
 };
 
 const Portfolio = () => {
+    const theme = useTheme();
     const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync } = useZerodha();
     const [activeTab, setActiveTab] = useState(0);
+
+    // Scroll to top when component mounts
+    useScrollToTop();
 
     // Process positions data
     const processedPositions = React.useMemo(() => {
@@ -138,63 +145,108 @@ const Portfolio = () => {
 
     if (!isAuth) {
         return (
-            <div>
+            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
                 <Header />
-                <Container maxWidth="md" sx={{ mt: 4 }}>
-                    <Typography variant="h5" gutterBottom>
-                        Please authenticate with Zerodha to view your portfolio
-                    </Typography>
+                <Container maxWidth="md" sx={{ mt: 8 }}>
+                    <Paper sx={{
+                        p: 4,
+                        textAlign: 'center',
+                        borderRadius: 2,
+                        boxShadow: theme.shadows[2],
+                        background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`
+                    }}>
+                        <AccountBalanceIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                        <Typography variant="h5" gutterBottom>
+                            Please authenticate with Zerodha
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                            Connect your Zerodha account to view your portfolio and trading information
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            onClick={fetchData}
+                            disabled={loading}
+                        >
+                            {loading ? 'Connecting...' : 'Connect to Zerodha'}
+                        </Button>
+                    </Paper>
                 </Container>
-            </div>
+            </Box>
         );
     }
 
     return (
-        <div>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <Header />
-            <Box sx={{ width: '100%', p: 3 }}>
-                <Box mb={3} display="flex" justifyContent="space-between" alignItems="center">
-                    <Box>
-                        <Typography variant="h4" color="success.main">Portfolio Overview</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Last updated: {new Date().toLocaleTimeString()}
-                        </Typography>
+            <Container maxWidth="lg" sx={{ py: 4 }}>
+                {/* Header Section */}
+                <Paper sx={{
+                    p: 3,
+                    mb: 3,
+                    borderRadius: 2,
+                    boxShadow: theme.shadows[2],
+                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`
+                }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                <ShowChartIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+                                <Typography variant="h4">Portfolio Overview</Typography>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary">
+                                Last updated: {new Date().toLocaleTimeString()}
+                            </Typography>
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={2}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={isAutoSync}
+                                        onChange={handleAutoSyncChange}
+                                        color="primary"
+                                    />
+                                }
+                                label={
+                                    <Box display="flex" alignItems="center">
+                                        Auto-sync
+                                        <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
+                                            <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+                                        </Tooltip>
+                                    </Box>
+                                }
+                            />
+                            <Button
+                                variant="outlined"
+                                startIcon={<RefreshIcon />}
+                                onClick={fetchData}
+                                disabled={loading}
+                                sx={{
+                                    borderRadius: 2,
+                                    textTransform: 'none',
+                                    px: 2
+                                }}
+                            >
+                                {loading ? 'Refreshing...' : 'Refresh Data'}
+                            </Button>
+                        </Box>
                     </Box>
-                    <Box display="flex" alignItems="center" gap={2}>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={isAutoSync}
-                                    onChange={handleAutoSyncChange}
-                                    color="primary"
-                                />
-                            }
-                            label={
-                                <Box display="flex" alignItems="center">
-                                    Auto-sync
-                                    <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
-                                        <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
-                                    </Tooltip>
-                                </Box>
-                            }
-                        />
-                        <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
-                            onClick={fetchData}
-                            disabled={loading}
-                        >
-                            {loading ? 'Refreshing...' : 'Refresh Data'}
-                        </Button>
-                    </Box>
-                </Box>
+                </Paper>
 
                 {/* Portfolio Stats */}
-                <Paper elevation={0} sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
-                    <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
+                <Grid container spacing={3} sx={{ mb: 3 }}>
+                    <Grid item xs={12} md={4}>
+                        <Paper sx={{
+                            p: 3,
+                            height: '100%',
+                            borderRadius: 2,
+                            boxShadow: theme.shadows[2],
+                            background: `linear-gradient(45deg, ${alpha(theme.palette.success.main, 0.05)}, ${alpha(theme.palette.success.main, 0.1)})`,
+                            border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
+                        }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                                     Equity Holdings
                                     <Tooltip title="Your long-term equity investments">
                                         <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
@@ -208,18 +260,29 @@ const Portfolio = () => {
                                         label={`Today's Change: ${formatCurrency(holdingsDayPnL)}`}
                                         color={holdingsDayPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                     <Chip
                                         label={`Overall P&L: ${formatCurrency(holdingsPnL)}`}
                                         color={holdingsPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                 </Stack>
                             </Box>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
+                        </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <Paper sx={{
+                            p: 3,
+                            height: '100%',
+                            borderRadius: 2,
+                            boxShadow: theme.shadows[2],
+                            background: `linear-gradient(45deg, ${alpha(theme.palette.warning.main, 0.05)}, ${alpha(theme.palette.warning.main, 0.1)})`,
+                            border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`
+                        }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                                     F&O Positions
                                     <Tooltip title="Your Futures and Options positions">
                                         <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
@@ -233,18 +296,29 @@ const Portfolio = () => {
                                         label={`Today's M2M: ${formatCurrency(positionsDayPnL)}`}
                                         color={positionsDayPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                     <Chip
                                         label={`Total P&L: ${formatCurrency(positionsTotalPnL)}`}
                                         color={positionsTotalPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                 </Stack>
                             </Box>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
+                        </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <Paper sx={{
+                            p: 3,
+                            height: '100%',
+                            borderRadius: 2,
+                            boxShadow: theme.shadows[2],
+                            background: `linear-gradient(45deg, ${alpha(theme.palette.info.main, 0.05)}, ${alpha(theme.palette.info.main, 0.1)})`,
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
+                        }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                                     Total Portfolio
                                     <Tooltip title="Combined performance of your equity and F&O positions">
                                         <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
@@ -258,63 +332,52 @@ const Portfolio = () => {
                                         label={`Today's P&L: ${formatCurrency(totalDayPnL)}`}
                                         color={totalDayPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                     <Chip
                                         label={`Net P&L: ${formatCurrency(totalPnL)}`}
                                         color={totalPnL >= 0 ? "success" : "error"}
                                         size="small"
+                                        sx={{ borderRadius: 1 }}
                                     />
                                 </Stack>
                             </Box>
-                        </Grid>
+                        </Paper>
                     </Grid>
-                </Paper>
+                </Grid>
 
                 {/* Tabs Section */}
-                <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
+                <Paper sx={{
+                    borderRadius: 2,
+                    boxShadow: theme.shadows[2],
+                    overflow: 'hidden'
+                }}>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                        <Tabs value={activeTab} onChange={handleTabChange} aria-label="portfolio tabs">
+                        <Tabs
+                            value={activeTab}
+                            onChange={handleTabChange}
+                            aria-label="portfolio tabs"
+                            sx={{
+                                '& .MuiTab-root': {
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    minHeight: 48
+                                }
+                            }}
+                        >
                             <Tab label="Holdings" id="portfolio-tab-0" aria-controls="portfolio-tabpanel-0" />
                             <Tab label="Positions" id="portfolio-tab-1" aria-controls="portfolio-tabpanel-1" />
                             <Tab label="Orders" id="portfolio-tab-2" aria-controls="portfolio-tabpanel-2" />
                         </Tabs>
                     </Box>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 0}
-                        id="portfolio-tabpanel-0"
-                        aria-labelledby="portfolio-tab-0"
-                        style={{ display: activeTab === 0 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Holdings />
-                        </Box>
-                    </div>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 1}
-                        id="portfolio-tabpanel-1"
-                        aria-labelledby="portfolio-tab-1"
-                        style={{ display: activeTab === 1 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Positions />
-                        </Box>
-                    </div>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 2}
-                        id="portfolio-tabpanel-2"
-                        aria-labelledby="portfolio-tab-2"
-                        style={{ display: activeTab === 2 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Orders />
-                        </Box>
-                    </div>
-                </Box>
-            </Box>
-        </div>
+                    <Box sx={{ p: 3, minHeight: '300px' }}>
+                        {activeTab === 0 && <Holdings />}
+                        {activeTab === 1 && <Positions />}
+                        {activeTab === 2 && <Orders />}
+                    </Box>
+                </Paper>
+            </Container>
+        </Box>
     );
 };
 
