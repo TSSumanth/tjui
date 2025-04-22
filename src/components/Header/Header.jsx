@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { AppBar, Toolbar, Button, Box, Menu, MenuItem, Typography, Divider } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import { AppBar, Toolbar, Button, Box, Menu, MenuItem, Typography, Divider, IconButton, Badge } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import HomeIcon from '@mui/icons-material/Home';
@@ -14,9 +14,29 @@ import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
+import { getActionItems } from '../../services/actionitems';
 
 const Header = () => {
+    const [actionItemsCount, setActionItemsCount] = useState(0);
+
+    useEffect(() => {
+        const fetchActionItems = async () => {
+            try {
+                const items = await getActionItems();
+                setActionItemsCount(items.length);
+            } catch (error) {
+                console.error('Error fetching action items:', error);
+            }
+        };
+
+        fetchActionItems();
+        // Refresh every 5 minutes
+        const interval = setInterval(fetchActionItems, 300000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <>
             <AppBar
@@ -67,6 +87,15 @@ const Header = () => {
                     <Box>
                         <ButtonGroup />
                     </Box>
+                    <IconButton
+                        component={Link}
+                        to="/actionitems"
+                        sx={{ ml: 2 }}
+                    >
+                        <Badge badgeContent={actionItemsCount} color="error">
+                            <NotificationsIcon />
+                        </Badge>
+                    </IconButton>
                 </Toolbar>
             </AppBar>
             {/* Spacer div to prevent content overlap */}

@@ -1,10 +1,9 @@
-import  Header  from '../components/Header/Header'
-import ActionItems from '../components/ActionItems/ActionItems'
+import Header from '../components/Header/Header'
+
 function Home() {
     return (
         <div>
             <Header />
-            <ActionItems />
         </div>
     );
 }

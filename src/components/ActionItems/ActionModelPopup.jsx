@@ -18,26 +18,46 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 
 function CreateActionItem({ isOpen, onClose, onSave }) {
-    const [status, setStatus] = useState('');
-    const [description, setDescription] = useState('');
+    const [formData, setFormData] = useState({
+        description: '',
+        status: 'TODO'
+    });
+    const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSave = () => {
-        if (!status || !description) return;
+    const handleSave = async () => {
+        if (!validateForm()) return;
 
         setIsSubmitting(true);
-        onSave({
-            "status": status,
-            "description": description
-        });
-        setIsSubmitting(false);
-        onClose();
+        try {
+            await onSave(formData);
+            setFormData({
+                description: '',
+                status: 'TODO'
+            });
+            onClose();
+        } catch (error) {
+            console.error('Error saving action item:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleClose = () => {
-        setStatus('');
-        setDescription('');
+        setFormData({
+            description: '',
+            status: 'TODO'
+        });
         onClose();
+    };
+
+    const validateForm = () => {
+        const newErrors = {};
+        if (!formData.description.trim()) {
+            newErrors.description = 'Description is required';
+        }
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     return (
@@ -49,7 +69,7 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
             PaperProps={{
                 sx: {
                     borderRadius: 2,
-                    minHeight: '400px'
+                    minHeight: '300px'
                 }
             }}
         >
@@ -80,14 +100,9 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                         <InputLabel id="status-label">Status</InputLabel>
                         <Select
                             labelId="status-label"
-                            value={status}
+                            value={formData.status}
                             label="Status"
-                            onChange={(e) => setStatus(e.target.value)}
-                            sx={{
-                                '& .MuiSelect-select': {
-                                    color: 'text.primary'
-                                }
-                            }}
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                         >
                             <MenuItem value="TODO">TODO</MenuItem>
                             <MenuItem value="COMPLETED">COMPLETED</MenuItem>
@@ -102,17 +117,12 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                             fullWidth
                             multiline
                             rows={4}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             placeholder="Enter description"
                             variant="outlined"
-                            sx={{
-                                '& .MuiOutlinedInput-root': {
-                                    '&:hover fieldset': {
-                                        borderColor: 'primary.main',
-                                    },
-                                },
-                            }}
+                            error={!!errors.description}
+                            helperText={errors.description}
                         />
                     </Box>
                 </Box>
@@ -135,7 +145,7 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                     onClick={handleSave}
                     variant="contained"
                     color="primary"
-                    disabled={isSubmitting || !status || !description}
+                    disabled={isSubmitting}
                     sx={{
                         minWidth: '100px',
                         '&:disabled': {

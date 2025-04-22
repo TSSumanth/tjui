@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Typography,
     Button,
@@ -7,11 +7,17 @@ import {
     Alert,
     Snackbar,
     Paper,
-    Fade
+    List,
+    ListItem,
+    ListItemText,
+    ListItemSecondaryAction,
+    IconButton,
+    Chip,
+    Divider
 } from "@mui/material";
-import { getActionItems, updateActionItem, addActionItem } from "../../services/actionitems.js";
+import { getActionItems, updateActionItem, addActionItem, deleteActionItem } from "../../services/actionitems.js";
 import { CreateActionItem } from "./ActionModelPopup.jsx";
-import ActionCard from "./ActionCard.jsx";
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const ActionItems = () => {
     const [activeActionItems, setActiveActionItems] = useState([]);
@@ -20,36 +26,34 @@ const ActionItems = () => {
     const [showModal, setShowModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState(null);
 
-    // Fetch active action items
-    const fetchActiveActionItems = useCallback(async () => {
+    const fetchActiveActionItems = async () => {
         try {
             setLoading(true);
             setError(null);
             const data = await getActionItems();
-            setActiveActionItems(data);
+            // Filter out completed items
+            const activeItems = data.filter(item => item.status !== 'COMPLETED');
+            setActiveActionItems(activeItems);
         } catch (error) {
             console.error("Error fetching action items:", error);
             setError("Failed to fetch action items. Please try again later.");
         } finally {
             setLoading(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
         fetchActiveActionItems();
-    }, [fetchActiveActionItems]);
+    }, []);
 
-    // Mark an action as complete
     const markComplete = async (item) => {
         try {
             setLoading(true);
             setError(null);
             const updatedItem = { ...item, status: "COMPLETED" };
-            const response = await updateActionItem(updatedItem);
-            if (response) {
-                setActiveActionItems((prev) => prev.filter((record) => record.id !== item.id));
-                setSuccessMessage("Action item marked as complete!");
-            }
+            await updateActionItem(updatedItem);
+            await fetchActiveActionItems();
+            setSuccessMessage("Action item marked as complete!");
         } catch (error) {
             console.error("Error updating action item:", error);
             setError("Failed to update action item. Please try again.");
@@ -58,40 +62,18 @@ const ActionItems = () => {
         }
     };
 
-    // Add new action item
-    const addItem = async (item) => {
+    const handleDelete = async (itemId) => {
         try {
-            setLoading(true);
-            setError(null);
-
-            if (!item.status || !item.description) {
-                setError("Status and Description are required.");
-                return;
-            }
-
-            const response = await addActionItem(item);
-            if (response) {
-                await fetchActiveActionItems();
-                setShowModal(false);
-                setSuccessMessage("Action item created successfully!");
-            }
+            await deleteActionItem(itemId);
+            await fetchActiveActionItems();
         } catch (error) {
-            console.error("Error adding action item:", error);
-            setError("Failed to add action item. Please try again.");
-        } finally {
-            setLoading(false);
+            console.error('Error deleting action item:', error);
         }
     };
-
-    // Split active items into two halves for left & right columns
-    const midIndex = Math.ceil(activeActionItems.length / 2);
-    const leftItems = activeActionItems.slice(0, midIndex);
-    const rightItems = activeActionItems.slice(midIndex);
 
     return (
         <Box sx={{ p: 3 }}>
             <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                {/* Header Section */}
                 <Box sx={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -100,26 +82,9 @@ const ActionItems = () => {
                 }}>
                     <Typography variant="h5" sx={{
                         fontWeight: "bold",
-                        color: "primary.main",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1
+                        color: "primary.main"
                     }}>
                         Action Items
-                        {activeActionItems.length > 0 && (
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    bgcolor: "primary.main",
-                                    color: "white",
-                                    px: 1,
-                                    py: 0.5,
-                                    borderRadius: 1
-                                }}
-                            >
-                                {activeActionItems.length}
-                            </Typography>
-                        )}
                     </Typography>
                     <Button
                         variant="contained"
@@ -131,14 +96,12 @@ const ActionItems = () => {
                     </Button>
                 </Box>
 
-                {/* Error Alert */}
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                         {error}
                     </Alert>
                 )}
 
-                {/* Loading State */}
                 {loading && (
                     <Box sx={{
                         display: "flex",
@@ -150,76 +113,52 @@ const ActionItems = () => {
                     </Box>
                 )}
 
-                {/* Action Items List */}
                 {!loading && (
-                    <Box sx={{ display: "flex", gap: 3 }}>
-                        {activeActionItems.length > 0 ? (
-                            <>
-                                <Box sx={{ flex: 1 }}>
-                                    {leftItems.map((item) => (
-                                        <Fade in={true} key={item.id}>
-                                            <Box sx={{ mb: 2 }}>
-                                                <ActionCard
-                                                    item={item}
-                                                    onComplete={() => markComplete(item)}
-                                                />
-                                            </Box>
-                                        </Fade>
-                                    ))}
-                                </Box>
-                                <Box sx={{ flex: 1 }}>
-                                    {rightItems.map((item) => (
-                                        <Fade in={true} key={item.id}>
-                                            <Box sx={{ mb: 2 }}>
-                                                <ActionCard
-                                                    item={item}
-                                                    onComplete={() => markComplete(item)}
-                                                />
-                                            </Box>
-                                        </Fade>
-                                    ))}
-                                </Box>
-                            </>
-                        ) : (
-                            <Box sx={{
-                                width: "100%",
-                                py: 6,
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: 2
-                            }}>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        color: "text.secondary",
-                                    }}
-                                >
-                                    No Pending Action Items
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        color: "text.secondary",
-                                    }}
-                                >
-                                    Create a new action item to get started
-                                </Typography>
-                            </Box>
-                        )}
-                    </Box>
+                    <List>
+                        {activeActionItems.map((item) => (
+                            <React.Fragment key={item.id}>
+                                <ListItem>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                        <Typography variant="body1" sx={{ mb: 1 }}>
+                                            {item.description}
+                                        </Typography>
+                                        <Chip
+                                            label={item.status}
+                                            color={item.status === 'COMPLETED' ? 'success' : 'default'}
+                                            size="small"
+                                            onClick={() => markComplete(item)}
+                                        />
+                                    </Box>
+                                    <ListItemSecondaryAction>
+                                        <IconButton edge="end" onClick={() => handleDelete(item.id)}>
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </ListItemSecondaryAction>
+                                </ListItem>
+                                <Divider />
+                            </React.Fragment>
+                        ))}
+                    </List>
                 )}
 
-                {/* Modal Popup */}
                 {showModal && (
                     <CreateActionItem
                         isOpen={showModal}
                         onClose={() => setShowModal(false)}
-                        onSave={addItem}
+                        onSave={async (newItem) => {
+                            try {
+                                await addActionItem(newItem);
+                                await fetchActiveActionItems();
+                                setShowModal(false);
+                                setSuccessMessage("Action item created successfully!");
+                            } catch (error) {
+                                console.error("Error adding action item:", error);
+                                setError("Failed to add action item. Please try again.");
+                            }
+                        }}
                     />
                 )}
 
-                {/* Success Snackbar */}
                 <Snackbar
                     open={!!successMessage}
                     autoHideDuration={3000}

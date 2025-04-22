@@ -12,6 +12,7 @@ import UpdateStrategyPage from './pages/UpdateStrategy'
 import ZerodhaAccount from './pages/ZerodhaAccount'
 import FNOInstrumentsPage from './pages/FNOInstruments'
 import PortfolioDetailsPage from './pages/PortfolioDetails'
+import ActionItemsPage from './pages/ActionItems'
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ZerodhaProvider } from './context/ZerodhaContext';
@@ -32,6 +33,7 @@ function App() {
                     <Route path="/zerodha" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/fno-instruments" element={<FNOInstrumentsPage />} />
                     <Route path="/zerodha/portfolio" element={<PortfolioDetailsPage />} />
+                    <Route path="/actionitems" element={<ActionItemsPage />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
             </ZerodhaProvider>
