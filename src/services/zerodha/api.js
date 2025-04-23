@@ -101,4 +101,38 @@ export const logout = () => {
     localStorage.removeItem('zerodha_public_token');
 };
 
+export const placeOrder = async (orderParams) => {
+    try {
+        const response = await api.post('/api/zerodha/order', orderParams);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to place order');
+    }
+};
+
+// Helper function to create close position order params
+export const createClosePositionOrder = (position) => {
+    const isLong = position.quantity > 0;
+    return {
+        tradingsymbol: position.tradingsymbol,
+        exchange: position.exchange,
+        transaction_type: isLong ? 'SELL' : 'BUY',
+        quantity: Math.abs(position.quantity),
+        product: position.product,
+        order_type: 'MARKET'
+    };
+};
+
+// Helper function to create close holding order params
+export const createCloseHoldingOrder = (holding) => {
+    return {
+        tradingsymbol: holding.tradingsymbol,
+        exchange: holding.exchange,
+        transaction_type: 'SELL',
+        quantity: holding.quantity,
+        product: 'CNC', // For holdings, always CNC
+        order_type: 'MARKET'
+    };
+};
+
 export default api; 

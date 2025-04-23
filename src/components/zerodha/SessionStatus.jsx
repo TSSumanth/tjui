@@ -2,14 +2,12 @@ import React, { useEffect } from 'react';
 import {
     Box,
     Button,
-    IconButton,
     Menu,
     MenuItem,
     ListItemIcon,
     ListItemText,
     Tooltip,
     CircularProgress,
-    Typography
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { Link } from 'react-router-dom';
@@ -36,20 +34,24 @@ const SessionStatus = () => {
     useEffect(() => {
         const checkSessionStatus = async () => {
             console.log('Checking session status in SessionStatus component');
-            const isValid = await checkSession();
-            if (isValid) {
-                await fetchData();
-            }
+            await checkSession();
+            // Remove the automatic fetchData call after session check
         };
 
-        // Initial check
-        checkSessionStatus();
+        // Initial check only if we're authenticated
+        if (isAuth) {
+            checkSessionStatus();
+        }
 
-        // Set up periodic check every minute
-        const interval = setInterval(checkSessionStatus, 60000);
+        // Set up periodic check every 5 minutes instead of every minute
+        const interval = setInterval(() => {
+            if (isAuth) {
+                checkSessionStatus();
+            }
+        }, 300000); // Check every 5 minutes
 
         return () => clearInterval(interval);
-    }, [checkSession, fetchData]);
+    }, [isAuth, checkSession]); // Remove fetchData from dependencies
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -61,8 +63,8 @@ const SessionStatus = () => {
 
     const handleRefresh = async () => {
         handleClose();
-        await checkSession();
-        if (sessionActive) {
+        const isValid = await checkSession();
+        if (isValid && sessionActive) {
             await fetchData();
         }
     };

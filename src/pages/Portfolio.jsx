@@ -54,11 +54,19 @@ const Portfolio = () => {
                 const isSessionValid = await checkSession();
                 console.log('Session check result:', { isSessionValid, isAuth });
 
-                if (isSessionValid) {
-                    console.log('Session is valid, fetching data...');
+                // Only fetch data if we don't already have holdings or positions
+                const needsInitialFetch = !holdings.length && !positions.length;
+                console.log('Initial fetch check:', { needsInitialFetch, holdingsCount: holdings.length, positionsCount: positions.length });
+
+                if (isSessionValid && needsInitialFetch) {
+                    console.log('Session is valid and data needed, fetching data...');
                     await fetchData();
                 } else {
-                    console.log('Session is invalid or not authenticated');
+                    console.log('Skipping initial fetch:', {
+                        reason: !isSessionValid ? 'Invalid session' : 'Data already loaded',
+                        sessionValid: isSessionValid,
+                        hasData: !needsInitialFetch
+                    });
                 }
             } catch (err) {
                 console.error('Error initializing data:', err);
@@ -68,7 +76,7 @@ const Portfolio = () => {
         };
 
         initializeData();
-    }, [isAuth, checkSession, fetchData]); // Dependencies for the effect
+    }, [isAuth, holdings.length, positions.length]); // Dependencies to check if we need to fetch
 
     // Process positions data
     const processedPositions = React.useMemo(() => {
@@ -365,23 +373,23 @@ const Portfolio = () => {
                         }}>
                             <Box>
                                 <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                                    F&O Positions
-                                    <Tooltip title="Your Futures and Options positions">
+                                    Equity Positions
+                                    <Tooltip title="Your equity positions">
                                         <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
                                     </Tooltip>
                                 </Typography>
                                 <Typography variant="h6" gutterBottom>
-                                    {processedPositions.length || 0} Positions
+                                    {positions?.length || 0} Positions
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
                                     <Chip
-                                        label={`Today's M2M: ${formatCurrency(positionsDayPnL)}`}
+                                        label={`Today's Change: ${formatCurrency(positionsDayPnL)}`}
                                         color={positionsDayPnL >= 0 ? "success" : "error"}
                                         size="small"
                                         sx={{ borderRadius: 1 }}
                                     />
                                     <Chip
-                                        label={`Total P&L: ${formatCurrency(positionsTotalPnL)}`}
+                                        label={`Overall P&L: ${formatCurrency(positionsTotalPnL)}`}
                                         color={positionsTotalPnL >= 0 ? "success" : "error"}
                                         size="small"
                                         sx={{ borderRadius: 1 }}
@@ -396,29 +404,23 @@ const Portfolio = () => {
                             height: '100%',
                             borderRadius: 2,
                             boxShadow: theme.shadows[2],
-                            background: `linear-gradient(45deg, ${alpha(theme.palette.info.main, 0.05)}, ${alpha(theme.palette.info.main, 0.1)})`,
-                            border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
+                            background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`,
+                            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
                         }}>
                             <Box>
                                 <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                                     Total Portfolio
-                                    <Tooltip title="Combined performance of your equity and F&O positions">
+                                    <Tooltip title="Your total portfolio P&L">
                                         <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
                                     </Tooltip>
                                 </Typography>
                                 <Typography variant="h6" gutterBottom>
-                                    {(holdings?.length || 0) + (processedPositions.length || 0)} Total
+                                    {formatCurrency(totalPnL)}
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
                                     <Chip
-                                        label={`Today's P&L: ${formatCurrency(totalDayPnL)}`}
+                                        label={`Today's Change: ${formatCurrency(totalDayPnL)}`}
                                         color={totalDayPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
-                                    <Chip
-                                        label={`Net P&L: ${formatCurrency(totalPnL)}`}
-                                        color={totalPnL >= 0 ? "success" : "error"}
                                         size="small"
                                         sx={{ borderRadius: 1 }}
                                     />
@@ -463,4 +465,4 @@ const Portfolio = () => {
     );
 };
 
-export default Portfolio; 
+export default Portfolio;

@@ -179,18 +179,19 @@ export const ZerodhaProvider = ({ children }) => {
                 });
 
                 if (isInitialLoad) {
-                    // Always fetch on initial load
-                    console.log('Performing initial data fetch');
+                    // Fetch on initial load only during market hours
+                    console.log('Initial load check:', { isMarketOpen });
                     await fetchData();
                     isInitialLoad = false;
                     setIsAutoSync(isMarketOpen);
-                } else if (isMarketOpen) {
-                    // Only auto-fetch during market hours after initial load
+                } else if (isAutoSync && isMarketOpen) {
+                    // Only auto-fetch if both auto-sync is enabled and market is open
                     console.log('Auto-fetching data during market hours');
                     await fetchData();
-                    setIsAutoSync(true);
                 } else {
-                    console.log('Market is closed, stopping auto-sync');
+                    console.log('Skipping auto-fetch:', {
+                        reason: !isMarketOpen ? 'Market closed' : 'Auto-sync disabled'
+                    });
                     setIsAutoSync(false);
                 }
             }
@@ -200,8 +201,16 @@ export const ZerodhaProvider = ({ children }) => {
             // Initial check and fetch
             checkAndFetch();
 
-            // Set up interval to check market hours and fetch data
+            // Set up interval for market hours check
             interval = setInterval(() => {
+                const isMarketOpen = isMarketHours();
+                if (!isMarketOpen) {
+                    // If market is closed, disable auto-sync
+                    setIsAutoSync(false);
+                    console.log('Market closed, disabled auto-sync');
+                    return;
+                }
+                // Only proceed with check and fetch if market is open
                 checkAndFetch();
             }, 60000); // Check every minute
         }
@@ -212,7 +221,7 @@ export const ZerodhaProvider = ({ children }) => {
             }
             setIsAutoSync(false);
         };
-    }, [isAuth, fetchData, checkSession]);
+    }, [isAuth, fetchData, checkSession, isAutoSync]);
 
     const value = {
         loading,
