@@ -32,12 +32,11 @@ function App() {
                     <Route path="/tagmanagement" element={<TagManagement />} />
                     <Route path="/mystrategies" element={<StrategyPage />} />
                     <Route path="/updatestrategy/:id" element={<UpdateStrategyPage />} />
-                    <Route path="/zerodha" element={<ZerodhaAccount />} />
+                    <Route path="/zerodha/accountdetails" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/fno-instruments" element={<FNOInstrumentsPage />} />
-                    <Route path="/zerodha/portfolio" element={<PortfolioDetailsPage />} />
+                    <Route path="/zerodha/portfolio" element={<Portfolio />} />
                     <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
                     <Route path="/actionitems" element={<ActionItemsPage />} />
-                    <Route path="/portfolio" element={<Portfolio />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
             </ZerodhaProvider>

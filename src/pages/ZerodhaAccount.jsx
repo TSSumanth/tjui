@@ -207,7 +207,7 @@ const ZerodhaAccount = () => {
                             variant="contained"
                             color="primary"
                             component={Link}
-                            to="/portfolio"
+                            to="/zerodha/portfolio"
                         >
                             View Portfolio
                         </Button>

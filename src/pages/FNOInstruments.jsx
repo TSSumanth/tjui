@@ -14,7 +14,7 @@ const FNOInstrumentsPage = () => {
                 <Box mb={3} display="flex" justifyContent="space-between" alignItems="center">
                     <Button
                         variant="outlined"
-                        onClick={() => navigate('/zerodha')}
+                        onClick={() => navigate('/zerodha/accountdetails')}
                     >
                         ← Back to Account
                     </Button>

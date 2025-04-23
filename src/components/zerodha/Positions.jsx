@@ -114,8 +114,17 @@ const PositionTable = ({ positions, underlying }) => {
             }
 
             // For options and other instruments
-            const isLong = position.buy_quantity > position.sell_quantity;
-            return total + ((lastPrice - closePrice) * quantity * (isLong ? 1 : -1));
+            if (positionType === 'Option') {
+                if (quantity > 0) {  // Long options
+                    return total + ((lastPrice - closePrice) * quantity);
+                } else {  // Short options
+                    return total + ((closePrice - lastPrice) * Math.abs(quantity));
+                }
+            } else {
+                // For stocks and other instruments
+                const isLong = position.buy_quantity > position.sell_quantity;
+                return total + ((lastPrice - closePrice) * quantity * (isLong ? 1 : -1));
+            }
         }, 0);
     };
 
@@ -147,8 +156,17 @@ const PositionTable = ({ positions, underlying }) => {
                 }
             } else {
                 // For options and other instruments
-                const isLong = position.buy_quantity > position.sell_quantity;
-                dayPnL = ((lastPrice - closePrice) * quantity * (isLong ? 1 : -1));
+                if (positionType === 'Option') {
+                    if (quantity > 0) {  // Long options
+                        dayPnL = (lastPrice - closePrice) * quantity;
+                    } else {  // Short options
+                        dayPnL = (closePrice - lastPrice) * Math.abs(quantity);
+                    }
+                } else {
+                    // For stocks and other instruments
+                    const isLong = position.buy_quantity > position.sell_quantity;
+                    dayPnL = ((lastPrice - closePrice) * quantity * (isLong ? 1 : -1));
+                }
             }
         }
 

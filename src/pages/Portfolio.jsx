@@ -221,7 +221,7 @@ const Portfolio = () => {
                             size="large"
                             startIcon={<LinkIcon />}
                             component={Link}
-                            to="/zerodha"
+                            to="/zerodha/accountdetails"
                         >
                             Connect to Zerodha
                         </Button>

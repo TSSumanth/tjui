@@ -1,17 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     Box,
     Button,
-    Chip,
-    Stack,
+    IconButton,
+    Menu,
+    MenuItem,
+    ListItemIcon,
+    ListItemText,
     Tooltip,
-    CircularProgress
+    CircularProgress,
+    Typography
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 const SessionStatus = () => {
     const {
@@ -23,32 +29,54 @@ const SessionStatus = () => {
         fetchData
     } = useZerodha();
 
+    const [anchorEl, setAnchorEl] = React.useState(null);
+    const open = Boolean(anchorEl);
+
+    // Check session status on mount and periodically
+    useEffect(() => {
+        const checkSessionStatus = async () => {
+            console.log('Checking session status in SessionStatus component');
+            const isValid = await checkSession();
+            if (isValid) {
+                await fetchData();
+            }
+        };
+
+        // Initial check
+        checkSessionStatus();
+
+        // Set up periodic check every minute
+        const interval = setInterval(checkSessionStatus, 60000);
+
+        return () => clearInterval(interval);
+    }, [checkSession, fetchData]);
+
+    const handleClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+        setAnchorEl(null);
+    };
+
     const handleRefresh = async () => {
+        handleClose();
         await checkSession();
         if (sessionActive) {
             await fetchData();
         }
     };
 
-    // Base container style to maintain consistent width
-    const containerStyle = {
-        minWidth: '300px',
-        display: 'flex',
-        justifyContent: 'flex-end'
+    const handleDisconnect = () => {
+        handleClose();
+        handleLogout();
     };
 
     // Loading state
     if (loading) {
         return (
-            <Box sx={containerStyle}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Chip
-                        label="Updating..."
-                        size="small"
-                        sx={{ bgcolor: 'rgba(255, 255, 255, 0.1)', color: 'white' }}
-                    />
-                    <CircularProgress size={20} sx={{ color: 'white' }} />
-                </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} sx={{ color: 'white' }} />
             </Box>
         );
     }
@@ -56,90 +84,83 @@ const SessionStatus = () => {
     // Not authenticated state
     if (!isAuth || !sessionActive) {
         return (
-            <Box sx={containerStyle}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip
-                        label="Not Connected"
-                        color="error"
-                        size="small"
-                        sx={{
-                            bgcolor: 'rgba(255, 255, 255, 0.9)',
-                            '& .MuiChip-label': {
-                                fontWeight: 500
-                            }
-                        }}
-                    />
-                    <Button
-                        component={Link}
-                        to="/zerodha"
-                        startIcon={<LinkIcon />}
-                        size="small"
-                        sx={{
-                            bgcolor: 'white',
-                            color: '#1976d2',
-                            '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.9)'
-                            },
-                            minWidth: '100px'
-                        }}
-                    >
-                        Connect
-                    </Button>
-                </Stack>
-            </Box>
+            <Button
+                component={Link}
+                to="/zerodha"
+                startIcon={<LinkIcon />}
+                sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                    '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255, 255, 255, 0.08)'
+                    }
+                }}
+                variant="outlined"
+                size="small"
+            >
+                Connect Zerodha
+            </Button>
         );
     }
 
     // Authenticated state
     return (
-        <Box sx={containerStyle}>
-            <Stack direction="row" spacing={1} alignItems="center">
-                <Tooltip title="Zerodha session is active">
-                    <Chip
-                        label="Connected"
-                        color="success"
-                        size="small"
-                        sx={{
-                            bgcolor: 'rgba(255, 255, 255, 0.9)',
-                            '& .MuiChip-label': {
-                                fontWeight: 500
-                            }
-                        }}
-                    />
-                </Tooltip>
+        <>
+            <Tooltip title="Zerodha Account">
                 <Button
-                    startIcon={<RefreshIcon />}
-                    size="small"
-                    onClick={handleRefresh}
+                    onClick={handleClick}
+                    endIcon={<KeyboardArrowDownIcon />}
+                    startIcon={<AccountCircleIcon />}
                     sx={{
-                        bgcolor: 'white',
-                        color: '#1976d2',
+                        color: 'white',
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
                         '&:hover': {
-                            bgcolor: 'rgba(255, 255, 255, 0.9)'
-                        },
-                        minWidth: '100px'
+                            borderColor: 'white',
+                            bgcolor: 'rgba(255, 255, 255, 0.08)'
+                        }
                     }}
-                >
-                    Refresh
-                </Button>
-                <Button
-                    startIcon={<LinkOffIcon />}
+                    variant="outlined"
                     size="small"
-                    onClick={handleLogout}
-                    sx={{
-                        bgcolor: 'white',
-                        color: '#d32f2f',
-                        '&:hover': {
-                            bgcolor: 'rgba(255, 255, 255, 0.9)',
-                            color: '#d32f2f'
-                        },
-                        minWidth: '100px'
-                    }}
                 >
-                    Disconnect
+                    Connected
                 </Button>
-            </Stack>
-        </Box>
+            </Tooltip>
+            <Menu
+                anchorEl={anchorEl}
+                open={open}
+                onClose={handleClose}
+                onClick={handleClose}
+                PaperProps={{
+                    sx: {
+                        mt: 1,
+                        minWidth: 200,
+                        boxShadow: '0px 2px 8px rgba(0,0,0,0.15)'
+                    }
+                }}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+                <MenuItem component={Link} to="/zerodha/accountdetails">
+                    <ListItemIcon>
+                        <AccountCircleIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Account Details</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={handleRefresh}>
+                    <ListItemIcon>
+                        <RefreshIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Refresh Data</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={handleDisconnect} sx={{ color: 'error.main' }}>
+                    <ListItemIcon>
+                        <LinkOffIcon fontSize="small" color="error" />
+                    </ListItemIcon>
+                    <ListItemText>Disconnect</ListItemText>
+                </MenuItem>
+            </Menu>
+        </>
     );
 };
 
