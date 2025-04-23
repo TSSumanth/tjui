@@ -74,18 +74,22 @@ const Portfolio = () => {
     const processedPositions = React.useMemo(() => {
         if (!positions || !positions.net) return [];
 
-        // Combine net positions
-        const allPositions = [...positions.net];
+        console.log('Raw positions data:', {
+            net: positions.net,
+            day: positions.day
+        });
 
-        // Add day positions that aren't in net
-        if (positions.day) {
-            positions.day.forEach(dayPosition => {
-                // Only add if not already in net positions
-                if (!allPositions.some(p => p.tradingsymbol === dayPosition.tradingsymbol)) {
-                    allPositions.push(dayPosition);
-                }
-            });
-        }
+        // Take all positions without any filtering
+        const allPositions = [...(positions.net || []), ...(positions.day || [])];
+
+        console.log('All positions before processing:', allPositions.map(p => ({
+            symbol: p.tradingsymbol,
+            quantity: p.quantity,
+            overnight_quantity: p.overnight_quantity,
+            m2m: p.m2m,
+            pnl: p.pnl,
+            isSquaredOff: p.quantity === 0 && (p.day_buy_quantity > 0 || p.day_sell_quantity > 0)
+        })));
 
         return allPositions;
     }, [positions]);
@@ -95,42 +99,65 @@ const Portfolio = () => {
         let totalPnL = 0;
         let dayPnL = 0;
 
-        processedPositions.forEach(position => {
-            const lastPrice = Number(position.last_price) || 0;
-            const closePrice = Number(position.close_price) || lastPrice;
-            const quantity = position.is_closed ? position.closed_quantity : Number(position.quantity) || 0;
-            const positionType = getPositionType(position.tradingsymbol);
+        console.log('Starting P&L calculations for positions:', processedPositions);
 
-            // Calculate total P&L
-            totalPnL += Number(position.pnl) || 0;
+        processedPositions.forEach((position, index) => {
+            const posType = getPositionType(position.tradingsymbol);
 
-            // Calculate day's P&L
-            if (position.is_closed) {
-                dayPnL += Number(position.pnl) || 0;
-            } else if (positionType === 'Future') {
-                if (quantity > 0) {  // Long futures
-                    dayPnL += (lastPrice - closePrice) * quantity;
-                } else {  // Short futures
-                    dayPnL += (closePrice - lastPrice) * Math.abs(quantity);
-                }
-            } else {
-                // For options and other instruments
-                const isLong = position.buy_quantity > position.sell_quantity;
-                dayPnL += (lastPrice - closePrice) * quantity * (isLong ? 1 : -1);
-            }
-
-            console.log('Position P&L calculation:', {
+            console.log(`Processing position ${index + 1}:`, {
                 symbol: position.tradingsymbol,
-                type: positionType,
-                quantity,
-                lastPrice,
-                closePrice,
-                dayPnL: position.is_closed ? position.pnl :
-                    (positionType === 'Future' ?
-                        (quantity > 0 ? (lastPrice - closePrice) * quantity : (closePrice - lastPrice) * Math.abs(quantity)) :
-                        (lastPrice - closePrice) * quantity * (position.buy_quantity > position.sell_quantity ? 1 : -1)),
-                totalPnL: position.pnl
+                type: posType,
+                isOption: posType === 'Option',
+                isFuture: posType === 'Future',
+                quantity: position.quantity,
+                overnight_quantity: position.overnight_quantity,
+                day_buy_quantity: position.day_buy_quantity,
+                day_sell_quantity: position.day_sell_quantity,
+                m2m: position.m2m,
+                pnl: position.pnl,
+                isSquaredOff: position.quantity === 0 && (position.day_buy_quantity > 0 || position.day_sell_quantity > 0)
             });
+
+            // Calculate for all F&O positions, including squared off ones
+            if (posType === 'Future' || posType === 'Option') {
+                // Calculate total P&L
+                const posPnL = Number(position.pnl) || 0;
+                totalPnL += posPnL;
+
+                // Use m2m for day's P&L
+                const posM2M = Number(position.m2m) || 0;
+                dayPnL += posM2M;
+
+                console.log('Added to P&L calculation:', {
+                    symbol: position.tradingsymbol,
+                    type: posType,
+                    pnl: posPnL,
+                    m2m: posM2M,
+                    quantity: position.quantity,
+                    overnight_quantity: position.overnight_quantity,
+                    day_buy_quantity: position.day_buy_quantity,
+                    day_sell_quantity: position.day_sell_quantity,
+                    running_total_pnl: totalPnL,
+                    running_total_m2m: dayPnL
+                });
+            }
+        });
+
+        console.log('Final P&L totals:', {
+            totalPnL,
+            dayPnL,
+            positionsCount: processedPositions.length,
+            positionsList: processedPositions.map(p => ({
+                symbol: p.tradingsymbol,
+                type: getPositionType(p.tradingsymbol),
+                quantity: p.quantity,
+                overnight_quantity: p.overnight_quantity,
+                day_buy_quantity: p.day_buy_quantity,
+                day_sell_quantity: p.day_sell_quantity,
+                m2m: p.m2m,
+                pnl: p.pnl,
+                isSquaredOff: p.quantity === 0 && (p.day_buy_quantity > 0 || p.day_sell_quantity > 0)
+            }))
         });
 
         return { positionsTotalPnL: totalPnL, positionsDayPnL: dayPnL };

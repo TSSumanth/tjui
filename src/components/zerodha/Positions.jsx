@@ -50,8 +50,141 @@ const calculateChangePercentage = (position) => {
     return ((last_price - close_price) / close_price) * 100;
 };
 
+const extractOptionDetails = (tradingsymbol) => {
+    // Example: RELIANCE25MAY1250CE
+    const match = tradingsymbol.match(/([A-Z]+)(\d{2}[A-Z]+)(\d+)(CE|PE)/);
+    if (!match) return null;
+
+    return {
+        symbol: match[1],
+        expiry: match[2],
+        strike: parseFloat(match[3]),
+        type: match[4]
+    };
+};
+
+const calculateBreakeven = (positions) => {
+    // Filter only option positions
+    const optionPositions = positions.filter(p => p.tradingsymbol.match(/(CE|PE)$/));
+    if (optionPositions.length === 0) return null;
+
+    // Get current underlying price (using last_price of the first position as reference)
+    const currentPrice = positions[0].last_price;
+
+    // Function to calculate total P&L at a given price point
+    const calculateTotalPnL = (atPrice) => {
+        return optionPositions.reduce((total, position) => {
+            const details = extractOptionDetails(position.tradingsymbol);
+            if (!details) return total;
+
+            const quantity = Math.abs(position.quantity);
+            const isLong = position.quantity > 0;
+
+            let optionValue = 0;
+            if (details.type === 'CE') {
+                optionValue = Math.max(0, atPrice - details.strike);
+            } else { // PE
+                optionValue = Math.max(0, details.strike - atPrice);
+            }
+
+            // For long positions: Current Value - Cost
+            // For short positions: Premium Received - Current Value
+            const pnl = isLong ?
+                (optionValue - position.average_price) * quantity :
+                (position.average_price - optionValue) * quantity;
+
+            return total + pnl;
+        }, 0);
+    };
+
+    // Sample price points to find approximate breakeven regions
+    const samplePoints = [];
+    const minStrike = Math.min(...optionPositions.map(p => extractOptionDetails(p.tradingsymbol)?.strike || currentPrice));
+    const maxStrike = Math.max(...optionPositions.map(p => extractOptionDetails(p.tradingsymbol)?.strike || currentPrice));
+    const range = maxStrike - minStrike;
+
+    // Create price points from 20% below min strike to 20% above max strike
+    const startPrice = minStrike * 0.8;
+    const endPrice = maxStrike * 1.2;
+    const step = range / 100; // 100 sample points
+
+    for (let price = startPrice; price <= endPrice; price += step) {
+        const pnl = calculateTotalPnL(price);
+        samplePoints.push({ price, pnl });
+    }
+
+    // Find where P&L crosses zero
+    const breakevenPoints = [];
+    for (let i = 1; i < samplePoints.length; i++) {
+        const prev = samplePoints[i - 1];
+        const curr = samplePoints[i];
+
+        // If P&L crosses zero between these points
+        if ((prev.pnl <= 0 && curr.pnl > 0) || (prev.pnl >= 0 && curr.pnl < 0)) {
+            // Linear interpolation to find more precise breakeven
+            const ratio = Math.abs(prev.pnl) / (Math.abs(prev.pnl) + Math.abs(curr.pnl));
+            const breakeven = prev.price + (curr.price - prev.price) * ratio;
+            breakevenPoints.push(Math.round(breakeven * 100) / 100);
+        }
+    }
+
+    // Calculate net premium
+    const totalNetPremium = optionPositions.reduce((sum, position) => {
+        const quantity = Math.abs(position.quantity);
+        return sum + (position.quantity > 0 ?
+            -position.average_price * quantity : // Long positions pay premium
+            position.average_price * quantity);  // Short positions receive premium
+    }, 0);
+
+    console.log('Breakeven calculation:', {
+        currentPrice,
+        breakevenPoints,
+        totalNetPremium,
+        samplePoints: samplePoints.filter((_, i) => i % 10 === 0) // Log every 10th point
+    });
+
+    return {
+        breakevenPoints: breakevenPoints.sort((a, b) => a - b),
+        netPremium: totalNetPremium,
+        perLotPremium: totalNetPremium
+    };
+};
+
+const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
+    <TableCell
+        align={align}
+        sx={{
+            fontSize: '0.875rem',
+            fontFamily: align === 'right' ? 'monospace' : 'inherit',
+            py: 1.5,
+            ...sx
+        }}
+        {...props}
+    >
+        {children}
+    </TableCell>
+);
+
 const PositionTable = ({ positions, underlying }) => {
     const [expanded, setExpanded] = useState(true);
+
+    // Calculate breakeven for the position group
+    const breakeven = React.useMemo(() => {
+        console.log('Calculating breakeven for:', underlying);
+        console.log('Positions:', positions);
+
+        const result = calculateBreakeven(positions);
+        console.log('Breakeven calculation result:', result);
+        return result;
+    }, [positions, underlying]);
+
+    // Add debug log for render
+    console.log('PositionTable render:', {
+        underlying,
+        hasBreakeven: !!breakeven,
+        breakevenPoints: breakeven?.breakevenPoints,
+        netPremium: breakeven?.netPremium
+    });
 
     // Process and group positions
     const { openPositions, closedPositions } = React.useMemo(() => {
@@ -94,37 +227,108 @@ const PositionTable = ({ positions, underlying }) => {
     // Calculate day's P&L for this underlying
     const calculateDayPnL = () => {
         return positions.reduce((total, position) => {
-            const lastPrice = Number(position.last_price) || 0;
-            const closePrice = Number(position.close_price) || lastPrice;
-            const quantity = position.is_closed ? position.closed_quantity : Number(position.quantity) || 0;
-            const positionType = getPositionType(position.tradingsymbol);
-
-            // If position is closed, use the total P&L
+            // If position is closed, use the realized P&L
             if (position.is_closed) {
                 return total + (Number(position.pnl) || 0);
             }
 
-            // For futures
-            if (positionType === 'Future') {
-                if (quantity > 0) {  // Long futures
-                    return total + ((lastPrice - closePrice) * quantity);
-                } else {  // Short futures
-                    return total + ((closePrice - lastPrice) * Math.abs(quantity));
+            // For open positions, use day_m2m if available
+            if (position.day_m2m !== undefined && position.day_m2m !== null) {
+                return total + Number(position.day_m2m);
+            }
+
+            // Fallback calculation if day_m2m is not available
+            const lastPrice = Number(position.last_price) || 0;
+            const closePrice = Number(position.close_price) || lastPrice;
+            const quantity = Number(position.quantity) || 0;
+            const positionType = getPositionType(position.tradingsymbol);
+            const overnightQuantity = Number(position.overnight_quantity) || 0;
+            const dayBuyQty = Number(position.day_buy_quantity) || 0;
+            const daySellQty = Number(position.day_sell_quantity) || 0;
+            const dayBuyPrice = Number(position.day_buy_price) || 0;
+            const daySellPrice = Number(position.day_sell_price) || 0;
+            const buyPrice = Number(position.buy_price) || 0;
+            const sellPrice = Number(position.sell_price) || 0;
+
+            let dayPnL = 0;
+
+            // Calculate M2M for overnight positions
+            if (overnightQuantity !== 0) {
+                if (positionType === 'Future') {
+                    // For long futures
+                    if (overnightQuantity > 0) {
+                        dayPnL += overnightQuantity * (lastPrice - closePrice);
+                    }
+                    // For short futures
+                    else {
+                        dayPnL += Math.abs(overnightQuantity) * (closePrice - lastPrice);
+                    }
+                } else if (positionType === 'Option') {
+                    // For long options
+                    if (overnightQuantity > 0) {
+                        dayPnL += overnightQuantity * (lastPrice - closePrice);
+                    }
+                    // For short options - reversed calculation as profit is inverse of price movement
+                    else {
+                        dayPnL += Math.abs(overnightQuantity) * (lastPrice - closePrice) * -1;
+                    }
                 }
             }
 
-            // For options and other instruments
-            if (positionType === 'Option') {
-                if (quantity > 0) {  // Long options
-                    return total + ((lastPrice - closePrice) * quantity);
-                } else {  // Short options
-                    return total + ((closePrice - lastPrice) * Math.abs(quantity));
+            // Add realized P&L from intraday trades
+            if (dayBuyQty > 0 || daySellQty > 0) {
+                // Calculate realized P&L from completed trades
+                const completedQty = Math.min(dayBuyQty, daySellQty);
+                if (completedQty > 0) {
+                    if (daySellQty >= dayBuyQty) {
+                        // Buy then Sell
+                        dayPnL += completedQty * (daySellPrice - dayBuyPrice);
+                    } else {
+                        // Sell then Buy (for short positions)
+                        dayPnL += completedQty * (sellPrice - buyPrice);
+                    }
                 }
-            } else {
-                // For stocks and other instruments
-                const isLong = position.buy_quantity > position.sell_quantity;
-                return total + ((lastPrice - closePrice) * quantity * (isLong ? 1 : -1));
+
+                // Calculate unrealized P&L for remaining intraday positions
+                const remainingQty = dayBuyQty - daySellQty;
+                if (remainingQty !== 0) {
+                    if (positionType === 'Option') {
+                        if (remainingQty > 0) {
+                            // Long intraday option position
+                            dayPnL += remainingQty * (lastPrice - dayBuyPrice);
+                        } else {
+                            // Short intraday option position
+                            dayPnL += Math.abs(remainingQty) * (dayBuyPrice - lastPrice);
+                        }
+                    } else {
+                        if (remainingQty > 0) {
+                            // Long intraday future position
+                            dayPnL += remainingQty * (lastPrice - dayBuyPrice);
+                        } else {
+                            // Short intraday future position
+                            dayPnL += Math.abs(remainingQty) * (daySellPrice - lastPrice);
+                        }
+                    }
+                }
             }
+
+            console.log('Day P&L calculation:', {
+                symbol: position.tradingsymbol,
+                type: positionType,
+                quantity,
+                overnightQuantity,
+                dayBuyQty,
+                daySellQty,
+                lastPrice,
+                closePrice,
+                dayBuyPrice,
+                daySellPrice,
+                dayPnL,
+                day_m2m: position.day_m2m,
+                isShortOption: positionType === 'Option' && (overnightQuantity < 0 || quantity < 0)
+            });
+
+            return total + dayPnL;
         }, 0);
     };
 
@@ -187,103 +391,63 @@ const PositionTable = ({ positions, underlying }) => {
             <TableRow
                 key={position.tradingsymbol + (position.is_closed ? '-closed' : '')}
                 sx={{
-                    backgroundColor: position.is_closed ? '#f8f9fa' : 'white',
+                    bgcolor: position.is_closed ? 'grey.50' : 'background.paper',
                     '&:hover': {
-                        backgroundColor: position.is_closed ? '#f0f1f2' : '#f5f5f5'
-                    },
-                    '&:last-child td': {
-                        borderBottom: 0
+                        bgcolor: position.is_closed ? 'grey.100' : 'grey.50'
                     }
                 }}
             >
-                <TableCell sx={{ fontSize: '0.875rem' }}>
-                    {position.tradingsymbol}
-                    {position.is_closed && (
-                        <Chip
-                            label="Closed"
-                            size="small"
-                            sx={{
-                                ml: 1,
-                                backgroundColor: '#e0e0e0',
-                                fontSize: '0.75rem',
-                                height: '20px'
-                            }}
-                        />
-                    )}
-                </TableCell>
-                <TableCell>
+                <StyledTableCell>{position.tradingsymbol}</StyledTableCell>
+                <StyledTableCell>
                     <Chip
                         label={getPositionType(position.tradingsymbol)}
                         size="small"
                         sx={{
-                            backgroundColor: getPositionType(position.tradingsymbol) === 'Future' ? '#e3f2fd' : '#f3e5f5',
-                            color: getPositionType(position.tradingsymbol) === 'Future' ? '#1976d2' : '#9c27b0',
+                            bgcolor: 'secondary.50',
+                            color: 'secondary.main',
                             fontSize: '0.75rem',
                             height: '24px'
                         }}
                     />
-                </TableCell>
-                <TableCell
+                </StyledTableCell>
+                <StyledTableCell
                     align="right"
                     sx={{
-                        color: isNegativeQuantity ? 'error.main' : 'inherit',
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
+                        color: isNegativeQuantity ? 'error.main' : 'inherit'
                     }}
                 >
                     {quantity}
-                </TableCell>
-                <TableCell
-                    align="right"
-                    sx={{
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
-                    }}
-                >
+                </StyledTableCell>
+                <StyledTableCell align="right">
                     {formatCurrency(position.average_price)}
-                </TableCell>
-                <TableCell
-                    align="right"
-                    sx={{
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
-                    }}
-                >
+                </StyledTableCell>
+                <StyledTableCell align="right">
                     {formatCurrency(position.is_closed ? position.closing_price : position.last_price)}
-                </TableCell>
-                <TableCell
+                </StyledTableCell>
+                <StyledTableCell
                     align="right"
                     sx={{
-                        color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 'bold',
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
+                        color: dayPnL >= 0 ? 'success.main' : 'error.main'
                     }}
                 >
                     {formatCurrency(dayPnL)}
-                </TableCell>
-                <TableCell
+                </StyledTableCell>
+                <StyledTableCell
                     align="right"
                     sx={{
-                        color: totalPnL >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 'bold',
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
+                        color: totalPnL >= 0 ? 'success.main' : 'error.main'
                     }}
                 >
                     {formatCurrency(totalPnL)}
-                </TableCell>
-                <TableCell
+                </StyledTableCell>
+                <StyledTableCell
                     align="right"
                     sx={{
-                        color: position.pnl >= 0 ? 'success.main' : 'error.main',
-                        fontWeight: 'bold',
-                        fontSize: '0.875rem',
-                        fontFamily: 'monospace'
+                        color: position.pnl >= 0 ? 'success.main' : 'error.main'
                     }}
                 >
                     {formatPercentage(calculateChangePercentage(position))}
-                </TableCell>
+                </StyledTableCell>
             </TableRow>
         );
     };
@@ -292,52 +456,139 @@ const PositionTable = ({ positions, underlying }) => {
         <Box sx={{ mb: 3 }}>
             <Box
                 sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    mb: 1,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    bgcolor: 'background.paper',
+                    borderLeft: '4px solid',
+                    borderLeftColor: 'primary.main',
+                    '&:hover': {
+                        bgcolor: 'grey.50'
+                    }
                 }}
                 onClick={() => setExpanded(!expanded)}
             >
-                <Typography variant="h6">
-                    {underlying}
-                    <Typography component="span" variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
-                        ({openPositions.length} Open, {closedPositions.length} Closed)
-                    </Typography>
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant="subtitle1" color={calculateDayPnL() >= 0 ? 'success.main' : 'error.main'}>
-                        Day: {formatCurrency(calculateDayPnL())}
-                    </Typography>
-                    <Typography variant="subtitle1" color={calculateTotalPnL() >= 0 ? 'success.main' : 'error.main'}>
-                        Total: {formatCurrency(calculateTotalPnL())}
-                    </Typography>
-                    <IconButton size="small">
-                        {expanded ? <ExpandLess /> : <ExpandMore />}
-                    </IconButton>
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: 2,
+                    px: 3,
+                    gap: 2,
+                    flexWrap: 'nowrap'
+                }}>
+                    {/* Left section - Asset Name */}
+                    <Box sx={{ minWidth: '150px', flexShrink: 0 }}>
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                color: 'text.primary',
+                                fontWeight: 500
+                            }}
+                        >
+                            {underlying}
+                        </Typography>
+                    </Box>
+
+                    {/* Middle section - Breakeven and Premium Info */}
+                    {breakeven && (
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            flex: 1,
+                            overflow: 'hidden'
+                        }}>
+                            <Box sx={{
+                                fontFamily: 'monospace',
+                                bgcolor: 'grey.50',
+                                px: 2,
+                                py: 1,
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                fontWeight: 500,
+                                whiteSpace: 'nowrap'
+                            }}>
+                                {breakeven.breakevenPoints.length > 0
+                                    ? `Breakeven: ↓${formatCurrency(breakeven.breakevenPoints[0])} / ↑${formatCurrency(breakeven.breakevenPoints[1])}`
+                                    : 'Unable to show BE'}
+                            </Box>
+                            <Box sx={{
+                                color: 'text.secondary',
+                                fontFamily: 'monospace',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                Net Premium: {formatCurrency(breakeven.netPremium)}
+                            </Box>
+                        </Box>
+                    )}
+
+                    {/* Right section - P&L Info */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        justifyContent: 'flex-end',
+                        minWidth: '350px',
+                        flexShrink: 0
+                    }}>
+                        <Box
+                            sx={{
+                                fontFamily: 'monospace',
+                                color: calculateDayPnL() >= 0 ? 'success.main' : 'error.main',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Day: {formatCurrency(calculateDayPnL())}
+                        </Box>
+                        <Box
+                            sx={{
+                                fontFamily: 'monospace',
+                                color: calculateTotalPnL() >= 0 ? 'success.main' : 'error.main',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Total: {formatCurrency(calculateTotalPnL())}
+                        </Box>
+                        <IconButton
+                            size="small"
+                            sx={{
+                                color: 'action.active',
+                                '&:hover': {
+                                    bgcolor: 'grey.100'
+                                }
+                            }}
+                        >
+                            {expanded ? <ExpandLess /> : <ExpandMore />}
+                        </IconButton>
+                    </Box>
                 </Box>
             </Box>
 
             {expanded && (
-                <TableContainer component={Paper} elevation={0}>
+                <TableContainer
+                    component={Paper}
+                    elevation={0}
+                    sx={{
+                        mt: 1,
+                        border: '1px solid',
+                        borderColor: 'divider'
+                    }}
+                >
                     <Table size="small">
                         <TableHead>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Symbol</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Position Type</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Quantity</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Avg. Price</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>LTP</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day's P&L</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Total P&L</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Change %</TableCell>
+                            <TableRow sx={{ bgcolor: 'grey.50' }}>
+                                <StyledTableCell>Symbol</StyledTableCell>
+                                <StyledTableCell>Position Type</StyledTableCell>
+                                <StyledTableCell align="right">Quantity</StyledTableCell>
+                                <StyledTableCell align="right">Avg. Price</StyledTableCell>
+                                <StyledTableCell align="right">LTP</StyledTableCell>
+                                <StyledTableCell align="right">Day's P&L</StyledTableCell>
+                                <StyledTableCell align="right">Total P&L</StyledTableCell>
+                                <StyledTableCell align="right">Change %</StyledTableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {/* Render open positions first */}
                             {openPositions.map(renderPositionRow)}
-                            {/* Then render closed positions */}
                             {closedPositions.map(renderPositionRow)}
                         </TableBody>
                     </Table>
@@ -444,28 +695,59 @@ const Positions = () => {
 
     if (!positions || (!positions.day?.length && !positions.net?.length)) {
         return (
-            <Box sx={{ textAlign: 'center', py: 3 }}>
-                <Typography variant="h5" component="h2" gutterBottom>
-                    Positions
+            <Box
+                sx={{
+                    textAlign: 'center',
+                    py: 8,
+                    bgcolor: 'background.paper',
+                    borderRadius: 1,
+                    border: '1px dashed',
+                    borderColor: 'divider'
+                }}
+            >
+                <Typography
+                    variant="h6"
+                    sx={{
+                        color: 'text.secondary',
+                        fontWeight: 500,
+                        mb: 1
+                    }}
+                >
+                    No Positions
                 </Typography>
-                <Typography variant="body1" color="textSecondary" align="center">
-                    No positions available.
+                <Typography
+                    variant="body2"
+                    sx={{
+                        color: 'text.secondary'
+                    }}
+                >
+                    You don't have any open or closed positions for today.
                 </Typography>
             </Box>
         );
     }
 
     return (
-        <Box>
+        <Box sx={{ maxWidth: '1400px', mx: 'auto', px: 2 }}>
             <Box sx={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                mb: 3,
-                pb: 2,
-                borderBottom: '1px solid #e0e0e0'
+                mb: 4,
+                pt: 2,
+                pb: 3,
+                borderBottom: '1px solid',
+                borderColor: 'divider'
             }}>
-                <Typography variant="h5" component="h2" sx={{ fontWeight: 500 }}>
+                <Typography
+                    variant="h5"
+                    component="h1"
+                    sx={{
+                        fontWeight: 500,
+                        color: 'text.primary',
+                        letterSpacing: '-0.5px'
+                    }}
+                >
                     Positions
                 </Typography>
             </Box>
