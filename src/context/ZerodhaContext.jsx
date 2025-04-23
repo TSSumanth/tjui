@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getHoldings, getPositions, getOrders } from '../services/zerodha/api';
+import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
 
 const ZerodhaContext = createContext();
@@ -35,24 +35,100 @@ export const ZerodhaProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
     const [isAuth, setIsAuth] = useState(isAuthenticated());
     const [isAutoSync, setIsAutoSync] = useState(false);
+    const [sessionActive, setSessionActive] = useState(false);
+    const [lastChecked, setLastChecked] = useState(0);
+
+    // Initialize session state
+    useEffect(() => {
+        const initializeSession = async () => {
+            if (isAuthenticated()) {
+                try {
+                    const response = await getAccountInfo();
+                    const isActive = response.success;
+                    console.log('Initial session check:', { isActive, timestamp: new Date().toLocaleTimeString() });
+                    setSessionActive(isActive);
+                    setIsAuth(true);
+                    if (isActive) {
+                        fetchData();
+                    }
+                } catch (err) {
+                    console.error('Initial session check failed:', err);
+                    if (err.response?.status === 401) {
+                        handleLogout();
+                    }
+                }
+            }
+        };
+
+        initializeSession();
+    }, []); // Run only on mount
 
     const handleLogout = useCallback(() => {
         logout();
         setIsAuth(false);
+        setSessionActive(false);
         setHoldings([]);
         setPositions([]);
         setOrders([]);
         setError(null);
         setIsAutoSync(false);
+        setLastChecked(0);
     }, []);
 
+    const checkSession = useCallback(async (force = false) => {
+        const now = Date.now();
+        const timeSinceLastCheck = now - lastChecked;
+
+        // Skip check if less than 30 seconds have passed, unless forced
+        if (!force && timeSinceLastCheck < 30000) {
+            console.log('Skipping session check - checked recently:', {
+                timeSinceLastCheck: Math.round(timeSinceLastCheck / 1000) + 's ago'
+            });
+            return sessionActive;
+        }
+
+        if (!isAuthenticated()) {
+            setIsAuth(false);
+            setSessionActive(false);
+            return false;
+        }
+
+        try {
+            setLoading(true);
+            const response = await getAccountInfo();
+            const isActive = response.success;
+            console.log('Session check:', { isActive, timestamp: new Date().toLocaleTimeString() });
+            setSessionActive(isActive);
+            setIsAuth(true);
+            setLastChecked(now);
+
+            if (!isActive) {
+                handleLogout();
+            }
+            return isActive;
+        } catch (err) {
+            console.error('Session check failed:', err);
+            if (err.response?.status === 401) {
+                handleLogout();
+            }
+            setSessionActive(false);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [handleLogout, lastChecked, sessionActive]);
+
     const fetchData = useCallback(async () => {
-        if (!isAuth) return;
+        if (!isAuth || !sessionActive) {
+            console.log('Skipping fetch - not authenticated or session inactive');
+            return;
+        }
 
         setLoading(true);
         setError(null);
 
         try {
+            console.log('Fetching data at:', new Date().toLocaleTimeString());
             const [holdingsData, positionsData, ordersData] = await Promise.all([
                 getHoldings(),
                 getPositions(),
@@ -71,33 +147,41 @@ export const ZerodhaProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, [isAuth, handleLogout]);
+    }, [isAuth, sessionActive, handleLogout]);
 
     // Effect for auto-sync during market hours
     useEffect(() => {
         let interval;
         let isInitialLoad = true;  // Flag to track initial load
 
-        const checkAndFetch = () => {
+        const checkAndFetch = async () => {
             if (isAuth) {
+                // First check if session is active
+                const isSessionValid = await checkSession();
+                if (!isSessionValid) {
+                    console.log('Session invalid, skipping fetch');
+                    return;
+                }
+
                 const isMarketOpen = isMarketHours();
                 console.log('Market status check:', {
                     isMarketOpen,
                     currentTime: new Date().toLocaleTimeString(),
                     isInitialLoad,
-                    isAutoSync
+                    isAutoSync,
+                    sessionActive
                 });
 
                 if (isInitialLoad) {
                     // Always fetch on initial load
                     console.log('Performing initial data fetch');
-                    fetchData();
+                    await fetchData();
                     isInitialLoad = false;
                     setIsAutoSync(isMarketOpen);
                 } else if (isMarketOpen) {
                     // Only auto-fetch during market hours after initial load
                     console.log('Auto-fetching data during market hours');
-                    fetchData();
+                    await fetchData();
                     setIsAutoSync(true);
                 } else {
                     console.log('Market is closed, stopping auto-sync');
@@ -113,7 +197,7 @@ export const ZerodhaProvider = ({ children }) => {
             // Set up interval to check market hours and fetch data
             interval = setInterval(() => {
                 checkAndFetch();
-            }, 30000); // Check every 30 seconds instead of every minute
+            }, 60000); // Check every minute
         }
 
         return () => {
@@ -122,7 +206,7 @@ export const ZerodhaProvider = ({ children }) => {
             }
             setIsAutoSync(false);
         };
-    }, [isAuth, fetchData, isAutoSync]);
+    }, [isAuth, fetchData, checkSession]);
 
     const value = {
         loading,
@@ -134,7 +218,9 @@ export const ZerodhaProvider = ({ children }) => {
         setIsAuth,
         fetchData,
         handleLogout,
-        isAutoSync
+        isAutoSync,
+        sessionActive,
+        checkSession
     };
 
     return (

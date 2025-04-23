@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import Header from '../components/Header/Header';
 import Holdings from '../components/zerodha/Holdings';
@@ -10,6 +10,9 @@ import InfoIcon from '@mui/icons-material/Info';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import useScrollToTop from '../hooks/useScrollToTop';
+import { getAccountInfo } from '../services/zerodha/api';
+import { Link } from 'react-router-dom';
+import LinkIcon from '@mui/icons-material/Link';
 
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -36,11 +39,36 @@ const getPositionType = (tradingsymbol) => {
 
 const Portfolio = () => {
     const theme = useTheme();
-    const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync } = useZerodha();
+    const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession } = useZerodha();
     const [activeTab, setActiveTab] = useState(0);
+    const [localLoading, setLocalLoading] = useState(true);
 
     // Scroll to top when component mounts
     useScrollToTop();
+
+    useEffect(() => {
+        const initializeData = async () => {
+            try {
+                setLocalLoading(true);
+                // First check if the session is active
+                const isSessionValid = await checkSession();
+                console.log('Session check result:', { isSessionValid, isAuth });
+
+                if (isSessionValid) {
+                    console.log('Session is valid, fetching data...');
+                    await fetchData();
+                } else {
+                    console.log('Session is invalid or not authenticated');
+                }
+            } catch (err) {
+                console.error('Error initializing data:', err);
+            } finally {
+                setLocalLoading(false);
+            }
+        };
+
+        initializeData();
+    }, [isAuth, checkSession, fetchData]); // Dependencies for the effect
 
     // Process positions data
     const processedPositions = React.useMemo(() => {
@@ -143,7 +171,32 @@ const Portfolio = () => {
         setIsAutoSync(event.target.checked);
     };
 
-    if (!isAuth) {
+    const handleConnect = () => {
+        // Redirect to Zerodha Account page for connection
+        window.location.href = '/zerodha';
+    };
+
+    // Show loading state while initializing
+    if (localLoading || loading) {
+        return (
+            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+                <Header />
+                <Container maxWidth="lg">
+                    <Box sx={{
+                        mt: 8,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <CircularProgress />
+                    </Box>
+                </Container>
+            </Box>
+        );
+    }
+
+    // Show connect screen if not authenticated or session inactive
+    if (!isAuth || !sessionActive) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
                 <Header />
@@ -166,10 +219,11 @@ const Portfolio = () => {
                             variant="contained"
                             color="primary"
                             size="large"
-                            onClick={fetchData}
-                            disabled={loading}
+                            startIcon={<LinkIcon />}
+                            component={Link}
+                            to="/zerodha"
                         >
-                            {loading ? 'Connecting...' : 'Connect to Zerodha'}
+                            Connect to Zerodha
                         </Button>
                     </Paper>
                 </Container>
@@ -177,6 +231,7 @@ const Portfolio = () => {
         );
     }
 
+    // Show portfolio when authenticated and session is active
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <Header />

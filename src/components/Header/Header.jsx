@@ -7,7 +7,8 @@ import {
     Menu,
     MenuItem,
     IconButton,
-    Badge
+    Badge,
+    Divider
 } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -25,6 +26,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
+import SessionStatus from '../zerodha/SessionStatus';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
@@ -58,16 +60,24 @@ const Header = () => {
                     zIndex: 1000
                 }}
             >
-                <Toolbar sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    minHeight: "60px",
-                    padding: "10px 10px",
-                    maxWidth: "1400px",
-                    margin: "0 auto",
-                    width: "100%"
-                }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Toolbar
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        minHeight: "64px",
+                        padding: "0 24px",
+                        maxWidth: "1400px",
+                        margin: "0 auto",
+                        width: "100%"
+                    }}
+                >
+                    {/* Left section - Logo and Home */}
+                    <Box sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        minWidth: '200px'
+                    }}>
                         <Link to="/" style={{ textDecoration: "none" }}>
                             <img
                                 src="/logo.png"
@@ -81,33 +91,59 @@ const Header = () => {
                             variant="contained"
                             startIcon={<HomeIcon />}
                             sx={{
-                                backgroundColor: "white",
+                                bgcolor: "white",
                                 color: "#1976d2",
                                 minWidth: "100px",
                                 padding: "6px 12px",
-                                "&:hover": { backgroundColor: "#e3f2fd" }
+                                "&:hover": { bgcolor: "#e3f2fd" }
                             }}
                         >
                             Home
                         </Button>
                     </Box>
 
-                    <Box>
+                    {/* Center section - Navigation */}
+                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
                         <ButtonGroup />
                     </Box>
-                    <IconButton
-                        component={Link}
-                        to="/actionitems"
-                        sx={{ ml: 2 }}
-                    >
-                        <Badge badgeContent={actionItemsCount} color="error">
-                            <NotificationsIcon />
-                        </Badge>
-                    </IconButton>
+
+                    {/* Right section - Session Status and Notifications */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        minWidth: '350px',
+                        justifyContent: 'flex-end'
+                    }}>
+                        <SessionStatus />
+                        <Divider
+                            orientation="vertical"
+                            flexItem
+                            sx={{
+                                bgcolor: 'rgba(255, 255, 255, 0.3)',
+                                height: '32px',
+                                my: 'auto'
+                            }}
+                        />
+                        <IconButton
+                            component={Link}
+                            to="/actionitems"
+                            sx={{
+                                color: 'white',
+                                '&:hover': {
+                                    bgcolor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }}
+                        >
+                            <Badge badgeContent={actionItemsCount} color="error">
+                                <NotificationsIcon />
+                            </Badge>
+                        </IconButton>
+                    </Box>
                 </Toolbar>
             </AppBar>
             {/* Spacer div to prevent content overlap */}
-            <Box sx={{ height: "80px" }} />
+            <Box sx={{ height: "64px" }} />
         </>
     );
 };
