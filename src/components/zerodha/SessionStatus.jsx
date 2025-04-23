@@ -30,23 +30,11 @@ const SessionStatus = () => {
     const [anchorEl, setAnchorEl] = React.useState(null);
     const open = Boolean(anchorEl);
 
-    // Check session status on mount and periodically
+    // Remove the interval-based session checking
     useEffect(() => {
-        const checkSessionStatus = async () => {
-            await checkSession();
-        };
-
         if (isAuth) {
-            checkSessionStatus();
+            checkSession();
         }
-
-        const interval = setInterval(() => {
-            if (isAuth) {
-                checkSessionStatus();
-            }
-        }, 300000);
-
-        return () => clearInterval(interval);
     }, [isAuth, checkSession]);
 
     const handleClick = (event) => {
@@ -59,10 +47,7 @@ const SessionStatus = () => {
 
     const handleRefresh = async () => {
         handleClose();
-        const isValid = await checkSession();
-        if (isValid && sessionActive) {
-            await fetchData();
-        }
+        await fetchData();
     };
 
     const handleDisconnect = () => {

@@ -1,50 +1,11 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import './index.css';
-import MarketAnalysis from './pages/MarketAnalysis'
-import Trades from './pages/Trades'
-import Dashboard from './pages/DashBoardManagement'
-import TagManagement from './pages/TagManagement'
-import Report from './pages/ProfitLossReport'
-import Home from './pages/Home'
-import StrategyPage from './pages/MyStrategies'
-import UpdateStrategyPage from './pages/UpdateStrategy'
-import ZerodhaAccount from './pages/ZerodhaAccount'
-import FNOInstrumentsPage from './pages/FNOInstruments'
-import PortfolioDetailsPage from './pages/PortfolioDetails'
-import ActionItemsPage from './pages/ActionItems'
+import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ZerodhaProvider } from './context/ZerodhaContext';
-import Portfolio from './pages/Portfolio';
-import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
 
-function App() {
-    return (
-        <BrowserRouter>
-            <ZerodhaProvider>
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/marketanalysis" element={<MarketAnalysis />} />
-                    <Route path="/trades" element={<Trades />} />
-                    <Route path="/profitlossreport" element={<Report />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/tagmanagement" element={<TagManagement />} />
-                    <Route path="/mystrategies" element={<StrategyPage />} />
-                    <Route path="/updatestrategy/:id" element={<UpdateStrategyPage />} />
-                    <Route path="/zerodha/accountdetails" element={<ZerodhaAccount />} />
-                    <Route path="/zerodha/fno-instruments" element={<FNOInstrumentsPage />} />
-                    <Route path="/zerodha/portfolio" element={<Portfolio />} />
-                    <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
-                    <Route path="/actionitems" element={<ActionItemsPage />} />
-                    <Route path="*" element={<Home />} />
-                </Routes>
-            </ZerodhaProvider>
-        </BrowserRouter>
-    );
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const container = document.getElementById('root');
+const root = createRoot(container);
 root.render(
     <React.StrictMode>
         <App />

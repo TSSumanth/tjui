@@ -50,9 +50,8 @@ const Portfolio = () => {
             try {
                 setLocalLoading(true);
                 const isSessionValid = await checkSession();
-                const needsInitialFetch = !holdings.length && !positions.length;
-
-                if (isSessionValid && needsInitialFetch) {
+                // Only fetch data if session is valid and we don't have data yet
+                if (isSessionValid && (!holdings?.length || !positions?.net?.length)) {
                     await fetchData();
                 }
             } catch (err) {
@@ -62,8 +61,14 @@ const Portfolio = () => {
             }
         };
 
-        initializeData();
-    }, [isAuth, holdings.length, positions.length]);
+        // Only initialize if we have auth and no data
+        if (isAuth && (!holdings?.length || !positions?.net?.length)) {
+            initializeData();
+        } else {
+            setLocalLoading(false);
+        }
+        // Remove holdings.length and positions.length from dependencies to prevent continuous fetching
+    }, [isAuth, checkSession, fetchData]);
 
     // Process positions data
     const processedPositions = React.useMemo(() => {
@@ -175,7 +180,7 @@ const Portfolio = () => {
                             size="large"
                             startIcon={<LinkIcon />}
                             component={Link}
-                            to="/zerodha/accountdetails"
+                            to="/zerodha/account"
                         >
                             Connect to Zerodha
                         </Button>

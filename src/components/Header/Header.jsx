@@ -26,9 +26,85 @@ import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import SessionStatus from '../zerodha/SessionStatus';
 import { useZerodha } from '../../context/ZerodhaContext';
+import { getLoginUrl } from '../../services/zerodha/authentication';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
+    const { sessionActive, isAuth, checkSession } = useZerodha();
+    const [loading, setLoading] = useState(false);
+
+    // Debug logging for session state
+    useEffect(() => {
+        console.log('Header session state:', { sessionActive, isAuth });
+    }, [sessionActive, isAuth]);
+
+    // Only check session on mount
+    useEffect(() => {
+        if (isAuth) {
+            checkSession();
+        }
+    }, [isAuth, checkSession]);
+
+    const handleConnect = async () => {
+        try {
+            setLoading(true);
+            console.log('Starting Zerodha connection process...');
+            const loginUrl = await getLoginUrl();
+            console.log('Received login URL:', loginUrl);
+
+            if (!loginUrl) {
+                console.error('No login URL received from server');
+                throw new Error('Failed to get login URL from server');
+            }
+
+            console.log('Opening Zerodha login window...');
+            const authWindow = window.open(
+                loginUrl,
+                'Zerodha Login',
+                'width=800,height=600,status=yes,scrollbars=yes'
+            );
+
+            if (!authWindow) {
+                console.error('Failed to open popup window');
+                throw new Error('Please allow popups for this site to proceed with authentication');
+            }
+
+            const handleMessage = async (event) => {
+                console.log('Received postMessage event:', event);
+                console.log('Event origin:', event.origin);
+                console.log('Event data:', event.data);
+
+                if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
+                    console.log('Authentication successful, storing tokens...');
+                    localStorage.setItem('zerodha_access_token', event.data.data.access_token);
+                    localStorage.setItem('zerodha_public_token', event.data.data.public_token);
+                    window.removeEventListener('message', handleMessage);
+                    console.log('Checking session after successful login...');
+                    await checkSession(true);
+                    console.log('Reloading page to update session state...');
+                    window.location.reload();
+                } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
+                    console.error('Authentication error:', event.data.error);
+                    window.removeEventListener('message', handleMessage);
+                }
+            };
+
+            window.addEventListener('message', handleMessage);
+
+            const checkWindow = setInterval(() => {
+                if (authWindow.closed) {
+                    console.log('Auth window was closed');
+                    clearInterval(checkWindow);
+                    window.removeEventListener('message', handleMessage);
+                    setLoading(false);
+                }
+            }, 500);
+        } catch (err) {
+            console.error('Error in handleConnect:', err);
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchActionItems = async () => {
@@ -41,7 +117,6 @@ const Header = () => {
         };
 
         fetchActionItems();
-        // Refresh every 5 minutes
         const interval = setInterval(fetchActionItems, 300000);
         return () => clearInterval(interval);
     }, []);
@@ -102,11 +177,28 @@ const Header = () => {
                     </Box>
 
                     {/* Center section - Navigation */}
-                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 2, alignItems: 'center' }}>
                         <ButtonGroup />
+                        {!sessionActive && (
+                            <Button
+                                onClick={handleConnect}
+                                variant="contained"
+                                disabled={loading}
+                                startIcon={<AccountBalanceIcon />}
+                                sx={{
+                                    bgcolor: "white",
+                                    color: "#1976d2",
+                                    minWidth: "120px",
+                                    padding: "6px 12px",
+                                    "&:hover": { bgcolor: "#e3f2fd" }
+                                }}
+                            >
+                                {loading ? "Connecting..." : "Connect Zerodha"}
+                            </Button>
+                        )}
                     </Box>
 
-                    {/* Right section - Session Status and Notifications */}
+                    {/* Right section - Notifications */}
                     <Box sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -114,7 +206,6 @@ const Header = () => {
                         minWidth: '200px',
                         justifyContent: 'flex-end'
                     }}>
-                        <SessionStatus />
                         <IconButton
                             component={Link}
                             to="/actionitems"
@@ -184,10 +275,26 @@ const ButtonGroup = () => {
                     icon: <AccountBalanceWalletIcon />,
                     requiresSession: true
                 },
-                "My Algo Strategies": {
+                "Account": {
+                    path: "/zerodha/account",
+                    icon: <AccountBalanceIcon />,
+                    requiresSession: true
+                },
+                "Algo Strategies": {
                     path: "/zerodha/algo-strategies",
                     icon: <PsychologyIcon />,
                     requiresSession: true
+                },
+                "Disconnect": {
+                    path: "#",
+                    icon: <LinkOffIcon />,
+                    requiresSession: true,
+                    onClick: () => {
+                        handleClose();
+                        localStorage.removeItem('zerodha_access_token');
+                        localStorage.removeItem('zerodha_public_token');
+                        window.location.reload();
+                    }
                 }
             }
         }
@@ -216,10 +323,9 @@ const ButtonGroup = () => {
         <>
             <Box sx={{ display: "flex", gap: 1 }}>
                 {Object.entries(menuItems).map(([menuName, { icon, items, requiresSession }]) => {
-                    // If menu requires session and we don't have one, check if it has any non-session items
-                    const hasAvailableItems = Object.values(items).some(item => !item.requiresSession);
-                    if (requiresSession && !sessionActive && !hasAvailableItems) {
-                        return null; // Don't show menu if it requires session and has no available items
+                    // Skip Zerodha menu if not authenticated
+                    if (menuName === "Zerodha" && !sessionActive) {
+                        return null;
                     }
 
                     return (
@@ -234,10 +340,7 @@ const ButtonGroup = () => {
                                     color: "#1976d2",
                                     minWidth: "120px",
                                     padding: "6px 12px",
-                                    "&:hover": { backgroundColor: "#e3f2fd" },
-                                    ...(requiresSession && !sessionActive && {
-                                        opacity: 0.7
-                                    })
+                                    "&:hover": { backgroundColor: "#e3f2fd" }
                                 }}
                             >
                                 {menuName}

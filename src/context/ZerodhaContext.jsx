@@ -28,117 +28,98 @@ export const useZerodha = () => {
 };
 
 export const ZerodhaProvider = ({ children }) => {
+    const [isAuth, setIsAuth] = useState(false);
+    const [sessionActive, setSessionActive] = useState(false);
+    const [accountInfo, setAccountInfo] = useState(null);
+    const [lastChecked, setLastChecked] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState([]);
     const [orders, setOrders] = useState([]);
-    const [isAuth, setIsAuth] = useState(isAuthenticated());
     const [isAutoSync, setIsAutoSync] = useState(false);
-    const [sessionActive, setSessionActive] = useState(false);
-    const [lastChecked, setLastChecked] = useState(0);
 
-    // Initialize session state
-    useEffect(() => {
-        const initializeSession = async () => {
-            if (isAuthenticated()) {
-                try {
-                    const response = await getAccountInfo();
-                    const isActive = response.success;
-                    setSessionActive(isActive);
-                    setIsAuth(true);
-                    if (isActive) {
-                        fetchData();
-                    }
-                } catch (err) {
-                    console.error('Initial session check failed:', err);
-                    if (err.response?.status === 401) {
-                        handleLogout();
-                    }
-                }
-            }
-        };
-
-        initializeSession();
-    }, []);
-
-    const handleLogout = useCallback(() => {
-        logout();
-        setIsAuth(false);
-        setSessionActive(false);
-        setHoldings([]);
-        setPositions([]);
-        setOrders([]);
-        setError(null);
-        setIsAutoSync(false);
-        setLastChecked(0);
-    }, []);
-
-    const checkSession = useCallback(async (force = false) => {
+    const checkSession = useCallback(async (forceCheck = false) => {
         const now = Date.now();
-        const timeSinceLastCheck = now - lastChecked;
-
-        if (!force && timeSinceLastCheck < 30000) {
-            return sessionActive;
-        }
-
-        if (!isAuthenticated()) {
-            setIsAuth(false);
-            setSessionActive(false);
-            return false;
+        // Only check if more than 2 seconds have passed since last check or if force check
+        if (!forceCheck && now - lastChecked < 2000) {
+            return;
         }
 
         try {
             setLoading(true);
             const response = await getAccountInfo();
-            const isActive = response.success;
-            setSessionActive(isActive);
-            setIsAuth(true);
+            if (response.success) {
+                setAccountInfo(response.data);
+                setSessionActive(true);
+                setIsAuth(true);
+            } else {
+                setSessionActive(false);
+                setAccountInfo(null);
+                if (!isAuth) {
+                    setIsAuth(false);
+                }
+            }
             setLastChecked(now);
-
-            if (!isActive) {
-                handleLogout();
-            }
-            return isActive;
         } catch (err) {
-            console.error('Session check failed:', err);
-            if (err.response?.status === 401) {
-                handleLogout();
-            }
+            console.error('Error checking session:', err);
             setSessionActive(false);
-            return false;
+            setAccountInfo(null);
         } finally {
             setLoading(false);
         }
-    }, [handleLogout, lastChecked, sessionActive]);
+    }, [isAuth, lastChecked]);
 
     const fetchData = useCallback(async () => {
-        if (!isAuth || !sessionActive) return;
-
-        setLoading(true);
-        setError(null);
+        if (!isAuth || !sessionActive) {
+            return;
+        }
 
         try {
-            const holdingsData = await getHoldings();
-            setHoldings(holdingsData.data || []);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            setLoading(true);
+            const [accountResponse, holdingsResponse, positionsResponse, ordersResponse] = await Promise.all([
+                getAccountInfo(),
+                getHoldings(),
+                getPositions(),
+                getOrders()
+            ]);
 
-            const positionsData = await getPositions();
-            setPositions(positionsData.data || []);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (accountResponse.success) {
+                setAccountInfo(accountResponse.data);
+            }
 
-            const ordersData = await getOrders();
-            setOrders(ordersData.data || []);
+            setHoldings(holdingsResponse.data || []);
+            setPositions(positionsResponse.data || []);
+            setOrders(ordersResponse.data || []);
         } catch (err) {
             console.error('Error fetching data:', err);
-            setError(err.response?.data?.error || err.message || 'Failed to fetch data');
-            if (err.response?.status === 401) {
-                handleLogout();
-            }
         } finally {
             setLoading(false);
         }
-    }, [isAuth, sessionActive, handleLogout]);
+    }, [isAuth, sessionActive]);
+
+    const handleLogout = useCallback(async () => {
+        try {
+            await logout();
+            localStorage.removeItem('zerodha_access_token');
+            localStorage.removeItem('zerodha_public_token');
+            setIsAuth(false);
+            setSessionActive(false);
+            setAccountInfo(null);
+            setHoldings([]);
+            setPositions([]);
+            setOrders([]);
+        } catch (err) {
+            console.error('Error during logout:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        const token = localStorage.getItem('zerodha_access_token');
+        if (token) {
+            setIsAuth(true);
+            checkSession(true);
+        }
+    }, []);
 
     // Effect for auto-sync during market hours
     useEffect(() => {
@@ -146,21 +127,30 @@ export const ZerodhaProvider = ({ children }) => {
         let isInitialLoad = true;
 
         const checkAndFetch = async () => {
-            if (isAuth) {
-                const isSessionValid = await checkSession();
-                if (!isSessionValid) return;
+            if (!isAuth) return;
 
-                const isMarketOpen = isMarketHours();
+            // Only check session if it's been more than 5 minutes or it's initial load
+            const now = Date.now();
+            const timeSinceLastCheck = now - lastChecked;
+            const shouldCheckSession = isInitialLoad || timeSinceLastCheck >= 300000;
 
-                if (isInitialLoad) {
-                    await fetchData();
-                    isInitialLoad = false;
-                    setIsAutoSync(isMarketOpen);
-                } else if (isAutoSync && isMarketOpen) {
-                    await fetchData();
-                } else {
-                    setIsAutoSync(false);
-                }
+            let isSessionValid = sessionActive;
+            if (shouldCheckSession) {
+                isSessionValid = await checkSession();
+            }
+
+            if (!isSessionValid) return;
+
+            const isMarketOpen = isMarketHours();
+
+            if (isInitialLoad) {
+                await fetchData();
+                isInitialLoad = false;
+                setIsAutoSync(isMarketOpen);
+            } else if (isAutoSync && isMarketOpen) {
+                await fetchData();
+            } else {
+                setIsAutoSync(false);
             }
         };
 
@@ -172,7 +162,9 @@ export const ZerodhaProvider = ({ children }) => {
                     setIsAutoSync(false);
                     return;
                 }
-                checkAndFetch();
+                if (isAutoSync) {
+                    checkAndFetch();
+                }
             }, 60000);
         }
 
@@ -180,23 +172,22 @@ export const ZerodhaProvider = ({ children }) => {
             if (interval) {
                 clearInterval(interval);
             }
-            setIsAutoSync(false);
         };
-    }, [isAuth, fetchData, checkSession, isAutoSync]);
+    }, [isAuth, fetchData, checkSession, isAutoSync, sessionActive, lastChecked]);
 
     const value = {
-        loading,
-        error,
-        holdings,
-        positions,
-        orders,
         isAuth,
-        setIsAuth,
+        sessionActive,
+        accountInfo,
+        loading,
+        checkSession,
         fetchData,
         handleLogout,
         isAutoSync,
-        sessionActive,
-        checkSession
+        setIsAutoSync,
+        holdings,
+        positions,
+        orders
     };
 
     return (
