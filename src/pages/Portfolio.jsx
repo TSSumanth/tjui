@@ -10,7 +10,6 @@ import InfoIcon from '@mui/icons-material/Info';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import useScrollToTop from '../hooks/useScrollToTop';
-import { getAccountInfo } from '../services/zerodha/api';
 import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
 
@@ -50,23 +49,11 @@ const Portfolio = () => {
         const initializeData = async () => {
             try {
                 setLocalLoading(true);
-                // First check if the session is active
                 const isSessionValid = await checkSession();
-                console.log('Session check result:', { isSessionValid, isAuth });
-
-                // Only fetch data if we don't already have holdings or positions
                 const needsInitialFetch = !holdings.length && !positions.length;
-                console.log('Initial fetch check:', { needsInitialFetch, holdingsCount: holdings.length, positionsCount: positions.length });
 
                 if (isSessionValid && needsInitialFetch) {
-                    console.log('Session is valid and data needed, fetching data...');
                     await fetchData();
-                } else {
-                    console.log('Skipping initial fetch:', {
-                        reason: !isSessionValid ? 'Invalid session' : 'Data already loaded',
-                        sessionValid: isSessionValid,
-                        hasData: !needsInitialFetch
-                    });
                 }
             } catch (err) {
                 console.error('Error initializing data:', err);
@@ -76,99 +63,36 @@ const Portfolio = () => {
         };
 
         initializeData();
-    }, [isAuth, holdings.length, positions.length]); // Dependencies to check if we need to fetch
+    }, [isAuth, holdings.length, positions.length]);
 
     // Process positions data
     const processedPositions = React.useMemo(() => {
         if (!positions || !positions.net) return [];
-
-        console.log('Raw positions data:', {
-            net: positions.net,
-            day: positions.day
-        });
-
-        // Take all positions without any filtering
         const allPositions = [...(positions.net || []), ...(positions.day || [])];
-
-        console.log('All positions before processing:', allPositions.map(p => ({
-            symbol: p.tradingsymbol,
-            quantity: p.quantity,
-            overnight_quantity: p.overnight_quantity,
-            m2m: p.m2m,
-            pnl: p.pnl,
-            isSquaredOff: p.quantity === 0 && (p.day_buy_quantity > 0 || p.day_sell_quantity > 0)
-        })));
-
-        return allPositions;
+        // Filter out duplicates based on tradingsymbol
+        return allPositions.filter((position, index, self) =>
+            index === self.findIndex((p) => p.tradingsymbol === position.tradingsymbol)
+        );
     }, [positions]);
 
     // Calculate P&L for positions
-    const { positionsTotalPnL, positionsDayPnL } = React.useMemo(() => {
+    const { positionsTotalPnL, positionsDayPnL, activePositionsCount } = React.useMemo(() => {
         let totalPnL = 0;
         let dayPnL = 0;
+        let activeCount = 0;
 
-        console.log('Starting P&L calculations for positions:', processedPositions);
-
-        processedPositions.forEach((position, index) => {
+        processedPositions.forEach((position) => {
             const posType = getPositionType(position.tradingsymbol);
-
-            console.log(`Processing position ${index + 1}:`, {
-                symbol: position.tradingsymbol,
-                type: posType,
-                isOption: posType === 'Option',
-                isFuture: posType === 'Future',
-                quantity: position.quantity,
-                overnight_quantity: position.overnight_quantity,
-                day_buy_quantity: position.day_buy_quantity,
-                day_sell_quantity: position.day_sell_quantity,
-                m2m: position.m2m,
-                pnl: position.pnl,
-                isSquaredOff: position.quantity === 0 && (position.day_buy_quantity > 0 || position.day_sell_quantity > 0)
-            });
-
-            // Calculate for all F&O positions, including squared off ones
             if (posType === 'Future' || posType === 'Option') {
-                // Calculate total P&L
-                const posPnL = Number(position.pnl) || 0;
-                totalPnL += posPnL;
-
-                // Use m2m for day's P&L
-                const posM2M = Number(position.m2m) || 0;
-                dayPnL += posM2M;
-
-                console.log('Added to P&L calculation:', {
-                    symbol: position.tradingsymbol,
-                    type: posType,
-                    pnl: posPnL,
-                    m2m: posM2M,
-                    quantity: position.quantity,
-                    overnight_quantity: position.overnight_quantity,
-                    day_buy_quantity: position.day_buy_quantity,
-                    day_sell_quantity: position.day_sell_quantity,
-                    running_total_pnl: totalPnL,
-                    running_total_m2m: dayPnL
-                });
+                if (position.quantity !== 0) {
+                    activeCount++;
+                }
+                totalPnL += Number(position.pnl) || 0;
+                dayPnL += Number(position.m2m) || 0;
             }
         });
 
-        console.log('Final P&L totals:', {
-            totalPnL,
-            dayPnL,
-            positionsCount: processedPositions.length,
-            positionsList: processedPositions.map(p => ({
-                symbol: p.tradingsymbol,
-                type: getPositionType(p.tradingsymbol),
-                quantity: p.quantity,
-                overnight_quantity: p.overnight_quantity,
-                day_buy_quantity: p.day_buy_quantity,
-                day_sell_quantity: p.day_sell_quantity,
-                m2m: p.m2m,
-                pnl: p.pnl,
-                isSquaredOff: p.quantity === 0 && (p.day_buy_quantity > 0 || p.day_sell_quantity > 0)
-            }))
-        });
-
-        return { positionsTotalPnL: totalPnL, positionsDayPnL: dayPnL };
+        return { positionsTotalPnL: totalPnL, positionsDayPnL: dayPnL, activePositionsCount: activeCount };
     }, [processedPositions]);
 
     // Calculate holdings P&L
@@ -204,11 +128,6 @@ const Portfolio = () => {
 
     const handleAutoSyncChange = (event) => {
         setIsAutoSync(event.target.checked);
-    };
-
-    const handleConnect = () => {
-        // Redirect to Zerodha Account page for connection
-        window.location.href = '/zerodha';
     };
 
     // Show loading state while initializing
@@ -273,21 +192,16 @@ const Portfolio = () => {
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 {/* Header Section */}
                 <Paper sx={{
-                    p: 3,
-                    mb: 3,
+                    p: 2,
+                    mb: 2,
                     borderRadius: 2,
                     boxShadow: theme.shadows[2],
-                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`
+                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.main, 0.05)})`
                 }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                <ShowChartIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-                                <Typography variant="h4">Portfolio Overview</Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary">
-                                Last updated: {new Date().toLocaleTimeString()}
-                            </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <ShowChartIcon sx={{ fontSize: 24, color: 'primary.main' }} />
+                            <Typography variant="h6">Portfolio Overview</Typography>
                         </Box>
                         <Box display="flex" alignItems="center" gap={2}>
                             <FormControlLabel
@@ -296,13 +210,14 @@ const Portfolio = () => {
                                         checked={isAutoSync}
                                         onChange={handleAutoSyncChange}
                                         color="primary"
+                                        size="small"
                                     />
                                 }
                                 label={
-                                    <Box display="flex" alignItems="center">
+                                    <Box display="flex" alignItems="center" sx={{ typography: 'body2' }}>
                                         Auto-sync
                                         <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
-                                            <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+                                            <InfoIcon sx={{ ml: 0.5, fontSize: '1rem', color: 'text.secondary' }} />
                                         </Tooltip>
                                     </Box>
                                 }
@@ -312,118 +227,204 @@ const Portfolio = () => {
                                 startIcon={<RefreshIcon />}
                                 onClick={fetchData}
                                 disabled={loading}
+                                size="small"
                                 sx={{
-                                    borderRadius: 2,
+                                    borderRadius: 1.5,
                                     textTransform: 'none',
-                                    px: 2
+                                    px: 1.5,
+                                    py: 0.5
                                 }}
                             >
-                                {loading ? 'Refreshing...' : 'Refresh Data'}
+                                {loading ? 'Refreshing...' : 'Refresh'}
                             </Button>
                         </Box>
                     </Box>
                 </Paper>
 
                 {/* Portfolio Stats */}
-                <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid item xs={12} md={4}>
                         <Paper sx={{
-                            p: 3,
+                            p: 2,
                             height: '100%',
                             borderRadius: 2,
                             boxShadow: theme.shadows[2],
-                            background: `linear-gradient(45deg, ${alpha(theme.palette.success.main, 0.05)}, ${alpha(theme.palette.success.main, 0.1)})`,
-                            border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
+                            background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.02)}, ${alpha(theme.palette.success.main, 0.05)})`,
+                            border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                            transition: 'transform 0.2s ease-in-out',
+                            '&:hover': {
+                                transform: 'translateY(-2px)'
+                            }
                         }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Typography variant="subtitle2" color="text.secondary" sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    mb: 1
+                                }}>
                                     Equity Holdings
                                     <Tooltip title="Your long-term equity investments">
-                                        <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+                                        <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
                                     </Tooltip>
                                 </Typography>
-                                <Typography variant="h6" gutterBottom>
+                                <Typography variant="h6" sx={{
+                                    color: 'text.primary',
+                                    fontWeight: 600,
+                                    mb: 1.5
+                                }}>
                                     {holdings?.length || 0} Stocks
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
-                                    <Chip
-                                        label={`Today's Change: ${formatCurrency(holdingsDayPnL)}`}
-                                        color={holdingsDayPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
-                                    <Chip
-                                        label={`Overall P&L: ${formatCurrency(holdingsPnL)}`}
-                                        color={holdingsPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Today's Change
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: holdingsDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(holdingsDayPnL)}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Overall P&L
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: holdingsPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(holdingsPnL)}
+                                        </Typography>
+                                    </Box>
                                 </Stack>
                             </Box>
                         </Paper>
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <Paper sx={{
-                            p: 3,
+                            p: 2,
                             height: '100%',
                             borderRadius: 2,
                             boxShadow: theme.shadows[2],
-                            background: `linear-gradient(45deg, ${alpha(theme.palette.warning.main, 0.05)}, ${alpha(theme.palette.warning.main, 0.1)})`,
-                            border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`
+                            background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.02)}, ${alpha(theme.palette.warning.main, 0.05)})`,
+                            border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+                            transition: 'transform 0.2s ease-in-out',
+                            '&:hover': {
+                                transform: 'translateY(-2px)'
+                            }
                         }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                                    Equity Positions
-                                    <Tooltip title="Your equity positions">
-                                        <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+                                <Typography variant="subtitle2" color="text.secondary" sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    mb: 1
+                                }}>
+                                    F&O Positions
+                                    <Tooltip title="Your futures and options positions">
+                                        <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
                                     </Tooltip>
                                 </Typography>
-                                <Typography variant="h6" gutterBottom>
-                                    {positions?.length || 0} Positions
+                                <Typography variant="h6" sx={{
+                                    color: 'text.primary',
+                                    fontWeight: 600,
+                                    mb: 1.5
+                                }}>
+                                    {activePositionsCount} Positions
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
-                                    <Chip
-                                        label={`Today's Change: ${formatCurrency(positionsDayPnL)}`}
-                                        color={positionsDayPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
-                                    <Chip
-                                        label={`Overall P&L: ${formatCurrency(positionsTotalPnL)}`}
-                                        color={positionsTotalPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Today's Change
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: positionsDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(positionsDayPnL)}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Overall P&L
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: positionsTotalPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(positionsTotalPnL)}
+                                        </Typography>
+                                    </Box>
                                 </Stack>
                             </Box>
                         </Paper>
                     </Grid>
                     <Grid item xs={12} md={4}>
                         <Paper sx={{
-                            p: 3,
+                            p: 2,
                             height: '100%',
                             borderRadius: 2,
                             boxShadow: theme.shadows[2],
-                            background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`,
-                            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.main, 0.05)})`,
+                            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                            transition: 'transform 0.2s ease-in-out',
+                            '&:hover': {
+                                transform: 'translateY(-2px)'
+                            }
                         }}>
                             <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Typography variant="subtitle2" color="text.secondary" sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    mb: 1
+                                }}>
                                     Total Portfolio
-                                    <Tooltip title="Your total portfolio P&L">
-                                        <InfoIcon fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+                                    <Tooltip title="Your total portfolio value and performance">
+                                        <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
                                     </Tooltip>
                                 </Typography>
-                                <Typography variant="h6" gutterBottom>
-                                    {formatCurrency(totalPnL)}
+                                <Typography variant="h6" sx={{
+                                    color: 'text.primary',
+                                    fontWeight: 600,
+                                    mb: 1.5
+                                }}>
+                                    Portfolio Summary
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
-                                    <Chip
-                                        label={`Today's Change: ${formatCurrency(totalDayPnL)}`}
-                                        color={totalDayPnL >= 0 ? "success" : "error"}
-                                        size="small"
-                                        sx={{ borderRadius: 1 }}
-                                    />
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Today's Change
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: totalDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(totalDayPnL)}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Overall P&L
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: totalPnL >= 0 ? 'success.main' : 'error.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(totalPnL)}
+                                        </Typography>
+                                    </Box>
                                 </Stack>
                             </Box>
                         </Paper>

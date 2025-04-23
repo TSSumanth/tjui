@@ -45,7 +45,6 @@ export const ZerodhaProvider = ({ children }) => {
                 try {
                     const response = await getAccountInfo();
                     const isActive = response.success;
-                    console.log('Initial session check:', { isActive, timestamp: new Date().toLocaleTimeString() });
                     setSessionActive(isActive);
                     setIsAuth(true);
                     if (isActive) {
@@ -61,7 +60,7 @@ export const ZerodhaProvider = ({ children }) => {
         };
 
         initializeSession();
-    }, []); // Run only on mount
+    }, []);
 
     const handleLogout = useCallback(() => {
         logout();
@@ -79,11 +78,7 @@ export const ZerodhaProvider = ({ children }) => {
         const now = Date.now();
         const timeSinceLastCheck = now - lastChecked;
 
-        // Skip check if less than 30 seconds have passed, unless forced
         if (!force && timeSinceLastCheck < 30000) {
-            console.log('Skipping session check - checked recently:', {
-                timeSinceLastCheck: Math.round(timeSinceLastCheck / 1000) + 's ago'
-            });
             return sessionActive;
         }
 
@@ -97,7 +92,6 @@ export const ZerodhaProvider = ({ children }) => {
             setLoading(true);
             const response = await getAccountInfo();
             const isActive = response.success;
-            console.log('Session check:', { isActive, timestamp: new Date().toLocaleTimeString() });
             setSessionActive(isActive);
             setIsAuth(true);
             setLastChecked(now);
@@ -119,29 +113,20 @@ export const ZerodhaProvider = ({ children }) => {
     }, [handleLogout, lastChecked, sessionActive]);
 
     const fetchData = useCallback(async () => {
-        if (!isAuth || !sessionActive) {
-            console.log('Skipping fetch - not authenticated or session inactive');
-            return;
-        }
+        if (!isAuth || !sessionActive) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            console.log('Fetching data at:', new Date().toLocaleTimeString());
-
-            // Sequential fetching with delays to avoid rate limits
-            console.log('Fetching holdings...');
             const holdingsData = await getHoldings();
             setHoldings(holdingsData.data || []);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            console.log('Fetching positions...');
             const positionsData = await getPositions();
             setPositions(positionsData.data || []);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            console.log('Fetching orders...');
             const ordersData = await getOrders();
             setOrders(ordersData.data || []);
         } catch (err) {
@@ -158,61 +143,37 @@ export const ZerodhaProvider = ({ children }) => {
     // Effect for auto-sync during market hours
     useEffect(() => {
         let interval;
-        let isInitialLoad = true;  // Flag to track initial load
+        let isInitialLoad = true;
 
         const checkAndFetch = async () => {
             if (isAuth) {
-                // First check if session is active
                 const isSessionValid = await checkSession();
-                if (!isSessionValid) {
-                    console.log('Session invalid, skipping fetch');
-                    return;
-                }
+                if (!isSessionValid) return;
 
                 const isMarketOpen = isMarketHours();
-                console.log('Market status check:', {
-                    isMarketOpen,
-                    currentTime: new Date().toLocaleTimeString(),
-                    isInitialLoad,
-                    isAutoSync,
-                    sessionActive
-                });
 
                 if (isInitialLoad) {
-                    // Fetch on initial load only during market hours
-                    console.log('Initial load check:', { isMarketOpen });
                     await fetchData();
                     isInitialLoad = false;
                     setIsAutoSync(isMarketOpen);
                 } else if (isAutoSync && isMarketOpen) {
-                    // Only auto-fetch if both auto-sync is enabled and market is open
-                    console.log('Auto-fetching data during market hours');
                     await fetchData();
                 } else {
-                    console.log('Skipping auto-fetch:', {
-                        reason: !isMarketOpen ? 'Market closed' : 'Auto-sync disabled'
-                    });
                     setIsAutoSync(false);
                 }
             }
         };
 
         if (isAuth) {
-            // Initial check and fetch
             checkAndFetch();
-
-            // Set up interval for market hours check
             interval = setInterval(() => {
                 const isMarketOpen = isMarketHours();
                 if (!isMarketOpen) {
-                    // If market is closed, disable auto-sync
                     setIsAutoSync(false);
-                    console.log('Market closed, disabled auto-sync');
                     return;
                 }
-                // Only proceed with check and fetch if market is open
                 checkAndFetch();
-            }, 60000); // Check every minute
+            }, 60000);
         }
 
         return () => {

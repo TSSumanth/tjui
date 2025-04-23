@@ -33,25 +33,21 @@ const SessionStatus = () => {
     // Check session status on mount and periodically
     useEffect(() => {
         const checkSessionStatus = async () => {
-            console.log('Checking session status in SessionStatus component');
             await checkSession();
-            // Remove the automatic fetchData call after session check
         };
 
-        // Initial check only if we're authenticated
         if (isAuth) {
             checkSessionStatus();
         }
 
-        // Set up periodic check every 5 minutes instead of every minute
         const interval = setInterval(() => {
             if (isAuth) {
                 checkSessionStatus();
             }
-        }, 300000); // Check every 5 minutes
+        }, 300000);
 
         return () => clearInterval(interval);
-    }, [isAuth, checkSession]); // Remove fetchData from dependencies
+    }, [isAuth, checkSession]);
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);

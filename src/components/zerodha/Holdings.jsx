@@ -18,13 +18,6 @@ import PropTypes from 'prop-types';
 const Holdings = () => {
     const { holdings, loading, error } = useZerodha();
 
-    // Add debug logging
-    console.log('Holdings Component:', {
-        loading,
-        error,
-        holdingsData: holdings,
-        holdingsCount: holdings?.length
-    });
 
     const formatCurrency = (value) => {
         if (typeof value !== 'number' || isNaN(value)) {
@@ -52,15 +45,6 @@ const Holdings = () => {
             const quantity = Number(holding.quantity) || 0;
             const dayPnL = (lastPrice - closePrice) * quantity;
 
-            console.log('Day P&L calculation:', {
-                symbol: holding.tradingsymbol,
-                lastPrice,
-                closePrice,
-                quantity,
-                dayPnL,
-                rawData: holding
-            });
-
             return dayPnL;
         } catch (error) {
             console.error('Error calculating day P&L:', error);
@@ -78,17 +62,6 @@ const Holdings = () => {
 
             const pnl = (lastPrice - avgPrice) * quantity;
             const dayChange = (lastPrice - closePrice) * quantity;
-
-            console.log('Holdings calculation:', {
-                symbol: holding.tradingsymbol,
-                lastPrice,
-                closePrice,
-                avgPrice,
-                quantity,
-                pnl,
-                dayChange,
-                rawData: holding
-            });
 
             return {
                 totalPnL: acc.totalPnL + pnl,

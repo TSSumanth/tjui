@@ -26,7 +26,6 @@ import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, createClosePositionOrder } from '../../services/zerodha/api';
-import CloseIcon from '@mui/icons-material/Close';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -146,12 +145,6 @@ const calculateBreakeven = (positions) => {
             position.average_price * quantity);  // Short positions receive premium
     }, 0);
 
-    console.log('Breakeven calculation:', {
-        currentPrice,
-        breakevenPoints,
-        totalNetPremium,
-        samplePoints: samplePoints.filter((_, i) => i % 10 === 0) // Log every 10th point
-    });
 
     return {
         breakevenPoints: breakevenPoints.sort((a, b) => a - b),
@@ -260,21 +253,10 @@ const PositionTable = ({ positions, underlying }) => {
 
     // Calculate breakeven for the position group
     const breakeven = React.useMemo(() => {
-        console.log('Calculating breakeven for:', underlying);
-        console.log('Positions:', positions);
-
         const result = calculateBreakeven(positions);
-        console.log('Breakeven calculation result:', result);
         return result;
-    }, [positions, underlying]);
+    }, [positions]);
 
-    // Add debug log for render
-    console.log('PositionTable render:', {
-        underlying,
-        hasBreakeven: !!breakeven,
-        breakevenPoints: breakeven?.breakevenPoints,
-        netPremium: breakeven?.netPremium
-    });
 
     // Process and group positions
     const { openPositions, closedPositions } = React.useMemo(() => {
@@ -402,21 +384,6 @@ const PositionTable = ({ positions, underlying }) => {
                 }
             }
 
-            console.log('Day P&L calculation:', {
-                symbol: position.tradingsymbol,
-                type: positionType,
-                quantity,
-                overnightQuantity,
-                dayBuyQty,
-                daySellQty,
-                lastPrice,
-                closePrice,
-                dayBuyPrice,
-                daySellPrice,
-                dayPnL,
-                day_m2m: position.day_m2m,
-                isShortOption: positionType === 'Option' && (overnightQuantity < 0 || quantity < 0)
-            });
 
             return total + dayPnL;
         }, 0);
@@ -467,15 +434,6 @@ const PositionTable = ({ positions, underlying }) => {
         // Total P&L remains as is
         const totalPnL = Number(position.pnl) || 0;
 
-        console.log('Position calculation:', {
-            symbol: position.tradingsymbol,
-            type: positionType,
-            quantity,
-            lastPrice,
-            closePrice,
-            dayPnL,
-            totalPnL
-        });
 
         return (
             <TableRow
