@@ -129,14 +129,20 @@ export const ZerodhaProvider = ({ children }) => {
 
         try {
             console.log('Fetching data at:', new Date().toLocaleTimeString());
-            const [holdingsData, positionsData, ordersData] = await Promise.all([
-                getHoldings(),
-                getPositions(),
-                getOrders()
-            ]);
 
+            // Sequential fetching with delays to avoid rate limits
+            console.log('Fetching holdings...');
+            const holdingsData = await getHoldings();
             setHoldings(holdingsData.data || []);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+
+            console.log('Fetching positions...');
+            const positionsData = await getPositions();
             setPositions(positionsData.data || []);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+
+            console.log('Fetching orders...');
+            const ordersData = await getOrders();
             setOrders(ordersData.data || []);
         } catch (err) {
             console.error('Error fetching data:', err);
