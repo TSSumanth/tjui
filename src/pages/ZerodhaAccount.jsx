@@ -22,6 +22,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getAccountInfo } from '../services/zerodha/api';
+import { getLoginUrl } from '../services/zerodha/authentication';
 import Header from '../components/Header/Header';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
@@ -35,6 +36,7 @@ const ZerodhaAccount = () => {
     const { isAuth, fetchData, disconnect } = useZerodha();
     const [accountInfo, setAccountInfo] = useState(null);
     const [sessionStatus, setSessionStatus] = useState('checking');
+    const [loading, setLoading] = useState(false);
     const theme = useTheme();
 
     useEffect(() => {
@@ -46,24 +48,71 @@ const ZerodhaAccount = () => {
     const checkSession = async () => {
         try {
             setSessionStatus('checking');
+            console.log('Checking session status...');
             const response = await getAccountInfo();
+            console.log('Account info response:', response);
+
             if (response.success) {
+                console.log('Session is active');
                 setSessionStatus('active');
                 setAccountInfo(response.data);
             } else {
+                console.log('Session is inactive:', response.error);
                 setSessionStatus('inactive');
                 setAccountInfo(null);
             }
         } catch (err) {
-            setSessionStatus('inactive');
             console.error('Error checking session:', err);
+            console.error('Error details:', err.response?.data || err.message);
+            setSessionStatus('inactive');
+            setAccountInfo(null);
         }
     };
 
     const handleConnect = async () => {
         try {
-            await fetchData();
-            await checkSession();
+            setLoading(true);
+            const loginUrl = await getLoginUrl();
+            console.log('Opening login URL:', loginUrl);
+
+            if (!loginUrl) {
+                throw new Error('Failed to get login URL from server');
+            }
+
+            const authWindow = window.open(
+                loginUrl,
+                'Zerodha Login',
+                'width=800,height=600,status=yes,scrollbars=yes'
+            );
+
+            if (!authWindow) {
+                throw new Error('Please allow popups for this site to proceed with authentication');
+            }
+
+            // Add message listener for login callback
+            const handleMessage = (event) => {
+                console.log('Received message:', event.data);
+                if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
+                    console.log('Auth success, storing tokens');
+                    localStorage.setItem('zerodha_access_token', event.data.data.access_token);
+                    localStorage.setItem('zerodha_public_token', event.data.data.public_token);
+                    window.removeEventListener('message', handleMessage);
+                    checkSession();
+                } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
+                    console.error('Auth error:', event.data.error);
+                    window.removeEventListener('message', handleMessage);
+                }
+            };
+
+            window.addEventListener('message', handleMessage);
+
+            const checkWindow = setInterval(() => {
+                if (authWindow.closed) {
+                    clearInterval(checkWindow);
+                    window.removeEventListener('message', handleMessage);
+                    checkSession();
+                }
+            }, 500);
         } catch (err) {
             console.error('Error connecting:', err);
         }
@@ -185,15 +234,27 @@ const ZerodhaAccount = () => {
                                         />
                                     </Box>
                                 </Box>
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    startIcon={<LinkOffIcon />}
-                                    onClick={handleDisconnect}
-                                    size="small"
-                                >
-                                    Disconnect
-                                </Button>
+                                {sessionStatus === 'active' ? (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<LinkOffIcon />}
+                                        onClick={handleDisconnect}
+                                        size="small"
+                                    >
+                                        Disconnect
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<LinkIcon />}
+                                        onClick={handleConnect}
+                                        size="small"
+                                    >
+                                        Connect
+                                    </Button>
+                                )}
                             </Box>
                         </Paper>
 

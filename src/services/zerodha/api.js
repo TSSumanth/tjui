@@ -39,13 +39,32 @@ api.interceptors.response.use(
 
 // API endpoints
 export const getLoginUrl = async () => {
-    const response = await api.get('/api/zerodha/login-url');
-    return response.data;
+    try {
+        const response = await api.get('/api/zerodha/login-url');
+        if (response.data && response.data.success) {
+            return response.data.loginUrl;
+        } else {
+            throw new Error('Failed to get login URL');
+        }
+    } catch (error) {
+        console.error('Error in getLoginUrl:', error);
+        throw error;
+    }
 };
 
 export const handleCallback = async (params) => {
-    const response = await api.get('/api/zerodha/login', { params });
-    return response.data;
+    try {
+        const response = await api.get('/api/zerodha/login', { params });
+        console.log('Login callback response:', response.data);
+        if (response.data && response.data.success) {
+            return response.data;
+        } else {
+            throw new Error('Failed to handle login callback');
+        }
+    } catch (error) {
+        console.error('Error in handleCallback:', error);
+        throw error;
+    }
 };
 
 export const getHoldings = async () => {

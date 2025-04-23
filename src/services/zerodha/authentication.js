@@ -8,8 +8,8 @@ const apiKey = process.env.REACT_APP_ZERODHA_API_KEY;
 export const getLoginUrl = async () => {
     try {
         // Get the login URL from our backend
-        const response = await zerodhaApi.getLoginUrl();
-        return response.data.loginUrl;
+        const loginUrl = await zerodhaApi.getLoginUrl();
+        return loginUrl;
     } catch (error) {
         console.error('Error generating login URL:', error);
         throw error;
@@ -19,13 +19,19 @@ export const getLoginUrl = async () => {
 // Function to handle login callback
 export const handleLoginCallback = async (params) => {
     try {
+        console.log('Handling login callback with params:', params);
         const response = await zerodhaApi.handleCallback(params);
-        if (response.data.access_token) {
-            localStorage.setItem('zerodha_access_token', response.data.access_token);
-            localStorage.setItem('zerodha_public_token', response.data.public_token);
+        console.log('Login callback response:', response);
+
+        if (response && response.access_token) {
+            console.log('Storing tokens in localStorage');
+            localStorage.setItem('zerodha_access_token', response.access_token);
+            localStorage.setItem('zerodha_public_token', response.public_token);
             window.location.reload(); // Reload to update the UI
+            return response;
+        } else {
+            throw new Error('No access token in response');
         }
-        return response.data;
     } catch (error) {
         console.error('Error handling login callback:', error);
         throw error;
