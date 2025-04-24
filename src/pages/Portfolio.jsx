@@ -192,62 +192,54 @@ const Portfolio = () => {
 
     // Show portfolio when authenticated and session is active
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+        <Box>
             <Header />
-            <Container maxWidth="lg" sx={{ py: 4 }}>
-                {/* Header Section */}
-                <Paper sx={{
-                    p: 2,
-                    mb: 2,
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[2],
-                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.02)}, ${alpha(theme.palette.primary.main, 0.05)})`
+            <Container maxWidth={false} sx={{ mt: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+                {/* Auto-sync switch */}
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    mb: 3,
+                    gap: 2,
+                    alignItems: 'center'
                 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <ShowChartIcon sx={{ fontSize: 24, color: 'primary.main' }} />
-                            <Typography variant="h6">Portfolio Overview</Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={2}>
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={isAutoSync}
-                                        onChange={handleAutoSyncChange}
-                                        color="primary"
-                                        size="small"
-                                    />
-                                }
-                                label={
-                                    <Box display="flex" alignItems="center" sx={{ typography: 'body2' }}>
-                                        Auto-sync
-                                        <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
-                                            <InfoIcon sx={{ ml: 0.5, fontSize: '1rem', color: 'text.secondary' }} />
-                                        </Tooltip>
-                                    </Box>
-                                }
-                            />
-                            <Button
-                                variant="outlined"
-                                startIcon={<RefreshIcon />}
-                                onClick={fetchData}
-                                disabled={loading}
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={isAutoSync}
+                                onChange={handleAutoSyncChange}
+                                color="primary"
                                 size="small"
-                                sx={{
-                                    borderRadius: 1.5,
-                                    textTransform: 'none',
-                                    px: 1.5,
-                                    py: 0.5
-                                }}
-                            >
-                                {loading ? 'Refreshing...' : 'Refresh'}
-                            </Button>
-                        </Box>
-                    </Box>
-                </Paper>
+                            />
+                        }
+                        label={
+                            <Box display="flex" alignItems="center" sx={{ typography: 'body2' }}>
+                                Auto-sync
+                                <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
+                                    <InfoIcon sx={{ ml: 0.5, fontSize: '1rem', color: 'text.secondary' }} />
+                                </Tooltip>
+                            </Box>
+                        }
+                    />
+                    <Button
+                        variant="outlined"
+                        startIcon={<RefreshIcon />}
+                        onClick={fetchData}
+                        disabled={loading}
+                        size="small"
+                        sx={{
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            px: 1.5,
+                            py: 0.5
+                        }}
+                    >
+                        {loading ? 'Refreshing...' : 'Refresh'}
+                    </Button>
+                </Box>
 
-                {/* Portfolio Stats */}
-                <Grid container spacing={2} sx={{ mb: 2 }}>
+                {/* Cards Grid */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
                     <Grid item xs={12} md={4}>
                         <Paper sx={{
                             p: 2,
@@ -440,7 +432,8 @@ const Portfolio = () => {
                 <Paper sx={{
                     borderRadius: 2,
                     boxShadow: theme.shadows[2],
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    mb: 4
                 }}>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <Tabs
@@ -460,7 +453,7 @@ const Portfolio = () => {
                             <Tab label="Orders" id="portfolio-tab-2" aria-controls="portfolio-tabpanel-2" />
                         </Tabs>
                     </Box>
-                    <Box sx={{ p: 3, minHeight: '300px' }}>
+                    <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: '300px' }}>
                         {activeTab === 0 && <Holdings />}
                         {activeTab === 1 && <Positions />}
                         {activeTab === 2 && <Orders />}

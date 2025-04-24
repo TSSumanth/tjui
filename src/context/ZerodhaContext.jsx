@@ -1,22 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
 
 const ZerodhaContext = createContext();
 
+const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
+
 // Function to check if current time is within market hours
 const isMarketHours = () => {
     const now = new Date();
-    const day = now.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    const day = now.getDay();
     const hours = now.getHours();
     const minutes = now.getMinutes();
-    const currentTime = hours * 100 + minutes; // Convert to HHMM format
+    const currentTime = hours * 100 + minutes;
 
-    // Check if it's a weekday (Monday-Friday)
-    if (day === 0 || day === 6) return false;
-
-    // Check if time is between 9:00 AM and 3:30 PM
-    return currentTime >= 900 && currentTime <= 1530;
+    // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 3:30 PM
+    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
 };
 
 export const useZerodha = () => {
@@ -37,61 +38,102 @@ export const ZerodhaProvider = ({ children }) => {
     const [positions, setPositions] = useState([]);
     const [orders, setOrders] = useState([]);
     const [isAutoSync, setIsAutoSync] = useState(false);
+    const [error, setError] = useState(null);
+
+    const isInitialLoadDone = useRef(false);
+    const lastFetchTime = useRef(0);
+    const fetchTimeoutRef = useRef(null);
+    const retryCount = useRef(0);
+
+    // Helper function to make API calls with retry logic
+    const makeApiCallWithRetry = async (apiCall, errorMessage) => {
+        try {
+            const response = await apiCall();
+            retryCount.current = 0; // Reset retry count on success
+            return response;
+        } catch (err) {
+            if (err.message?.includes('ERR_INSUFFICIENT_RESOURCES') && retryCount.current < MAX_RETRIES) {
+                retryCount.current++;
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryCount.current));
+                return makeApiCallWithRetry(apiCall, errorMessage);
+            }
+            throw new Error(`${errorMessage}: ${err.message}`);
+        }
+    };
 
     const checkSession = useCallback(async (forceCheck = false) => {
         const now = Date.now();
-        // Only check if more than 2 seconds have passed since last check or if force check
         if (!forceCheck && now - lastChecked < 2000) {
-            return;
+            return sessionActive;
         }
 
         try {
-            setLoading(true);
-            const response = await getAccountInfo();
+            setError(null);
+            const response = await makeApiCallWithRetry(
+                () => getAccountInfo(),
+                'Failed to check session'
+            );
+
             if (response.success) {
                 setAccountInfo(response.data);
                 setSessionActive(true);
                 setIsAuth(true);
+                setLastChecked(now);
+                return true;
             } else {
                 setSessionActive(false);
                 setAccountInfo(null);
                 if (!isAuth) {
                     setIsAuth(false);
                 }
+                return false;
             }
-            setLastChecked(now);
         } catch (err) {
             console.error('Error checking session:', err);
+            setError(err.message);
             setSessionActive(false);
             setAccountInfo(null);
-        } finally {
-            setLoading(false);
+            return false;
         }
-    }, [isAuth, lastChecked]);
+    }, [isAuth, lastChecked, sessionActive]);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current < FETCH_COOLDOWN) {
+            return;
+        }
+
         if (!isAuth || !sessionActive) {
             return;
         }
 
+        // Clear any pending fetch timeout
+        if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+        }
+
         try {
             setLoading(true);
-            const [accountResponse, holdingsResponse, positionsResponse, ordersResponse] = await Promise.all([
-                getAccountInfo(),
-                getHoldings(),
-                getPositions(),
-                getOrders()
-            ]);
+            setError(null);
 
-            if (accountResponse.success) {
-                setAccountInfo(accountResponse.data);
-            }
+            const [holdingsResponse, positionsResponse, ordersResponse] = await Promise.all([
+                makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings'),
+                makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions'),
+                makeApiCallWithRetry(() => getOrders(), 'Failed to fetch orders')
+            ]);
 
             setHoldings(holdingsResponse.data || []);
             setPositions(positionsResponse.data || []);
             setOrders(ordersResponse.data || []);
+            lastFetchTime.current = now;
+            retryCount.current = 0;
         } catch (err) {
             console.error('Error fetching data:', err);
+            setError(err.message);
+            // Schedule a retry after FETCH_COOLDOWN if it's an insufficient resources error
+            if (err.message?.includes('ERR_INSUFFICIENT_RESOURCES')) {
+                fetchTimeoutRef.current = setTimeout(() => fetchData(true), FETCH_COOLDOWN);
+            }
         } finally {
             setLoading(false);
         }
@@ -108,64 +150,56 @@ export const ZerodhaProvider = ({ children }) => {
             setHoldings([]);
             setPositions([]);
             setOrders([]);
+            setError(null);
+            isInitialLoadDone.current = false;
+            if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
+            }
         } catch (err) {
             console.error('Error during logout:', err);
+            setError(err.message);
         }
     }, []);
 
+    // Initial setup effect
     useEffect(() => {
-        const token = localStorage.getItem('zerodha_access_token');
-        if (token) {
-            setIsAuth(true);
-            checkSession(true);
-        }
-    }, []);
+        const initializeApp = async () => {
+            if (isInitialLoadDone.current) return;
 
-    // Effect for auto-sync during market hours
-    useEffect(() => {
-        let interval;
-        let isInitialLoad = true;
-
-        const checkAndFetch = async () => {
-            if (!isAuth) return;
-
-            // Only check session if it's been more than 5 minutes or it's initial load
-            const now = Date.now();
-            const timeSinceLastCheck = now - lastChecked;
-            const shouldCheckSession = isInitialLoad || timeSinceLastCheck >= 300000;
-
-            let isSessionValid = sessionActive;
-            if (shouldCheckSession) {
-                isSessionValid = await checkSession();
-            }
-
-            if (!isSessionValid) return;
-
-            const isMarketOpen = isMarketHours();
-
-            if (isInitialLoad) {
-                await fetchData();
-                isInitialLoad = false;
-                setIsAutoSync(isMarketOpen);
-            } else if (isAutoSync && isMarketOpen) {
-                await fetchData();
-            } else {
-                setIsAutoSync(false);
+            const token = localStorage.getItem('zerodha_access_token');
+            if (token) {
+                setIsAuth(true);
+                const isSessionValid = await checkSession(true);
+                if (isSessionValid) {
+                    await fetchData(true);
+                    setIsAutoSync(isMarketHours());
+                    isInitialLoadDone.current = true;
+                }
             }
         };
 
-        if (isAuth) {
-            checkAndFetch();
-            interval = setInterval(() => {
+        initializeApp();
+
+        return () => {
+            if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
+            }
+        };
+    }, [checkSession, fetchData]);
+
+    // Auto-sync effect with increased interval
+    useEffect(() => {
+        let interval;
+
+        if (isAuth && sessionActive && isAutoSync && isInitialLoadDone.current) {
+            interval = setInterval(async () => {
                 const isMarketOpen = isMarketHours();
                 if (!isMarketOpen) {
                     setIsAutoSync(false);
                     return;
                 }
-                if (isAutoSync) {
-                    checkAndFetch();
-                }
-            }, 60000);
+                await fetchData();
+            }, FETCH_COOLDOWN); // Use the same cooldown period for the interval
         }
 
         return () => {
@@ -173,13 +207,14 @@ export const ZerodhaProvider = ({ children }) => {
                 clearInterval(interval);
             }
         };
-    }, [isAuth, fetchData, checkSession, isAutoSync, sessionActive, lastChecked]);
+    }, [isAuth, sessionActive, isAutoSync, fetchData]);
 
     const value = {
         isAuth,
         sessionActive,
         accountInfo,
         loading,
+        error,
         checkSession,
         fetchData,
         handleLogout,
