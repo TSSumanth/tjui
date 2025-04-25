@@ -3,7 +3,6 @@ import { getHoldings, getPositions, getOrders, getAccountInfo } from '../service
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
 
 const ZerodhaContext = createContext();
-
 const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds

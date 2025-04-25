@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ZerodhaProvider } from './context/ZerodhaContext';
 import Home from './pages/Home';
 import ZerodhaAccount from './pages/ZerodhaAccount';
@@ -19,7 +19,7 @@ function App() {
     console.log('App component rendering');
     return (
         <ZerodhaProvider>
-            <HashRouter>
+            <BrowserRouter>
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/zerodha" element={<Navigate to="/zerodha/account" replace />} />
@@ -38,7 +38,7 @@ function App() {
                     <Route path="/actionitems" element={<ActionItemsPage />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
-            </HashRouter>
+            </BrowserRouter>
         </ZerodhaProvider>
     );
 }

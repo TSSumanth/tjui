@@ -370,7 +370,7 @@ const ZerodhaAccount = () => {
                                                 })()}
                                             </Box>
                                         )}
-                                    </Box>
+            </Box>
                                     <TableContainer>
                                         <Table size="small" sx={{
                                             '& .MuiTableCell-root': {

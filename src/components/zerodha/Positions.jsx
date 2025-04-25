@@ -60,94 +60,151 @@ const calculateChangePercentage = (position) => {
 };
 
 const extractOptionDetails = (tradingsymbol) => {
-    // Example: RELIANCE25MAY1250CE
-    const match = tradingsymbol.match(/([A-Z]+)(\d{2}[A-Z]+)(\d+)(CE|PE)/);
-    if (!match) return null;
+    // Early return for non-option symbols
+    if (!tradingsymbol || !tradingsymbol.endsWith('CE') && !tradingsymbol.endsWith('PE')) {
+        return null;
+    }
 
-    return {
-        symbol: match[1],
-        expiry: match[2],
-        strike: parseFloat(match[3]),
-        type: match[4]
-    };
+    // Cache the regex pattern
+    const optionPattern = /([A-Z]+)(\d{2}[A-Z]+)(\d+)(CE|PE)/;
+
+    try {
+        const match = tradingsymbol.match(optionPattern);
+        if (!match) return null;
+
+        return {
+            symbol: match[1],
+            expiry: match[2],
+            strike: parseFloat(match[3]),
+            type: match[4]
+        };
+    } catch (error) {
+        console.warn('Error parsing option details:', error);
+        return null;
+    }
 };
 
 const calculateBreakeven = (positions) => {
-    // Filter only option positions
-    const optionPositions = positions.filter(p => p.tradingsymbol.match(/(CE|PE)$/));
+    // Early return if futures positions are present
+    const hasFutures = positions.some(p => p.tradingsymbol.endsWith('FUT'));
+    if (hasFutures) return null;
+
+    // Early return if no option positions
+    const optionPositions = positions.filter(p => p.tradingsymbol.endsWith('CE') || p.tradingsymbol.endsWith('PE'));
     if (optionPositions.length === 0) return null;
 
-    // Get current underlying price (using last_price of the first position as reference)
-    const currentPrice = positions[0].last_price;
-
-    // Function to calculate total P&L at a given price point
-    const calculateTotalPnL = (atPrice) => {
-        return optionPositions.reduce((total, position) => {
-            const details = extractOptionDetails(position.tradingsymbol);
-            if (!details) return total;
-
-            const quantity = Math.abs(position.quantity);
-            const isLong = position.quantity > 0;
-
-            let optionValue = 0;
-            if (details.type === 'CE') {
-                optionValue = Math.max(0, atPrice - details.strike);
-            } else { // PE
-                optionValue = Math.max(0, details.strike - atPrice);
-            }
-
-            // For long positions: Current Value - Cost
-            // For short positions: Premium Received - Current Value
-            const pnl = isLong ?
-                (optionValue - position.average_price) * quantity :
-                (position.average_price - optionValue) * quantity;
-
-            return total + pnl;
-        }, 0);
-    };
-
-    // Sample price points to find approximate breakeven regions
-    const samplePoints = [];
-    const minStrike = Math.min(...optionPositions.map(p => extractOptionDetails(p.tradingsymbol)?.strike || currentPrice));
-    const maxStrike = Math.max(...optionPositions.map(p => extractOptionDetails(p.tradingsymbol)?.strike || currentPrice));
-    const range = maxStrike - minStrike;
-
-    // Create price points from 20% below min strike to 20% above max strike
-    const startPrice = minStrike * 0.8;
-    const endPrice = maxStrike * 1.2;
-    const step = range / 100; // 100 sample points
-
-    for (let price = startPrice; price <= endPrice; price += step) {
-        const pnl = calculateTotalPnL(price);
-        samplePoints.push({ price, pnl });
-    }
-
-    // Find where P&L crosses zero
-    const breakevenPoints = [];
-    for (let i = 1; i < samplePoints.length; i++) {
-        const prev = samplePoints[i - 1];
-        const curr = samplePoints[i];
-
-        // If P&L crosses zero between these points
-        if ((prev.pnl <= 0 && curr.pnl > 0) || (prev.pnl >= 0 && curr.pnl < 0)) {
-            // Linear interpolation to find more precise breakeven
-            const ratio = Math.abs(prev.pnl) / (Math.abs(prev.pnl) + Math.abs(curr.pnl));
-            const breakeven = prev.price + (curr.price - prev.price) * ratio;
-            breakevenPoints.push(Math.round(breakeven * 100) / 100);
-        }
-    }
-
-    // Calculate net premium
+    // Calculate net premium first
     const totalNetPremium = optionPositions.reduce((sum, position) => {
         const quantity = Math.abs(position.quantity);
         return sum + (position.quantity > 0 ?
-            -position.average_price * quantity : // Long positions pay premium
-            position.average_price * quantity);  // Short positions receive premium
+            -position.average_price * quantity :
+            position.average_price * quantity);
     }, 0);
 
+    // If all positions are closed or squared off, return early
+    if (optionPositions.every(p => p.quantity === 0)) {
+        return {
+            breakevenPoints: [],
+            netPremium: totalNetPremium,
+            perLotPremium: totalNetPremium
+        };
+    }
+
+    // Get current underlying price
+    const currentPrice = positions[0].last_price;
+    if (!currentPrice) return null;
+
+    // Pre-process option details
+    const optionDetails = optionPositions.map(position => {
+        const details = extractOptionDetails(position.tradingsymbol);
+        if (!details) return null;
+
+        return {
+            ...details,
+            quantity: Math.abs(position.quantity),
+            isLong: position.quantity > 0,
+            averagePrice: position.average_price
+        };
+    }).filter(Boolean);
+
+    if (optionDetails.length === 0) return null;
+
+    // Find min and max strike prices
+    const strikes = optionDetails.map(d => d.strike);
+    const minStrike = Math.min(...strikes);
+    const maxStrike = Math.max(...strikes);
+    const range = maxStrike - minStrike;
+
+    // Create sample points with wider range
+    const samplePoints = [];
+    const startPrice = Math.max(0, minStrike - range * 1.0); // Increased range significantly
+    const endPrice = maxStrike + range * 1.0; // Increased range significantly
+    const step = range / 100; // More sample points for accuracy
+
+    // Calculate P&L at each price point
+    for (let price = startPrice; price <= endPrice; price += step) {
+        const pnl = optionDetails.reduce((total, option) => {
+            let optionValue = 0;
+            if (option.type === 'CE') {
+                optionValue = Math.max(0, price - option.strike);
+            } else {
+                optionValue = Math.max(0, option.strike - price);
+            }
+
+            const pnl = option.isLong ?
+                (optionValue - option.averagePrice) * option.quantity :
+                (option.averagePrice - optionValue) * option.quantity;
+
+            return total + pnl;
+        }, 0);
+
+        samplePoints.push({ price, pnl });
+    }
+
+    // Find breakeven points with improved logic
+    const breakevenPoints = [];
+    let lastSign = Math.sign(samplePoints[0].pnl);
+
+    for (let i = 1; i < samplePoints.length; i++) {
+        const currentSign = Math.sign(samplePoints[i].pnl);
+
+        if (currentSign !== lastSign) {
+            const prev = samplePoints[i - 1];
+            const curr = samplePoints[i];
+
+            // Linear interpolation to find exact breakeven point
+            const ratio = Math.abs(prev.pnl) / (Math.abs(prev.pnl) + Math.abs(curr.pnl));
+            const breakeven = prev.price + (curr.price - prev.price) * ratio;
+            breakevenPoints.push(Math.round(breakeven * 100) / 100);
+
+            lastSign = currentSign;
+        }
+    }
+
+    // Sort and ensure we have both upper and lower breakeven points
+    const sortedBreakevenPoints = breakevenPoints.sort((a, b) => a - b);
+
+    // If we only have one breakeven point, we need to find the other one
+    if (sortedBreakevenPoints.length === 1) {
+        const singlePoint = sortedBreakevenPoints[0];
+        const totalPnL = optionDetails.reduce((sum, option) => {
+            const pnl = option.isLong ?
+                -option.averagePrice * option.quantity :
+                option.averagePrice * option.quantity;
+            return sum + pnl;
+        }, 0);
+
+        // If total P&L is positive, we need a lower breakeven
+        // If total P&L is negative, we need an upper breakeven
+        if (totalPnL > 0) {
+            sortedBreakevenPoints.unshift(0); // Add lower breakeven at 0
+        } else {
+            sortedBreakevenPoints.push(maxStrike * 2); // Add upper breakeven at 2x max strike
+        }
+    }
 
     return {
-        breakevenPoints: breakevenPoints.sort((a, b) => a - b),
+        breakevenPoints: sortedBreakevenPoints,
         netPremium: totalNetPremium,
         perLotPremium: totalNetPremium
     };
@@ -171,30 +228,25 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
 const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions }) => {
     const [expanded, setExpanded] = useState(true);
 
-    // Calculate breakeven for the position group
+    // Memoize breakeven calculation
     const breakeven = React.useMemo(() => {
-        const result = calculateBreakeven(positions);
-        return result;
+        return calculateBreakeven(positions);
     }, [positions]);
 
-    // Process and group positions
-    const { openPositions, closedPositions } = React.useMemo(() => {
-        return positions.reduce((acc, position) => {
-            // Determine if position is actually closed
+    // Memoize position processing
+    const { openPositions, closedPositions, dayPnL, totalPnL } = React.useMemo(() => {
+        const result = positions.reduce((acc, position) => {
             const isSquaredOff = position.quantity === 0 &&
                 (position.day_buy_quantity > 0 || position.day_sell_quantity > 0);
 
-            // For overnight positions
             const hasOvernightPosition = position.overnight_quantity !== 0;
             const isOvernightSquaredOff = hasOvernightPosition && (
                 (position.overnight_quantity > 0 && position.day_sell_quantity === position.overnight_quantity) ||
                 (position.overnight_quantity < 0 && position.day_buy_quantity === Math.abs(position.overnight_quantity))
             );
 
-            // Final closed status
             const isClosed = isSquaredOff || isOvernightSquaredOff;
 
-            // Add position to appropriate array
             if (isClosed) {
                 acc.closedPositions.push({
                     ...position,
@@ -211,109 +263,31 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 });
             }
 
-            return acc;
-        }, { openPositions: [], closedPositions: [] });
-    }, [positions]);
-
-    // Calculate day's P&L for this underlying
-    const calculateDayPnL = () => {
-        return positions.reduce((total, position) => {
-            // If position is closed, use the realized P&L
+            // Calculate P&L
             if (position.is_closed) {
-                return total + (Number(position.pnl) || 0);
-            }
+                acc.totalPnL += Number(position.pnl) || 0;
+            } else if (position.day_m2m !== undefined && position.day_m2m !== null) {
+                acc.dayPnL += Number(position.day_m2m);
+            } else {
+                // Calculate day P&L based on position type
+                const lastPrice = Number(position.last_price) || 0;
+                const closePrice = Number(position.close_price) || lastPrice;
+                const quantity = Number(position.quantity) || 0;
+                const positionType = getPositionType(position.tradingsymbol);
 
-            // For open positions, use day_m2m if available
-            if (position.day_m2m !== undefined && position.day_m2m !== null) {
-                return total + Number(position.day_m2m);
-            }
-
-            // Fallback calculation if day_m2m is not available
-            const lastPrice = Number(position.last_price) || 0;
-            const closePrice = Number(position.close_price) || lastPrice;
-            const quantity = Number(position.quantity) || 0;
-            const positionType = getPositionType(position.tradingsymbol);
-            const overnightQuantity = Number(position.overnight_quantity) || 0;
-            const dayBuyQty = Number(position.day_buy_quantity) || 0;
-            const daySellQty = Number(position.day_sell_quantity) || 0;
-            const dayBuyPrice = Number(position.day_buy_price) || 0;
-            const daySellPrice = Number(position.day_sell_price) || 0;
-            const buyPrice = Number(position.buy_price) || 0;
-            const sellPrice = Number(position.sell_price) || 0;
-
-            let dayPnL = 0;
-
-            // Calculate M2M for overnight positions
-            if (overnightQuantity !== 0) {
-                if (positionType === 'Future') {
-                    // For long futures
-                    if (overnightQuantity > 0) {
-                        dayPnL += overnightQuantity * (lastPrice - closePrice);
-                    }
-                    // For short futures
-                    else {
-                        dayPnL += Math.abs(overnightQuantity) * (closePrice - lastPrice);
-                    }
-                } else if (positionType === 'Option') {
-                    // For long options
-                    if (overnightQuantity > 0) {
-                        dayPnL += overnightQuantity * (lastPrice - closePrice);
-                    }
-                    // For short options - reversed calculation as profit is inverse of price movement
-                    else {
-                        dayPnL += Math.abs(overnightQuantity) * (lastPrice - closePrice) * -1;
-                    }
+                if (positionType === 'Future' || positionType === 'Option') {
+                    acc.dayPnL += quantity * (lastPrice - closePrice);
+                } else {
+                    const isLong = position.buy_quantity > position.sell_quantity;
+                    acc.dayPnL += quantity * (lastPrice - closePrice) * (isLong ? 1 : -1);
                 }
             }
 
-            // Add realized P&L from intraday trades
-            if (dayBuyQty > 0 || daySellQty > 0) {
-                // Calculate realized P&L from completed trades
-                const completedQty = Math.min(dayBuyQty, daySellQty);
-                if (completedQty > 0) {
-                    if (daySellQty >= dayBuyQty) {
-                        // Buy then Sell
-                        dayPnL += completedQty * (daySellPrice - dayBuyPrice);
-                    } else {
-                        // Sell then Buy (for short positions)
-                        dayPnL += completedQty * (sellPrice - buyPrice);
-                    }
-                }
+            return acc;
+        }, { openPositions: [], closedPositions: [], dayPnL: 0, totalPnL: 0 });
 
-                // Calculate unrealized P&L for remaining intraday positions
-                const remainingQty = dayBuyQty - daySellQty;
-                if (remainingQty !== 0) {
-                    if (positionType === 'Option') {
-                        if (remainingQty > 0) {
-                            // Long intraday option position
-                            dayPnL += remainingQty * (lastPrice - dayBuyPrice);
-                        } else {
-                            // Short intraday option position
-                            dayPnL += Math.abs(remainingQty) * (dayBuyPrice - lastPrice);
-                        }
-                    } else {
-                        if (remainingQty > 0) {
-                            // Long intraday future position
-                            dayPnL += remainingQty * (lastPrice - dayBuyPrice);
-                        } else {
-                            // Short intraday future position
-                            dayPnL += Math.abs(remainingQty) * (daySellPrice - lastPrice);
-                        }
-                    }
-                }
-            }
-
-
-            return total + dayPnL;
-        }, 0);
-    };
-
-    // Calculate total P&L for this underlying
-    const calculateTotalPnL = () => {
-        return positions.reduce((total, position) => {
-            return total + (Number(position.pnl) || 0);
-        }, 0);
-    };
+        return result;
+    }, [positions]);
 
     const renderPositionRow = (position) => {
         const lastPrice = Number(position.last_price) || 0;
@@ -530,6 +504,13 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             }}>
                                 Net Premium: {formatCurrency(breakeven.netPremium)}
                             </Box>
+                            <Box sx={{
+                                color: 'text.secondary',
+                                fontFamily: 'monospace',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                Current: {formatCurrency(breakeven.currentPrice)}
+                            </Box>
                         </Box>
                     )}
 
@@ -545,20 +526,20 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                         <Box
                             sx={{
                                 fontFamily: 'monospace',
-                                color: calculateDayPnL() >= 0 ? 'success.main' : 'error.main',
+                                color: dayPnL >= 0 ? 'success.main' : 'error.main',
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            Day: {formatCurrency(calculateDayPnL())}
+                            Day: {formatCurrency(dayPnL)}
                         </Box>
                         <Box
                             sx={{
                                 fontFamily: 'monospace',
-                                color: calculateTotalPnL() >= 0 ? 'success.main' : 'error.main',
+                                color: totalPnL >= 0 ? 'success.main' : 'error.main',
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            Total: {formatCurrency(calculateTotalPnL())}
+                            Total: {formatCurrency(totalPnL)}
                         </Box>
                         <IconButton
                             size="small"
