@@ -14,14 +14,11 @@ import {
     Typography,
     Box,
     Tooltip,
-    IconButton,
-    Menu,
-    MenuItem
+    IconButton
 } from "@mui/material";
 import { AssignTradesToStrategy } from "../Strategies/AssignTradesPopup";
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import InfoIcon from '@mui/icons-material/Info';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 // Helper function to format dates consistently
 const formatDate = (dateString) => {
@@ -89,36 +86,23 @@ const TABLE_STYLES = {
     }
 };
 
-function TradesTable({
-    stockTrades = [],
-    optionTrades = [],
-    includeColumns = [],
-    columnAliases = {},
-    updateTrade,
-    renderStockTradeActions,
-    renderOptionTradeActions,
-    onAddActionItem
-}) {
+function TradesTable({ data, includeColumns = [], columnAliases = {}, updateTrade }) {
     // State management
-    const [sortedData, setSortedData] = useState([...stockTrades, ...optionTrades]);
+    const [sortedData, setSortedData] = useState(data);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
     const [selectedTrades, setSelectedTrades] = useState([]);
     const [showAssignTradesPopup, setShowAssignTradesPopup] = useState(false);
-    const [anchorEl, setAnchorEl] = useState(null);
-    const [selectedTrade, setSelectedTrade] = useState(null);
 
-    // Update sorted data when trades change
+    // Update sorted data when data prop changes
     useEffect(() => {
-        // Combine and sort trades by entry date
-        const combinedTrades = [...stockTrades, ...optionTrades].sort((a, b) =>
-            new Date(b.entrydate) - new Date(a.entrydate)
-        );
-        setSortedData(combinedTrades);
-    }, [stockTrades, optionTrades]);
+        if (data) {
+            setSortedData(data);
+        }
+    }, [data]);
 
     // Get visible columns based on includeColumns prop
-    const columns = sortedData.length > 0
-        ? Object.keys(sortedData[0]).filter(col => includeColumns.includes(col))
+    const columns = data.length > 0
+        ? Object.keys(data[0]).filter(col => includeColumns.includes(col))
         : [];
 
     // Handle sorting of table data
@@ -151,24 +135,6 @@ function TradesTable({
         ...(isSelected ? TABLE_STYLES.selectedRow : {}),
         ...(index % 2 === 0 ? TABLE_STYLES.evenRow : TABLE_STYLES.oddRow)
     });
-
-    const handleMenuClick = (event, trade) => {
-        event.stopPropagation();
-        setAnchorEl(event.currentTarget);
-        setSelectedTrade(trade);
-    };
-
-    const handleMenuClose = () => {
-        setAnchorEl(null);
-        setSelectedTrade(null);
-    };
-
-    const handleAddActionItem = () => {
-        if (selectedTrade) {
-            onAddActionItem(selectedTrade);
-            handleMenuClose();
-        }
-    };
 
     return (
         <TableContainer component={Paper} sx={TABLE_STYLES.container}>
@@ -221,7 +187,6 @@ function TradesTable({
                                 </TableSortLabel>
                             </TableCell>
                         ))}
-                        <TableCell>Actions</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
@@ -248,7 +213,7 @@ function TradesTable({
                                         key={col}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            updateTrade(row)
+                                            updateTrade(row);
                                         }}
                                     >
                                         {(col === "entrydate" || col === "exitdate" || col === "lastmodifieddate")
@@ -256,29 +221,11 @@ function TradesTable({
                                             : row[col]}
                                     </TableCell>
                                 ))}
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => handleMenuClick(e, row)}
-                                    >
-                                        <MoreVertIcon />
-                                    </IconButton>
-                                </TableCell>
                             </TableRow>
                         );
                     })}
                 </TableBody>
             </Table>
-
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem onClick={handleAddActionItem}>
-                    Create Action Item
-                </MenuItem>
-            </Menu>
 
             {/* Assign trades popup */}
             {showAssignTradesPopup && (
