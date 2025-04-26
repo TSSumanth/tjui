@@ -20,10 +20,15 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField
+    TextField,
+    Menu,
+    MenuItem,
+    Popper,
+    ClickAwayListener,
+    Grow
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
-import { ExpandLess, ExpandMore } from '@mui/icons-material';
+import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, createClosePositionOrder } from '../../services/zerodha/api';
 
@@ -227,49 +232,16 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
 
 const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions }) => {
     const [expanded, setExpanded] = useState(true);
+    const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+    const [selectedPosition, setSelectedPosition] = useState(null);
 
-    // Memoize breakeven calculation
-    const breakeven = React.useMemo(() => {
-        return calculateBreakeven(positions);
-    }, [positions]);
-
-    // Memoize position processing
-    const { openPositions, closedPositions, dayPnL, totalPnL } = React.useMemo(() => {
-        const result = positions.reduce((acc, position) => {
-            const isSquaredOff = position.quantity === 0 &&
-                (position.day_buy_quantity > 0 || position.day_sell_quantity > 0);
-
-            const hasOvernightPosition = position.overnight_quantity !== 0;
-            const isOvernightSquaredOff = hasOvernightPosition && (
-                (position.overnight_quantity > 0 && position.day_sell_quantity === position.overnight_quantity) ||
-                (position.overnight_quantity < 0 && position.day_buy_quantity === Math.abs(position.overnight_quantity))
-            );
-
-            const isClosed = isSquaredOff || isOvernightSquaredOff;
-
-            if (isClosed) {
-                acc.closedPositions.push({
-                    ...position,
-                    is_closed: true,
-                    closing_price: position.last_price,
-                    closed_quantity: hasOvernightPosition ?
-                        Math.abs(position.overnight_quantity) :
-                        Math.max(position.day_buy_quantity, position.day_sell_quantity)
-                });
-            } else if (position.quantity !== 0) {
-                acc.openPositions.push({
-                    ...position,
-                    is_closed: false
-                });
-            }
-
-            // Calculate P&L
-            if (position.is_closed) {
-                acc.totalPnL += Number(position.pnl) || 0;
-            } else if (position.day_m2m !== undefined && position.day_m2m !== null) {
+    // Calculate P&L values
+    const { dayPnL, totalPnL } = React.useMemo(() => {
+        return positions.reduce((acc, position) => {
+            // Day P&L calculation
+            if (position.day_m2m !== undefined && position.day_m2m !== null) {
                 acc.dayPnL += Number(position.day_m2m);
             } else {
-                // Calculate day P&L based on position type
                 const lastPrice = Number(position.last_price) || 0;
                 const closePrice = Number(position.close_price) || lastPrice;
                 const quantity = Number(position.quantity) || 0;
@@ -283,11 +255,52 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 }
             }
 
-            return acc;
-        }, { openPositions: [], closedPositions: [], dayPnL: 0, totalPnL: 0 });
+            // Total P&L calculation
+            acc.totalPnL += Number(position.pnl) || 0;
 
-        return result;
+            return acc;
+        }, { dayPnL: 0, totalPnL: 0 });
     }, [positions]);
+
+    const handleMenuClick = (event, position) => {
+        event.stopPropagation();
+        console.log('Menu clicked for position:', {
+            tradingsymbol: position.tradingsymbol,
+            quantity: position.quantity,
+            position
+        });
+        setMenuAnchorEl(event.currentTarget);
+        setSelectedPosition(position);
+    };
+
+    const handleMenuClose = () => {
+        setMenuAnchorEl(null);
+        setSelectedPosition(null);
+    };
+
+    const handleClosePosition = () => {
+        if (!selectedPosition) {
+            console.warn('No position selected for closing');
+            return;
+        }
+
+        console.log('Closing position:', selectedPosition);
+        const menuButton = menuAnchorEl;
+        handleMenuClose();
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, false);
+    };
+
+    const handleAddMore = () => {
+        if (!selectedPosition) {
+            console.warn('No position selected for adding');
+            return;
+        }
+
+        console.log('Adding to position:', selectedPosition);
+        const menuButton = menuAnchorEl;
+        handleMenuClose();
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, true);
+    };
 
     const renderPositionRow = (position) => {
         const lastPrice = Number(position.last_price) || 0;
@@ -418,19 +431,35 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             Squared Off
                         </Typography>
                     ) : (
-                        <Button
-                            variant="contained"
-                            color="error"
-                            size="small"
-                            onClick={() => onOpenOrderDialog(position)}
-                            disabled={loadingPositions[position.tradingsymbol]}
-                        >
-                            {loadingPositions[position.tradingsymbol] ? (
-                                <CircularProgress size={20} color="inherit" />
-                            ) : (
-                                'Close'
-                            )}
-                        </Button>
+                        <>
+                            <IconButton
+                                size="small"
+                                onClick={(e) => handleMenuClick(e, position)}
+                                disabled={loadingPositions[position.tradingsymbol]}
+                            >
+                                <MoreVert fontSize="small" />
+                            </IconButton>
+                            <Menu
+                                anchorEl={menuAnchorEl}
+                                open={Boolean(menuAnchorEl) && selectedPosition?.tradingsymbol === position.tradingsymbol}
+                                onClose={handleMenuClose}
+                                anchorOrigin={{
+                                    vertical: 'bottom',
+                                    horizontal: 'right',
+                                }}
+                                transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'right',
+                                }}
+                            >
+                                <MenuItem onClick={handleClosePosition}>
+                                    <Typography variant="body2">Close Position</Typography>
+                                </MenuItem>
+                                <MenuItem onClick={handleAddMore}>
+                                    <Typography variant="body2">Add More</Typography>
+                                </MenuItem>
+                            </Menu>
+                        </>
                     )}
                 </StyledTableCell>
             </TableRow>
@@ -474,7 +503,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     </Box>
 
                     {/* Middle section - Breakeven and Premium Info */}
-                    {breakeven && (
+                    {calculateBreakeven(positions) && (
                         <Box sx={{
                             display: 'flex',
                             alignItems: 'center',
@@ -493,8 +522,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 fontWeight: 500,
                                 whiteSpace: 'nowrap'
                             }}>
-                                {breakeven.breakevenPoints.length > 0
-                                    ? `Breakeven: ↓${formatCurrency(breakeven.breakevenPoints[0])} / ↑${formatCurrency(breakeven.breakevenPoints[1])}`
+                                {calculateBreakeven(positions).breakevenPoints.length > 0
+                                    ? `Breakeven: ↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
                                     : 'Unable to show BE'}
                             </Box>
                             <Box sx={{
@@ -502,14 +531,14 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 fontFamily: 'monospace',
                                 whiteSpace: 'nowrap'
                             }}>
-                                Net Premium: {formatCurrency(breakeven.netPremium)}
+                                Net Premium: {formatCurrency(calculateBreakeven(positions).netPremium)}
                             </Box>
                             <Box sx={{
                                 color: 'text.secondary',
                                 fontFamily: 'monospace',
                                 whiteSpace: 'nowrap'
                             }}>
-                                Current: {formatCurrency(breakeven.currentPrice)}
+                                Current: {formatCurrency(calculateBreakeven(positions).currentPrice)}
                             </Box>
                         </Box>
                     )}
@@ -581,8 +610,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {openPositions.map(renderPositionRow)}
-                            {closedPositions.map(renderPositionRow)}
+                            {positions.map(renderPositionRow)}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -591,36 +619,145 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     );
 };
 
+const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price, underlying, isAdding, onQuantityChange, onPriceChange, onSubmit, loading }) => {
+    if (!open || !anchorEl) return null;
+
+    return (
+        <Popper
+            open={open}
+            anchorEl={anchorEl}
+            placement="right-start"
+            transition
+            style={{ zIndex: 1300 }}
+            modifiers={[
+                {
+                    name: 'offset',
+                    options: {
+                        offset: [0, 8],
+                    },
+                },
+            ]}
+        >
+            {({ TransitionProps }) => (
+                <Grow {...TransitionProps}>
+                    <Paper
+                        elevation={3}
+                        sx={{
+                            width: '400px',
+                            p: 2,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            bgcolor: 'background.paper'
+                        }}
+                    >
+                        <ClickAwayListener onClickAway={onClose}>
+                            <Box>
+                                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Typography variant="h6" component="h2">
+                                        {isAdding ? 'Add Position' : 'Close Position'}
+                                    </Typography>
+                                    <IconButton size="small" onClick={onClose}>
+                                        <Close fontSize="small" />
+                                    </IconButton>
+                                </Box>
+
+                                <Typography variant="subtitle1" gutterBottom>
+                                    {position?.tradingsymbol}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    {isAdding
+                                        ? `${position?.quantity > 0 ? 'BUY' : 'SELL'} ${position?.product}`
+                                        : `${position?.quantity > 0 ? 'SELL' : 'BUY'} ${position?.product}`}
+                                </Typography>
+
+                                <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+                                    <TextField
+                                        label="Quantity"
+                                        type="text"
+                                        value={quantity || ''}
+                                        onChange={onQuantityChange}
+                                        fullWidth
+                                        size="small"
+                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                                    />
+                                    <TextField
+                                        label="Price (Optional)"
+                                        type="text"
+                                        value={price || ''}
+                                        onChange={onPriceChange}
+                                        fullWidth
+                                        size="small"
+                                        helperText="Leave empty for market order"
+                                        inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
+                                    />
+                                </Box>
+
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+                                    {price ? 'Limit Order' : 'Market Order'}
+                                </Typography>
+
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+                                    <Button onClick={onClose} size="small">
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={onSubmit}
+                                        variant="contained"
+                                        color={isAdding ? "primary" : "error"}
+                                        size="small"
+                                        disabled={!quantity || loading}
+                                    >
+                                        {loading ? (
+                                            <CircularProgress size={20} color="inherit" />
+                                        ) : (
+                                            isAdding ? 'Add Position' : 'Close Position'
+                                        )}
+                                    </Button>
+                                </Box>
+                            </Box>
+                        </ClickAwayListener>
+                    </Paper>
+                </Grow>
+            )}
+        </Popper>
+    );
+};
+
 const Positions = () => {
     const { positions, loading, error } = useZerodha();
     const [orderDialog, setOrderDialog] = useState({
         open: false,
+        anchorEl: null,
         position: null,
         quantity: '',
         price: '',
-        underlying: ''
+        underlying: '',
+        isAdding: false
     });
     const [loadingPositions, setLoadingPositions] = useState({});
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-    // Ref to track if dialog should stay open
-    const dialogShouldStayOpen = React.useRef(false);
+    // Refs for dialog state management
+    const dialogStateRef = React.useRef(null);
+    const lastPositionRef = React.useRef(null);
+    const isDialogOpenRef = React.useRef(false);
+    const positionUpdateCount = React.useRef(0);
 
-    // Track previous positions for comparison
-    const previousPositions = React.useRef(positions);
-
-    // Process positions data
+    // Process positions data with memoization
     const { dayPositions, netPositions } = React.useMemo(() => {
+        console.log('Positions memo update:', {
+            hasPositions: !!positions,
+            hasDay: !!positions?.day,
+            hasNet: !!positions?.net,
+            dialogOpen: isDialogOpenRef.current,
+            dialogState: dialogStateRef.current,
+            lastPosition: lastPositionRef.current
+        });
+
         if (!positions || !positions.day || !positions.net) {
             return { dayPositions: [], netPositions: [] };
         }
-
-        // Check if this is a position update
-        if (previousPositions.current !== positions && orderDialog.open) {
-            console.log('Positions updated while dialog is open');
-            dialogShouldStayOpen.current = true;
-        }
-        previousPositions.current = positions;
 
         return {
             dayPositions: positions.day,
@@ -628,104 +765,146 @@ const Positions = () => {
         };
     }, [positions]);
 
-    // Effect to handle position updates while dialog is open
+    // Effect to sync dialog state with refs
     React.useEffect(() => {
-        if (!dialogShouldStayOpen.current) return;
+        if (orderDialog.open !== isDialogOpenRef.current) {
+            console.log('Dialog state changed:', {
+                newState: orderDialog.open,
+                oldState: isDialogOpenRef.current,
+                hasDialogState: !!dialogStateRef.current,
+                hasLastPosition: !!lastPositionRef.current
+            });
+            isDialogOpenRef.current = orderDialog.open;
+        }
+    }, [orderDialog.open]);
 
-        console.log('Handling position update with dialog open');
+    const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding = false) => {
+        console.log('Opening order dialog with data:', {
+            tradingsymbol: position?.tradingsymbol,
+            quantity: position?.quantity,
+            position,
+            underlying,
+            isAdding
+        });
+
+        if (!position?.tradingsymbol || !position?.quantity) {
+            console.error('Invalid position data:', {
+                position,
+                tradingsymbol: position?.tradingsymbol,
+                quantity: position?.quantity
+            });
+            return;
+        }
+
+        const dialogState = {
+            open: true,
+            anchorEl,
+            position,
+            quantity: Math.abs(position.quantity).toString(),
+            price: position.last_price?.toString() || '',
+            underlying,
+            isAdding: Boolean(isAdding)
+        };
+
+        console.log('Setting dialog state:', dialogState);
+
+        setOrderDialog(dialogState);
+        dialogStateRef.current = dialogState;
+        lastPositionRef.current = position;
+        isDialogOpenRef.current = true;
+    };
+
+    // Effect to handle position updates
+    React.useEffect(() => {
+        if (!positions || !orderDialog.open || !orderDialog.position?.tradingsymbol) return;
+
         const currentPosition = orderDialog.position;
-        if (!currentPosition) return;
-
         const allPositions = [...(positions?.net || []), ...(positions?.day || [])];
         const updatedPosition = allPositions.find(p => p.tradingsymbol === currentPosition.tradingsymbol);
 
+        console.log('Position update check:', {
+            dialogOpen: orderDialog.open,
+            currentSymbol: currentPosition.tradingsymbol,
+            foundUpdatedPosition: !!updatedPosition,
+            updatedPosition
+        });
+
         if (updatedPosition) {
-            console.log('Updating dialog with new position data');
             setOrderDialog(prev => ({
                 ...prev,
-                position: updatedPosition,
-                // Preserve user input if it exists
-                quantity: prev.quantity || Math.abs(updatedPosition.quantity).toString(),
-                price: prev.price || updatedPosition.last_price?.toString() || ''
+                position: {
+                    ...updatedPosition,
+                    average_price: currentPosition.average_price || updatedPosition.average_price,
+                    quantity: currentPosition.quantity || updatedPosition.quantity,
+                    product: currentPosition.product || updatedPosition.product,
+                    exchange: currentPosition.exchange || updatedPosition.exchange
+                }
             }));
         }
-
-        dialogShouldStayOpen.current = false;
     }, [positions]);
 
-    const handleOpenOrderDialog = (position, underlying) => {
-        console.log('Opening order dialog for:', position.tradingsymbol);
-        dialogShouldStayOpen.current = true;
-        setOrderDialog({
-            open: true,
-            position,
-            underlying,
-            quantity: Math.abs(position.quantity).toString(),
-            price: position.last_price?.toString() || ''
-        });
-    };
-
     const handleCloseOrderDialog = () => {
-        console.log('Explicitly closing order dialog');
-        dialogShouldStayOpen.current = false;
-        setOrderDialog({
+        console.log('Closing order dialog');
+        dialogStateRef.current = null;
+        lastPositionRef.current = null;
+        isDialogOpenRef.current = false;
+        setOrderDialog(prev => ({
+            ...prev,
             open: false,
+            anchorEl: null,
             position: null,
             quantity: '',
             price: '',
-            underlying: ''
-        });
-    };
-
-    const handleQuantityChange = (event) => {
-        const value = event.target.value;
-        if (value === '' || /^\d*$/.test(value)) {
-            setOrderDialog(prev => ({
-                ...prev,
-                quantity: value
-            }));
-        }
-    };
-
-    const handlePriceChange = (event) => {
-        const value = event.target.value;
-        if (value === '' || /^\d*\.?\d*$/.test(value)) {
-            setOrderDialog(prev => ({
-                ...prev,
-                price: value
-            }));
-        }
+            underlying: '',
+            isAdding: false
+        }));
     };
 
     const handleClosePosition = async () => {
         if (!orderDialog.position) return;
 
-        const { position, quantity, price } = orderDialog;
+        const { position, quantity, price, isAdding } = orderDialog;
         const tradingsymbol = position.tradingsymbol;
 
         setLoadingPositions(prev => ({ ...prev, [tradingsymbol]: true }));
         try {
-            const orderParams = {
-                ...createClosePositionOrder(position),
-                quantity: parseInt(quantity, 10),
-                order_type: price ? 'LIMIT' : 'MARKET',
-                ...(price && { price: parseFloat(price) })
-            };
+            let orderParams;
+            if (isAdding) {
+                orderParams = {
+                    tradingsymbol: position.tradingsymbol,
+                    exchange: position.exchange,
+                    transaction_type: position.quantity > 0 ? 'BUY' : 'SELL',
+                    order_type: price ? 'LIMIT' : 'MARKET',
+                    quantity: parseInt(quantity, 10),
+                    product: position.product,
+                    validity: 'DAY',
+                    ...(price && { price: parseFloat(price) })
+                };
+            } else {
+                orderParams = {
+                    ...createClosePositionOrder(position),
+                    quantity: parseInt(quantity, 10),
+                    order_type: price ? 'LIMIT' : 'MARKET',
+                    ...(price && { price: parseFloat(price) })
+                };
+            }
 
             const response = await placeOrder(orderParams);
             if (response.success) {
                 setSnackbar({
                     open: true,
-                    message: `Successfully placed order for ${tradingsymbol}`,
+                    message: `Successfully placed ${isAdding ? 'add' : 'close'} order for ${tradingsymbol}`,
                     severity: 'success'
                 });
-                dialogShouldStayOpen.current = false;
+                dialogStateRef.current = null;
+                lastPositionRef.current = null;
+                isDialogOpenRef.current = false;
                 handleCloseOrderDialog();
             } else {
                 throw new Error(response.message || 'Failed to place order');
             }
         } catch (error) {
-            console.error('Error closing position:', error);
+            console.error('Error handling position:', error);
             setSnackbar({
                 open: true,
                 message: error.message || 'Failed to place order',
@@ -734,10 +913,6 @@ const Positions = () => {
         } finally {
             setLoadingPositions(prev => ({ ...prev, [tradingsymbol]: false }));
         }
-    };
-
-    const handleCloseSnackbar = () => {
-        setSnackbar(prev => ({ ...prev, open: false }));
     };
 
     // Group positions by underlying
@@ -804,6 +979,19 @@ const Positions = () => {
 
         return groups;
     }, [dayPositions, netPositions]);
+
+    // Memoize the position table to prevent unnecessary re-renders
+    const positionTables = React.useMemo(() => {
+        return Object.entries(groupedPositions).map(([underlying, { openPositions, closedPositions }]) => (
+            <PositionTable
+                key={underlying}
+                positions={[...openPositions, ...closedPositions]}
+                underlying={underlying}
+                onOpenOrderDialog={(position, isAdding) => handleOpenOrderDialog(position, underlying, isAdding)}
+                loadingPositions={loadingPositions}
+            />
+        ));
+    }, [groupedPositions, loadingPositions]);
 
     if (loading) {
         return (
@@ -880,107 +1068,34 @@ const Positions = () => {
                 </Typography>
             </Box>
 
-            {Object.entries(groupedPositions).map(([underlying, { openPositions, closedPositions }]) => (
-                <PositionTable
-                    key={underlying}
-                    positions={[...openPositions, ...closedPositions]}
-                    underlying={underlying}
-                    onOpenOrderDialog={(position) => handleOpenOrderDialog(position, underlying)}
-                    loadingPositions={loadingPositions}
-                />
-            ))}
+            {positionTables}
 
-            <Dialog
-                open={orderDialog.open}
-                onClose={(event, reason) => {
-                    console.log('Dialog onClose triggered:', reason);
-                    if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
-                        console.log('Preventing automatic dialog close');
-                        return;
-                    }
-                    if (!dialogShouldStayOpen.current) {
-                        handleCloseOrderDialog();
-                    } else {
-                        console.log('Dialog kept open due to position update');
-                    }
-                }}
-                maxWidth="sm"
-                fullWidth
-                disableEscapeKeyDown
-                keepMounted
-                sx={{
-                    '& .MuiDialog-paper': {
-                        minHeight: '300px'
-                    }
-                }}
-            >
-                <DialogTitle>
-                    Close Position - {orderDialog.underlying}
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            {orderDialog.position?.tradingsymbol}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                            {orderDialog.position?.quantity > 0 ? 'SELL' : 'BUY'} {orderDialog.position?.product}
-                        </Typography>
-                        <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                            <TextField
-                                label="Quantity"
-                                type="text"
-                                value={orderDialog.quantity}
-                                onChange={handleQuantityChange}
-                                fullWidth
-                                sx={{ mb: 2 }}
-                                inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                            />
-                            <TextField
-                                label="Price (Optional)"
-                                type="text"
-                                value={orderDialog.price}
-                                onChange={handlePriceChange}
-                                fullWidth
-                                sx={{ mb: 2 }}
-                                helperText="Leave empty for market order"
-                                inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
-                            />
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                            {orderDialog.price ? 'Limit Order' : 'Market Order'}
-                        </Typography>
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseOrderDialog}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleClosePosition}
-                        variant="contained"
-                        color="primary"
-                        disabled={!orderDialog.quantity || loadingPositions[orderDialog.position?.tradingsymbol]}
-                    >
-                        {loadingPositions[orderDialog.position?.tradingsymbol] ? (
-                            <CircularProgress size={24} color="inherit" />
-                        ) : (
-                            'Place Order'
-                        )}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FloatingOrderCard
+                open={orderDialog.open && !!orderDialog.position?.tradingsymbol}
+                anchorEl={orderDialog.anchorEl}
+                onClose={handleCloseOrderDialog}
+                position={orderDialog.position}
+                quantity={orderDialog.quantity}
+                price={orderDialog.price}
+                underlying={orderDialog.underlying}
+                isAdding={orderDialog.isAdding}
+                onQuantityChange={(e) => setOrderDialog(prev => ({ ...prev, quantity: e.target.value }))}
+                onPriceChange={(e) => setOrderDialog(prev => ({ ...prev, price: e.target.value }))}
+                onSubmit={handleClosePosition}
+                loading={loadingPositions[orderDialog.position?.tradingsymbol]}
+            />
 
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
-                onClose={handleCloseSnackbar}
+                onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
                 <MuiAlert
                     elevation={6}
                     variant="filled"
                     severity={snackbar.severity}
-                    onClose={handleCloseSnackbar}
+                    onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                 >
                     {snackbar.message}
                 </MuiAlert>
