@@ -11,27 +11,36 @@ import {
     ListItem,
     Divider,
     IconButton,
-    Chip
+    Chip,
+    Stack,
+    Tooltip
 } from "@mui/material";
 import { getActionItems, updateActionItem, addActionItem, deleteActionItem } from "../../services/actionitems.js";
 import { CreateActionItem } from "./ActionModelPopup.jsx";
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonIcon from '@mui/icons-material/Person';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const ActionItems = () => {
     const [activeActionItems, setActiveActionItems] = useState([]);
+    const [completedActionItems, setCompletedActionItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState(null);
 
-    const fetchActiveActionItems = async () => {
+    const fetchActionItems = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getActionItems();
-            // Filter out completed items
-            const activeItems = data.filter(item => item.status !== 'COMPLETED');
-            setActiveActionItems(activeItems);
+            const [activeData, completedData] = await Promise.all([
+                getActionItems("TODO"),
+                getActionItems("COMPLETED")
+            ]);
+            setActiveActionItems(activeData);
+            setCompletedActionItems(completedData);
         } catch (error) {
             console.error("Error fetching action items:", error);
             setError("Failed to fetch action items. Please try again later.");
@@ -41,7 +50,7 @@ const ActionItems = () => {
     };
 
     useEffect(() => {
-        fetchActiveActionItems();
+        fetchActionItems();
     }, []);
 
     const markComplete = async (item) => {
@@ -50,7 +59,7 @@ const ActionItems = () => {
             setError(null);
             const updatedItem = { ...item, status: "COMPLETED" };
             await updateActionItem(updatedItem);
-            await fetchActiveActionItems();
+            await fetchActionItems();
             setSuccessMessage("Action item marked as complete!");
         } catch (error) {
             console.error("Error updating action item:", error);
@@ -63,15 +72,110 @@ const ActionItems = () => {
     const handleDelete = async (itemId) => {
         try {
             await deleteActionItem(itemId);
-            await fetchActiveActionItems();
+            await fetchActionItems();
         } catch (error) {
             console.error('Error deleting action item:', error);
         }
     };
 
+    const renderActionItems = (items, isActive = true) => {
+        if (loading) {
+            return (
+                <Box sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    minHeight: "200px"
+                }}>
+                    <CircularProgress />
+                </Box>
+            );
+        }
+
+        if (items.length === 0) {
+            return (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                        No {isActive ? 'active' : 'completed'} action items found
+                    </Typography>
+                </Box>
+            );
+        }
+
+        return (
+            <List>
+                {items.map((item) => (
+                    <React.Fragment key={item.id}>
+                        <ListItem>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                <Typography variant="body1" sx={{ mb: 1 }}>
+                                    {item.description}
+                                </Typography>
+                                <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                                    <Chip
+                                        icon={<PersonIcon />}
+                                        label={`Created by: ${item.created_by.toUpperCase()}`}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                    <Chip
+                                        icon={<LocalOfferIcon />}
+                                        label={`Asset: ${item.asset || 'N/A'}`}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                    <Chip
+                                        icon={item.status === 'COMPLETED' ? <CheckCircleIcon /> : <CheckCircleOutlineIcon />}
+                                        label={item.status}
+                                        color={item.status === 'COMPLETED' ? 'success' : 'default'}
+                                        size="small"
+                                    />
+                                </Stack>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                {isActive && (
+                                    <Tooltip title="Mark as Complete">
+                                        <IconButton
+                                            color="success"
+                                            onClick={() => markComplete(item)}
+                                            disabled={loading}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'success.light',
+                                                    color: 'white'
+                                                }
+                                            }}
+                                        >
+                                            <CheckCircleOutlineIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+                                <Tooltip title="Delete">
+                                    <IconButton
+                                        color="error"
+                                        onClick={() => handleDelete(item.id)}
+                                        sx={{
+                                            '&:hover': {
+                                                backgroundColor: 'error.light',
+                                                color: 'white'
+                                            }
+                                        }}
+                                    >
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
+                        </ListItem>
+                        <Divider />
+                    </React.Fragment>
+                ))}
+            </List>
+        );
+    };
+
     return (
         <Box sx={{ p: 3 }}>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
                 <Box sx={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -82,7 +186,7 @@ const ActionItems = () => {
                         fontWeight: "bold",
                         color: "primary.main"
                     }}>
-                        Action Items
+                        Active Action Items
                     </Typography>
                     <Button
                         variant="contained"
@@ -100,76 +204,52 @@ const ActionItems = () => {
                     </Alert>
                 )}
 
-                {loading && (
-                    <Box sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        minHeight: "200px"
-                    }}>
-                        <CircularProgress />
-                    </Box>
-                )}
-
-                {!loading && (
-                    <List>
-                        {activeActionItems.map((item) => (
-                            <React.Fragment key={item.id}>
-                                <ListItem>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                                        <Typography variant="body1" sx={{ mb: 1 }}>
-                                            {item.description}
-                                        </Typography>
-                                        <Chip
-                                            label={item.status}
-                                            color={item.status === 'COMPLETED' ? 'success' : 'default'}
-                                            size="small"
-                                            onClick={() => markComplete(item)}
-                                        />
-                                    </Box>
-                                    <IconButton edge="end" onClick={() => handleDelete(item.id)}>
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </ListItem>
-                                <Divider />
-                            </React.Fragment>
-                        ))}
-                    </List>
-                )}
-
-                {showModal && (
-                    <CreateActionItem
-                        isOpen={showModal}
-                        onClose={() => setShowModal(false)}
-                        onSave={async (newItem) => {
-                            try {
-                                await addActionItem(newItem);
-                                await fetchActiveActionItems();
-                                setShowModal(false);
-                                setSuccessMessage("Action item created successfully!");
-                            } catch (error) {
-                                console.error("Error adding action item:", error);
-                                setError("Failed to add action item. Please try again.");
-                            }
-                        }}
-                    />
-                )}
-
-                <Snackbar
-                    open={!!successMessage}
-                    autoHideDuration={3000}
-                    onClose={() => setSuccessMessage(null)}
-                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                >
-                    <Alert
-                        onClose={() => setSuccessMessage(null)}
-                        severity="success"
-                        sx={{ width: "100%" }}
-                    >
-                        {successMessage}
-                    </Alert>
-                </Snackbar>
+                {renderActionItems(activeActionItems, true)}
             </Paper>
+
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="h5" sx={{
+                    fontWeight: "bold",
+                    color: "success.main",
+                    mb: 3
+                }}>
+                    Completed Action Items
+                </Typography>
+                {renderActionItems(completedActionItems, false)}
+            </Paper>
+
+            {showModal && (
+                <CreateActionItem
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    onSave={async (newItem) => {
+                        try {
+                            await addActionItem(newItem);
+                            await fetchActionItems();
+                            setShowModal(false);
+                            setSuccessMessage("Action item created successfully!");
+                        } catch (error) {
+                            console.error("Error adding action item:", error);
+                            setError("Failed to add action item. Please try again.");
+                        }
+                    }}
+                />
+            )}
+
+            <Snackbar
+                open={!!successMessage}
+                autoHideDuration={3000}
+                onClose={() => setSuccessMessage(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert
+                    onClose={() => setSuccessMessage(null)}
+                    severity="success"
+                    sx={{ width: "100%" }}
+                >
+                    {successMessage}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

@@ -20,7 +20,9 @@ import CloseIcon from '@mui/icons-material/Close';
 function CreateActionItem({ isOpen, onClose, onSave }) {
     const [formData, setFormData] = useState({
         description: '',
-        status: 'TODO'
+        status: 'TODO',
+        created_by: 'MANUAL',
+        asset: ''
     });
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,7 +35,9 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
             await onSave(formData);
             setFormData({
                 description: '',
-                status: 'TODO'
+                status: 'TODO',
+                created_by: 'MANUAL',
+                asset: ''
             });
             onClose();
         } catch (error) {
@@ -46,7 +50,9 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
     const handleClose = () => {
         setFormData({
             description: '',
-            status: 'TODO'
+            status: 'TODO',
+            created_by: 'MANUAL',
+            asset: ''
         });
         onClose();
     };
@@ -108,6 +114,27 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                             <MenuItem value="COMPLETED">COMPLETED</MenuItem>
                         </Select>
                     </FormControl>
+
+                    <FormControl fullWidth>
+                        <InputLabel id="created-by-label">Created By</InputLabel>
+                        <Select
+                            labelId="created-by-label"
+                            value={formData.created_by}
+                            label="Created By"
+                            onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
+                        >
+                            <MenuItem value="MANUAL">MANUAL</MenuItem>
+                            <MenuItem value="AUTOMATIC">AUTOMATIC</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <TextField
+                        fullWidth
+                        label="Asset (Optional)"
+                        value={formData.asset}
+                        onChange={(e) => setFormData({ ...formData, asset: e.target.value })}
+                        placeholder="Enter asset name"
+                    />
 
                     <Box>
                         <Typography variant="subtitle1" component="div" sx={{ mb: 1, fontWeight: 'medium' }}>
