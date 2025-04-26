@@ -19,12 +19,12 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import { updateStrategy, getOpenStrategies } from '../../services/strategies';
+import { updateStrategy, getOpenStrategies, getStrategies } from '../../services/strategies';
 import { getStockTradesbyId, getOptionTradesbyId, addNewOptionTrade, addNewStockTrade, updateStockTrade, updateOptionTrade } from '../../services/trades';
 import { StockTradeForm } from "../Trades/StockTradeForm.jsx";
 import OptionTradeForm from "../Trades/OptionTradeForm.jsx";
 
-const StrategyCard = ({ strategy }) => {
+const StrategyCard = ({ strategy, setStrategy }) => {
     const theme = useTheme();
     const navigate = useNavigate();
     const [showCreateStockTrade, setShowCreateStockTrade] = useState(false);
@@ -47,9 +47,13 @@ const StrategyCard = ({ strategy }) => {
             setLoading(true);
             setError(null);
 
-            // Get trade IDs from the strategy object
-            const stockTradeIds = strategy.stock_trades || [];
-            const optionTradeIds = strategy.option_trades || [];
+            // Get the latest strategy data
+            const latestStrategy = await getStrategies({ id: strategy.id });
+            const currentStrategy = latestStrategy && latestStrategy[0] ? latestStrategy[0] : strategy;
+
+            // Get trade IDs from the current strategy object
+            const stockTradeIds = currentStrategy.stock_trades || [];
+            const optionTradeIds = currentStrategy.option_trades || [];
 
             console.log('Strategy trade IDs:', {
                 stock_trades: stockTradeIds,
@@ -153,9 +157,14 @@ const StrategyCard = ({ strategy }) => {
             setError(null);
             const response = await addNewStockTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
-                await updateStrategy(strategy.id, { stock_trades: [...(strategy.stock_trades || []), response.data.tradeid] });
+                await updateStrategy(strategy.id, { stock_trades: [...(strategy.stock_trades || []), response.tradeid] });
                 setShowCreateStockTrade(false);
-                fetchTrades();
+                await fetchTrades();
+                // Reload strategy data
+                const updatedStrategy = await getStrategies({ id: strategy.id });
+                if (updatedStrategy && updatedStrategy[0]) {
+                    setStrategy(updatedStrategy[0]);
+                }
             } else {
                 setError("Failed to create stock trade. Please try again.");
             }
@@ -170,9 +179,14 @@ const StrategyCard = ({ strategy }) => {
             setError(null);
             const response = await addNewOptionTrade({ ...tradeDetails, strategy_id: strategy.id });
             if (response?.created) {
-                await updateStrategy(strategy.id, { option_trades: [...(strategy.option_trades || []), response.data.tradeid] });
+                await updateStrategy(strategy.id, { option_trades: [...(strategy.option_trades || []), response.tradeid] });
                 setShowCreateOptionTrade(false);
-                fetchTrades();
+                await fetchTrades();
+                // Reload strategy data
+                const updatedStrategy = await getStrategies({ id: strategy.id });
+                if (updatedStrategy && updatedStrategy[0]) {
+                    setStrategy(updatedStrategy[0]);
+                }
             } else {
                 setError("Failed to create option trade. Please try again.");
             }
@@ -220,7 +234,13 @@ const StrategyCard = ({ strategy }) => {
                 response = await updateOptionTrade(updatedTrade);
             }
             if (response?.created) {
-                fetchTrades();
+                // First fetch the latest strategy data
+                const updatedStrategy = await getStrategies({ id: strategy.id });
+                if (updatedStrategy && updatedStrategy[0]) {
+                    setStrategy(updatedStrategy[0]);
+                }
+                // Then fetch the updated trades
+                await fetchTrades();
                 setShowUpdateTrade(false);
             } else {
                 setError("Failed to update trade. Please try again.");
@@ -640,6 +660,14 @@ const StrategyCards = () => {
         fetchStrategies();
     }, []);
 
+    const updateStrategy = (strategyId, updatedStrategy) => {
+        setOpenStrategies(prevStrategies =>
+            prevStrategies.map(strategy =>
+                strategy.id === strategyId ? updatedStrategy : strategy
+            )
+        );
+    };
+
     return (
         <Stack spacing={4} sx={{ width: '100%' }}>
             <Typography variant="h4" sx={{
@@ -676,7 +704,11 @@ const StrategyCards = () => {
                 >
                     {openStrategies.length > 0 ? (
                         openStrategies.map((strategy) => (
-                            <StrategyCard key={strategy.id} strategy={strategy} />
+                            <StrategyCard
+                                key={strategy.id}
+                                strategy={strategy}
+                                setStrategy={(updatedStrategy) => updateStrategy(strategy.id, updatedStrategy)}
+                            />
                         ))
                     ) : (
                         <Box

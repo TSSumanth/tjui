@@ -50,7 +50,7 @@ const normalizeOrderType = (type) => {
 function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
-    const [newTradeId] = useState(uuidv4());
+    const [newTradeId] = useState(() => isUpdate ? null : uuidv4());
     const [activeTab, setActiveTab] = useState(0);
     const [showOrderFailedAlertPopup, setShowOrderFailedAlertPopup] = useState(false);
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
@@ -265,6 +265,9 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
             let response1 = await deleteOptionTrade(tradeDetails.tradeid)
             if (response1) {
                 setShowTradeDeleteConfirmPopup(false)
+                if (onDelete) {
+                    onDelete()
+                }
                 onCancel()
             } else {
                 setShowTradeDeleteConfirmPopup(false)
@@ -278,9 +281,6 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         } else {
             setShowTradeDeleteConfirmPopup(false)
             setShowTradeFailedAlertPopup(true)
-        }
-        if (onDelete) {
-            onDelete()
         }
     }
 

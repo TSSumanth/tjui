@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Button,
     Typography,
@@ -12,6 +12,7 @@ import {
     Paper,
     Tooltip,
     Chip,
+    CircularProgress,
 } from "@mui/material";
 import { addNewStockTrade, getStockTrades, updateStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade } from "../../services/trades.js";
 import { AlertPopup } from "../Generic/Popup.jsx";
@@ -123,28 +124,121 @@ const TABLE_COLUMNS = {
 function TradeTypeSection() {
     // State management
     const [selectedData, setSelectedData] = useState([]);
-    const [selectedDataType, setSelectedDataType] = useState("All Trades");
+    const [selectedDataType, setSelectedDataType] = useState("Open Trades");
     const [showStockTradeForm, setShowStockTradeForm] = useState(false);
     const [showOptionTradeForm, setShowOptionTradeForm] = useState(false);
     const [showCreateStrategyPopup, setShowCreateStrategyPopup] = useState(false);
     const [updateTradeDetails, setUpdateTradeDetails] = useState(null);
     const [showTradeFailedAlertPopup, setShowTradeFailedAlertPopup] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Fetch trades based on filter
-    const fetchTrades = async (filter) => {
-        const stockTrades = await getStockTrades(filter);
-        const optionTrades = await getOptionTrades(filter);
-        setSelectedData([...stockTrades, ...optionTrades]);
+    const fetchTrades = async (filter, tradeType) => {
+        setIsLoading(true);
+        try {
+            console.log('Fetching trades with filter:', filter, 'tradeType:', tradeType);
+            // Fetch both stock and option trades in parallel
+            const [stockTrades, optionTrades] = await Promise.all([
+                getStockTrades(filter),
+                getOptionTrades(filter)
+            ]);
+
+            console.log('Received stock trades:', stockTrades);
+            console.log('Received option trades:', optionTrades);
+
+            // Combine and format the trades
+            const combinedTrades = [
+                ...(Array.isArray(stockTrades) ? stockTrades : []).map(trade => ({
+                    ...trade,
+                    tradetype: trade.tradetype || 'LONG',
+                    status: trade.status?.toUpperCase() || 'OPEN'  // Ensure status is uppercase
+                })),
+                ...(Array.isArray(optionTrades) ? optionTrades : []).map(trade => ({
+                    ...trade,
+                    tradetype: trade.tradetype || 'LONG',
+                    status: trade.status?.toUpperCase() || 'OPEN'  // Ensure status is uppercase
+                }))
+            ];
+
+            console.log('Combined trades before filtering:', combinedTrades);
+
+            // Apply additional frontend filtering based on the trade type
+            let filteredTrades = combinedTrades;
+            if (tradeType === "Open Trades") {
+                filteredTrades = combinedTrades.filter(trade => {
+                    const isOpen = trade.status === "OPEN";
+                    console.log(`Trade ${trade.tradeid}: status=${trade.status}, isOpen=${isOpen}`);
+                    return isOpen;
+                });
+            } else if (tradeType === "Closed Trades") {
+                filteredTrades = combinedTrades.filter(trade => {
+                    const isClosed = trade.status === "CLOSED";
+                    console.log(`Trade ${trade.tradeid}: status=${trade.status}, isClosed=${isClosed}`);
+                    return isClosed;
+                });
+            } else if (tradeType === "Loss Trades") {
+                filteredTrades = combinedTrades.filter(trade => {
+                    const isLoss = trade.status === "CLOSED" && (trade.overallreturn || 0) < 0;
+                    console.log(`Trade ${trade.tradeid}: status=${trade.status}, return=${trade.overallreturn}, isLoss=${isLoss}`);
+                    return isLoss;
+                });
+            } else if (tradeType === "Profitable Trades") {
+                filteredTrades = combinedTrades.filter(trade => {
+                    const isProfit = trade.status === "CLOSED" && (trade.overallreturn || 0) > 0;
+                    console.log(`Trade ${trade.tradeid}: status=${trade.status}, return=${trade.overallreturn}, isProfit=${isProfit}`);
+                    return isProfit;
+                });
+            }
+
+            console.log('Filtered trades:', filteredTrades);
+
+            // Sort trades by entry date (newest first)
+            const sortedTrades = filteredTrades.sort((a, b) => {
+                const dateA = new Date(a.entrydate || 0);
+                const dateB = new Date(b.entrydate || 0);
+                return dateB - dateA;
+            });
+
+            setSelectedData(sortedTrades);
+        } catch (error) {
+            console.error('Error fetching trades:', error);
+            setSelectedData([]);
+        } finally {
+            setIsLoading(false);
+        }
     };
+
+    // Fetch open trades when component mounts
+    useEffect(() => {
+        fetchTrades({ status: "OPEN" }, "Open Trades");
+    }, []);
 
     // Handle trade type selection
     const handleTradeTypeClick = async (tradeType) => {
-        setSelectedDataType(tradeType.title);
-        if (tradeType.filter) {
-            await fetchTrades(tradeType.filter);
-        } else {
-            await fetchTrades({ status: tradeType.status });
+        const newSelectedType = tradeType.title;
+        setSelectedDataType(newSelectedType);
+
+        let filter = {};
+        if (newSelectedType === "Open Trades") {
+            filter = { status: "OPEN" };
+        } else if (newSelectedType === "Closed Trades") {
+            filter = { status: "CLOSED" };
+        } else if (newSelectedType === "Loss Trades") {
+            filter = { status: "CLOSED", maximumreturn: 0 };
+        } else if (newSelectedType === "Profitable Trades") {
+            filter = { status: "CLOSED", minimumreturn: 0 };
         }
+
+        await fetchTrades(filter, newSelectedType);
+    };
+
+    // Handle dialog close
+    const handleDialogClose = (event, reason) => {
+        // Prevent closing on backdrop click and escape key
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+            return;
+        }
+        setUpdateTradeDetails(null);
     };
 
     // Handle trade update
@@ -153,20 +247,34 @@ function TradeTypeSection() {
     };
 
     // Handle trade submission
-    const handleSubmitTrade = async (tradeDetails, isStock, isUpdate = false) => {
-        const tradeFunction = isStock ? (isUpdate ? updateStockTrade : addNewStockTrade) : (isUpdate ? updateOptionTrade : addNewOptionTrade);
-        const response = await tradeFunction(tradeDetails);
-        if (response?.created) {
+    const handleSubmitTrade = async (tradeDetails, isStock, isUpdate = false, isDelete = false) => {
+        let response = { created: false };
+        if (!isDelete) {
+            const tradeFunction = isStock ? (isUpdate ? updateStockTrade : addNewStockTrade) : (isUpdate ? updateOptionTrade : addNewOptionTrade);
+            response = await tradeFunction(tradeDetails);
+        }
+        if (response?.created || response?.tradeid || isDelete) {
             if (isUpdate) {
                 setUpdateTradeDetails(null);
             } else {
                 setShowStockTradeForm(false);
                 setShowOptionTradeForm(false);
             }
+            // Maintain the current filter state when refreshing trades
+            if (selectedDataType === "Open Trades") {
+                await fetchTrades({ status: "OPEN" }, "Open Trades");
+            } else if (selectedDataType === "Closed Trades") {
+                await fetchTrades({ status: "CLOSED" }, "Closed Trades");
+            } else if (selectedDataType === "Profitable Trades") {
+                await fetchTrades({ minimumreturn: 0 }, "Profitable Trades");
+            } else if (selectedDataType === "Loss Trades") {
+                await fetchTrades({ maximumreturn: 0 }, "Loss Trades");
+            } else {
+                await fetchTrades({}, selectedDataType);
+            }
         } else {
             setShowTradeFailedAlertPopup(true);
         }
-        await fetchTrades(selectedDataType);
     };
 
     // Get table configuration based on selected type
@@ -279,7 +387,11 @@ function TradeTypeSection() {
             </Grid>
 
             {/* Trades Table Section */}
-            {selectedData && selectedData.length > 0 ? (
+            {isLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                    <CircularProgress />
+                </Box>
+            ) : selectedData && selectedData.length > 0 ? (
                 <TradesTable
                     data={selectedData}
                     includeColumns={getTableConfig(selectedDataType).columns}
@@ -295,7 +407,13 @@ function TradeTypeSection() {
             )}
 
             {/* Dialogs */}
-            <Dialog open={!!showStockTradeForm} onClose={() => setShowStockTradeForm(false)} maxWidth="md" fullWidth>
+            <Dialog
+                open={!!showStockTradeForm}
+                onClose={() => setShowStockTradeForm(false)}
+                maxWidth="md"
+                fullWidth
+                disableEscapeKeyDown
+            >
                 <StockTradeForm
                     title='New Stock Trade'
                     buttonText='Submit'
@@ -304,7 +422,13 @@ function TradeTypeSection() {
                 />
             </Dialog>
 
-            <Dialog open={!!showOptionTradeForm} onClose={() => setShowOptionTradeForm(false)} maxWidth="md" fullWidth>
+            <Dialog
+                open={!!showOptionTradeForm}
+                onClose={() => setShowOptionTradeForm(false)}
+                maxWidth="md"
+                fullWidth
+                disableEscapeKeyDown
+            >
                 <OptionTradeForm
                     title='New Option Trade'
                     buttonText='Submit'
@@ -313,22 +437,28 @@ function TradeTypeSection() {
                 />
             </Dialog>
 
-            <Dialog open={!!updateTradeDetails} onClose={() => setUpdateTradeDetails(null)} maxWidth="md" fullWidth>
+            <Dialog
+                open={!!updateTradeDetails}
+                onClose={handleDialogClose}
+                maxWidth="md"
+                fullWidth
+                disableEscapeKeyDown
+            >
                 {updateTradeDetails?.lotsize === undefined ? (
                     <StockTradeForm
                         title='Update Stock Trade'
-                        buttonText='Submit'
+                        buttonText='Update'
                         onSubmit={(details) => handleSubmitTrade(details, true, true)}
-                        onCancel={() => setUpdateTradeDetails(null)}
+                        onCancel={handleDialogClose}
                         isUpdate={true}
                         currentTrade={updateTradeDetails}
                     />
                 ) : (
                     <OptionTradeForm
                         title='Update Option Trade'
-                        buttonText='Submit'
+                        buttonText='Update'
                         onSubmit={(details) => handleSubmitTrade(details, false, true)}
-                        onCancel={() => setUpdateTradeDetails(null)}
+                        onCancel={handleDialogClose}
                         isUpdate={true}
                         currentTrade={updateTradeDetails}
                     />
