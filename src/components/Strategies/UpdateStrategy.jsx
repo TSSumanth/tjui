@@ -26,9 +26,11 @@ import {
     Select,
     MenuItem,
     Snackbar,
+    IconButton,
 } from "@mui/material";
 import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
+import { addActionItem } from "../../services/actionitems";
 import StrategyForm from "./StrategyForm";
 import TradesTable from "../Trades/TradesTable";
 import { StockTradeForm } from "../Trades/StockTradeForm";
@@ -42,6 +44,9 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import Menu from '@mui/material/Menu';
+import { CreateActionItem } from "../ActionItems/ActionModelPopup";
 
 const TABLE_STYLES = {
     container: {
@@ -103,6 +108,10 @@ function UpdateStrategy({ id }) {
         message: '',
         severity: 'success'
     });
+    const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState(null);
+    const [selectedTradeForMenu, setSelectedTradeForMenu] = useState(null);
+    const [showActionItemPopup, setShowActionItemPopup] = useState(false);
+    const [selectedTradeForAction, setSelectedTradeForAction] = useState(null);
     const navigate = useNavigate();
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
@@ -156,14 +165,31 @@ function UpdateStrategy({ id }) {
             // Format dates for all trades
             const formatTrades = (trades) => {
                 if (!Array.isArray(trades)) return [];
-                return trades.map(trade => ({
-                    ...trade,
-                    entrydate: trade.entrydate ? moment(trade.entrydate).format('YYYY-MM-DD HH:mm:ss') : null,
-                    exitdate: trade.exitdate ? moment(trade.exitdate).format('YYYY-MM-DD HH:mm:ss') : null,
-                    lastmodifieddate: trade.lastmodifieddate ? moment(trade.lastmodifieddate).format('YYYY-MM-DD HH:mm:ss') : null,
-                    return: Number(trade.return) || 0,
-                    overallreturn: Number(trade.overallreturn) || 0
-                }));
+                return trades.map(trade => {
+                    const formatDate = (dateString) => {
+                        if (!dateString) return null;
+                        try {
+                            // First try parsing as ISO string
+                            const date = new Date(dateString);
+                            if (!isNaN(date.getTime())) {
+                                return moment(date).format('YYYY-MM-DD HH:mm:ss');
+                            }
+                            return null;
+                        } catch (error) {
+                            console.error('Invalid date format:', dateString);
+                            return null;
+                        }
+                    };
+
+                    return {
+                        ...trade,
+                        entrydate: formatDate(trade.entrydate),
+                        exitdate: formatDate(trade.exitdate),
+                        lastmodifieddate: formatDate(trade.lastmodifieddate),
+                        return: Number(trade.return) || 0,
+                        overallreturn: Number(trade.overallreturn) || 0
+                    };
+                });
             };
 
             const formattedStockTrades = formatTrades(stockTradesData || []);
@@ -493,6 +519,44 @@ function UpdateStrategy({ id }) {
         });
     }, []);
 
+    const handleActionMenuClick = (event, trade) => {
+        event.stopPropagation();
+        setActionMenuAnchorEl(event.currentTarget);
+        setSelectedTradeForMenu(trade);
+    };
+
+    const handleActionMenuClose = () => {
+        setActionMenuAnchorEl(null);
+        setSelectedTradeForMenu(null);
+    };
+
+    const handleCreateActionItem = () => {
+        if (selectedTradeForMenu) {
+            setSelectedTradeForAction(selectedTradeForMenu);
+            setShowActionItemPopup(true);
+        }
+        handleActionMenuClose();
+    };
+
+    const handleSaveActionItem = async (actionItem) => {
+        try {
+            await addActionItem(actionItem);
+            setSnackbar({
+                open: true,
+                message: 'Action item created successfully',
+                severity: 'success'
+            });
+            setShowActionItemPopup(false);
+        } catch (error) {
+            console.error('Error creating action item:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to create action item',
+                severity: 'error'
+            });
+        }
+    };
+
     useEffect(() => {
         console.log('Initial load - fetching strategy');
         fetchStrategy();
@@ -517,12 +581,12 @@ function UpdateStrategy({ id }) {
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
 
-    return (
+        return (
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="h6" gutterBottom>
                         P/L Summary
-            </Typography>
+                    </Typography>
 
                     {hasOpenTrades && hasOpenTradesWithZeroLTP && (
                         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -991,6 +1055,7 @@ function UpdateStrategy({ id }) {
                                                     <TableCell>LTP</TableCell>
                                                     <TableCell>Unrealized P/L</TableCell>
                                                     <TableCell>Overall P/L</TableCell>
+                                                    <TableCell>Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
@@ -1043,6 +1108,14 @@ function UpdateStrategy({ id }) {
                                                             >
                                                                 {trade.overallreturn >= 0 ? '+' : ''}{trade.overallreturn}
                                                             </TableCell>
+                                                            <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => handleActionMenuClick(e, trade)}
+                                                                >
+                                                                    <MoreVertIcon />
+                                                                </IconButton>
+                                                            </TableCell>
                                                         </TableRow>
                                                     );
                                                 })}
@@ -1071,6 +1144,7 @@ function UpdateStrategy({ id }) {
                                                     <TableCell>LTP</TableCell>
                                                     <TableCell>Unrealized P/L</TableCell>
                                                     <TableCell>Overall P/L</TableCell>
+                                                    <TableCell>Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
@@ -1123,6 +1197,14 @@ function UpdateStrategy({ id }) {
                                                                 }}
                                                             >
                                                                 {trade.overallreturn >= 0 ? '+' : ''}{trade.overallreturn}
+                                                            </TableCell>
+                                                            <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => handleActionMenuClick(e, trade)}
+                                                                >
+                                                                    <MoreVertIcon />
+                                                                </IconButton>
                                                             </TableCell>
                                                         </TableRow>
                                                     );
@@ -1206,6 +1288,36 @@ function UpdateStrategy({ id }) {
             </Dialog>
 
             <LTPUpdateDialog />
+
+            {/* Action Menu */}
+            <Menu
+                anchorEl={actionMenuAnchorEl}
+                open={Boolean(actionMenuAnchorEl)}
+                onClose={handleActionMenuClose}
+            >
+                <MenuItem onClick={handleCreateActionItem}>
+                    Create Action Item
+                </MenuItem>
+            </Menu>
+
+            {/* Create Action Item Dialog */}
+            <Dialog
+                open={showActionItemPopup}
+                onClose={() => setShowActionItemPopup(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                {selectedTradeForAction && (
+                    <CreateActionItem
+                        isOpen={showActionItemPopup}
+                        onClose={() => setShowActionItemPopup(false)}
+                        onSave={handleSaveActionItem}
+                        tradeId={selectedTradeForAction.tradeid}
+                        tradeType={selectedTradeForAction.lotsize === undefined ? 'stock' : 'option'}
+                        asset={selectedTradeForAction.asset}
+                    />
+                )}
+            </Dialog>
 
             <Snackbar
                 open={snackbar.open}

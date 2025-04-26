@@ -31,6 +31,24 @@ const ActionItems = () => {
     const [showModal, setShowModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState(null);
 
+    const fetchActiveActionItems = async () => {
+        try {
+            const items = await getActionItems({ status: "TODO" });
+            setActiveActionItems(items);
+        } catch (error) {
+            console.error('Error fetching active action items:', error);
+        }
+    };
+
+    const fetchCompletedActionItems = async () => {
+        try {
+            const items = await getActionItems({ status: "COMPLETED" });
+            setCompletedActionItems(items);
+        } catch (error) {
+            console.error('Error fetching completed action items:', error);
+        }
+    };
+
     const fetchActionItems = async () => {
         try {
             setLoading(true);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Dialog,
     DialogTitle,
@@ -17,15 +17,28 @@ import {
 } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 
-function CreateActionItem({ isOpen, onClose, onSave }) {
+function CreateActionItem({ isOpen, onClose, onSave, tradeId, tradeType, asset }) {
     const [formData, setFormData] = useState({
         description: '',
         status: 'TODO',
         created_by: 'MANUAL',
-        asset: ''
+        asset: '',
+        stock_trade_id: null,
+        option_trade_id: null
     });
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Update form data when trade props change
+    useEffect(() => {
+        if (tradeId && tradeType) {
+            setFormData(prev => ({
+                ...prev,
+                asset: asset || '',
+                [tradeType === 'stock' ? 'stock_trade_id' : 'option_trade_id']: tradeId
+            }));
+        }
+    }, [tradeId, tradeType, asset]);
 
     const handleSave = async () => {
         if (!validateForm()) return;
@@ -37,7 +50,9 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                 description: '',
                 status: 'TODO',
                 created_by: 'MANUAL',
-                asset: ''
+                asset: '',
+                stock_trade_id: null,
+                option_trade_id: null
             });
             onClose();
         } catch (error) {
@@ -52,7 +67,9 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
             description: '',
             status: 'TODO',
             created_by: 'MANUAL',
-            asset: ''
+            asset: '',
+            stock_trade_id: null,
+            option_trade_id: null
         });
         onClose();
     };
@@ -115,26 +132,47 @@ function CreateActionItem({ isOpen, onClose, onSave }) {
                         </Select>
                     </FormControl>
 
-                    <FormControl fullWidth>
-                        <InputLabel id="created-by-label">Created By</InputLabel>
-                        <Select
-                            labelId="created-by-label"
-                            value={formData.created_by}
-                            label="Created By"
-                            onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
-                        >
-                            <MenuItem value="MANUAL">MANUAL</MenuItem>
-                            <MenuItem value="AUTOMATIC">AUTOMATIC</MenuItem>
-                        </Select>
-                    </FormControl>
+                    <TextField
+                        fullWidth
+                        label="Created By"
+                        value={formData.created_by}
+                        disabled
+                        InputProps={{
+                            readOnly: true,
+                        }}
+                    />
 
                     <TextField
                         fullWidth
-                        label="Asset (Optional)"
+                        label="Asset"
                         value={formData.asset}
                         onChange={(e) => setFormData({ ...formData, asset: e.target.value })}
                         placeholder="Enter asset name"
                     />
+
+                    {tradeType === 'stock' && (
+                        <TextField
+                            fullWidth
+                            label="Stock Trade ID"
+                            value={formData.stock_trade_id || ''}
+                            disabled
+                            InputProps={{
+                                readOnly: true,
+                            }}
+                        />
+                    )}
+
+                    {tradeType === 'option' && (
+                        <TextField
+                            fullWidth
+                            label="Option Trade ID"
+                            value={formData.option_trade_id || ''}
+                            disabled
+                            InputProps={{
+                                readOnly: true,
+                            }}
+                        />
+                    )}
 
                     <Box>
                         <Typography variant="subtitle1" component="div" sx={{ mb: 1, fontWeight: 'medium' }}>

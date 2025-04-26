@@ -109,7 +109,7 @@ const Header = () => {
     useEffect(() => {
         const fetchActionItems = async () => {
             try {
-                const items = await getActionItems();
+                const items = await getActionItems({ status: "TODO" });
                 setActionItemsCount(items.length);
             } catch (error) {
                 console.error('Error fetching action items:', error);
