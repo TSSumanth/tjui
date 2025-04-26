@@ -27,10 +27,15 @@ import {
     MenuItem,
     Snackbar,
     IconButton,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Stack,
 } from "@mui/material";
 import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
-import { addActionItem } from "../../services/actionitems";
+import { addActionItem, getActionItems } from "../../services/actionitems";
 import StrategyForm from "./StrategyForm";
 import TradesTable from "../Trades/TradesTable";
 import { StockTradeForm } from "../Trades/StockTradeForm";
@@ -47,6 +52,9 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import Menu from '@mui/material/Menu';
 import { CreateActionItem } from "../ActionItems/ActionModelPopup";
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
 
 const TABLE_STYLES = {
     container: {
@@ -112,6 +120,7 @@ function UpdateStrategy({ id }) {
     const [selectedTradeForMenu, setSelectedTradeForMenu] = useState(null);
     const [showActionItemPopup, setShowActionItemPopup] = useState(false);
     const [selectedTradeForAction, setSelectedTradeForAction] = useState(null);
+    const [tradeActionItems, setTradeActionItems] = useState({});
     const navigate = useNavigate();
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
@@ -572,6 +581,29 @@ function UpdateStrategy({ id }) {
     useEffect(() => {
         calculatePLSummary();
     }, [calculatePLSummary]);
+
+    useEffect(() => {
+        const fetchAllTradeActionItems = async () => {
+            if (!stockTrades.length && !optionTrades.length) return;
+            const actionItemsByTrade = {};
+            // Fetch for stock trades
+            for (const trade of stockTrades) {
+                const items = await getActionItems({ stock_trade_id: trade.tradeid });
+                if (items && items.length > 0) {
+                    actionItemsByTrade[trade.tradeid] = items;
+                }
+            }
+            // Fetch for option trades
+            for (const trade of optionTrades) {
+                const items = await getActionItems({ option_trade_id: trade.tradeid });
+                if (items && items.length > 0) {
+                    actionItemsByTrade[trade.tradeid] = items;
+                }
+            }
+            setTradeActionItems(actionItemsByTrade);
+        };
+        fetchAllTradeActionItems();
+    }, [stockTrades, optionTrades]);
 
     const PLSummaryCard = () => {
         const hasOpenTrades = [...stockTrades, ...optionTrades].some(trade => trade.status === 'OPEN');
@@ -1067,7 +1099,7 @@ function UpdateStrategy({ id }) {
                                                             onClick={() => handleTradeClick(trade)}
                                                             sx={{
                                                                 ...TABLE_STYLES.row,
-                                                                backgroundColor: trade.status === 'OPEN' ? 'action.hover' : 'inherit'
+                                                                backgroundColor: trade.status === 'CLOSED' ? '#f5f5f5' : '#fff'
                                                             }}
                                                         >
                                                             <TableCell>
@@ -1156,7 +1188,7 @@ function UpdateStrategy({ id }) {
                                                             onClick={() => handleTradeClick(trade)}
                                                             sx={{
                                                                 ...TABLE_STYLES.row,
-                                                                backgroundColor: trade.status === 'OPEN' ? 'action.hover' : 'inherit'
+                                                                backgroundColor: trade.status === 'CLOSED' ? '#f5f5f5' : '#fff'
                                                             }}
                                                         >
                                                             <TableCell>
@@ -1318,6 +1350,84 @@ function UpdateStrategy({ id }) {
                     />
                 )}
             </Dialog>
+
+            {Object.keys(tradeActionItems).length > 0 && (
+                <Box sx={{ mt: 6 }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            mb: 1,
+                            color: 'text.secondary',
+                            fontWeight: 600,
+                            letterSpacing: 1,
+                            textTransform: 'uppercase',
+                        }}
+                    >
+                        Trade Action Items
+                    </Typography>
+                    <Divider sx={{ mb: 3 }} />
+                    <Grid container spacing={3}>
+                        {Object.entries(tradeActionItems).map(([tradeId, items]) => {
+                            // Find the trade details for better context
+                            const trade = stockTrades.find(t => t.tradeid === tradeId) || optionTrades.find(t => t.tradeid === tradeId);
+                            if (!trade) return null;
+                            // Sort items: TODO first, then completed
+                            const sortedItems = [...items].sort((a, b) => {
+                                if (a.status === 'TODO' && b.status !== 'TODO') return -1;
+                                if (a.status !== 'TODO' && b.status === 'TODO') return 1;
+                                return 0;
+                            });
+                            return (
+                                <Grid item xs={12} md={6} lg={4} key={tradeId}>
+                                    <Card elevation={3} sx={{ borderRadius: 2 }}>
+                                        <CardContent>
+                                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                                                <AssignmentIcon color="primary" />
+                                                <Typography variant="subtitle1" fontWeight="bold">
+                                                    {trade.asset} {trade.strikeprize ? trade.strikeprize : ''}
+                                                </Typography>
+                                                <Chip
+                                                    label={trade.tradetype}
+                                                    color={trade.tradetype === 'LONG' ? 'primary' : 'secondary'}
+                                                    size="small"
+                                                    icon={trade.tradetype === 'LONG' ? <TrendingUpIcon /> : <TrendingDownIcon />}
+                                                />
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {moment(trade.entrydate).format('YYYY-MM-DD')}
+                                                </Typography>
+                                            </Stack>
+                                            <List dense>
+                                                {sortedItems.map((item) => (
+                                                    <ListItem key={item.id} alignItems="flex-start" sx={{ pl: 0 }}>
+                                                        <ListItemIcon sx={{ minWidth: 32 }}>
+                                                            {item.status === 'TODO' ? (
+                                                                <PendingActionsIcon color="warning" />
+                                                            ) : (
+                                                                <CheckCircleIcon color="success" />
+                                                            )}
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primary={item.description}
+                                                            secondary={
+                                                                <Chip
+                                                                    label={item.status}
+                                                                    color={item.status === 'TODO' ? 'warning' : 'success'}
+                                                                    size="small"
+                                                                    sx={{ mt: 0.5 }}
+                                                                />
+                                                            }
+                                                        />
+                                                    </ListItem>
+                                                ))}
+                                            </List>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            );
+                        })}
+                    </Grid>
+                </Box>
+            )}
 
             <Snackbar
                 open={snackbar.open}
