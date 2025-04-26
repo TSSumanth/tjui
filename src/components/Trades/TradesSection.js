@@ -68,55 +68,55 @@ const TABLE_COLUMNS = {
     OPEN_TRADES: {
         columns: ["asset", "tradetype", 'quantity', 'openquantity', 'entryprice', 'exitaverageprice', 'entrydate', 'lastmodifieddate'],
         aliases: {
-            "asset": "Asset Name",
-            "tradetype": "Trade Type",
-            "quantity": "Total Quantity",
-            "openquantity": "Open Quantity",
-            "entryprice": "Entry Price",
-            "entrydate": "Entry Date",
-            'exitaverageprice': "Exit Avg. Price",
-            "lastmodifieddate": "Last Modified Date",
+                    "asset": "Asset Name",
+                    "tradetype": "Trade Type",
+                    "quantity": "Total Quantity",
+                    "openquantity": "Open Quantity",
+                    "entryprice": "Entry Price",
+                    "entrydate": "Entry Date",
+                    'exitaverageprice': "Exit Avg. Price",
+                    "lastmodifieddate": "Last Modified Date",
         }
     },
     CLOSED_TRADES: {
         columns: ["asset", "tradetype", 'quantity', 'entryprice', 'entrydate', 'finalexitprice', "exitdate", "overallreturn"],
         aliases: {
-            "asset": "Asset Name",
-            "tradetype": "Trade Type",
-            "quantity": "Total Quantity",
-            "entryprice": "Entry Price",
-            "entrydate": "Entry Date",
-            "exitdate": "Exit Date",
-            'finalexitprice': "Exit Price",
-            "overallreturn": "Return"
+                    "asset": "Asset Name",
+                    "tradetype": "Trade Type",
+                    "quantity": "Total Quantity",
+                    "entryprice": "Entry Price",
+                    "entrydate": "Entry Date",
+                    "exitdate": "Exit Date",
+                    'finalexitprice': "Exit Price",
+                    "overallreturn": "Return"
         }
     },
     PROFITABLE_TRADES: {
         columns: ["asset", "tradetype", 'quantity', 'entryprice', 'entrydate', 'finalexitprice', "exitdate", "overallreturn", 'status'],
         aliases: {
-            "asset": "Asset Name",
-            "tradetype": "Trade Type",
-            "quantity": "Total Quantity",
-            "entryprice": "Entry Price",
-            "entrydate": "Entry Date",
-            "status": "Current Status",
-            "exitdate": "Exit Date",
-            'finalexitprice': "Exit Price",
-            "overallreturn": "Return"
+                    "asset": "Asset Name",
+                    "tradetype": "Trade Type",
+                    "quantity": "Total Quantity",
+                    "entryprice": "Entry Price",
+                    "entrydate": "Entry Date",
+                    "status": "Current Status",
+                    "exitdate": "Exit Date",
+                    'finalexitprice': "Exit Price",
+                    "overallreturn": "Return"
         }
     },
     LOSS_TRADES: {
         columns: ["asset", "tradetype", 'quantity', 'openquantity', 'entryprice', 'entrydate', 'finalexitprice', "exitdate", "overallreturn", 'status'],
         aliases: {
-            "asset": "Asset Name",
-            "tradetype": "Trade Type",
-            "quantity": "Total Quantity",
-            "entryprice": "Entry Price",
-            "entrydate": "Entry Date",
-            "status": "Current Status",
-            "exitdate": "Exit Date",
-            'finalexitprice': "Exit Price",
-            "overallreturn": "Return"
+                    "asset": "Asset Name",
+                    "tradetype": "Trade Type",
+                    "quantity": "Total Quantity",
+                    "entryprice": "Entry Price",
+                    "entrydate": "Entry Date",
+                    "status": "Current Status",
+                    "exitdate": "Exit Date",
+                    'finalexitprice': "Exit Price",
+                    "overallreturn": "Return"
         }
     }
 };
@@ -330,7 +330,7 @@ function TradeTypeSection() {
                             Create Strategy
                         </Button>
                     </Tooltip>
-                </Stack>
+            </Stack>
             </Paper>
 
             <Divider sx={{ my: 2 }} />

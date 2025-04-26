@@ -729,7 +729,7 @@ const StrategyCards = () => {
                             </Typography>
                         </Box>
                     )}
-                </Box>
+            </Box>
             )}
         </Stack>
     );
