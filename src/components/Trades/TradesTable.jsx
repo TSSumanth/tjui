@@ -109,7 +109,11 @@ function TradesTable({
 
     // Update sorted data when trades change
     useEffect(() => {
-        setSortedData([...stockTrades, ...optionTrades]);
+        // Combine and sort trades by entry date
+        const combinedTrades = [...stockTrades, ...optionTrades].sort((a, b) =>
+            new Date(b.entrydate) - new Date(a.entrydate)
+        );
+        setSortedData(combinedTrades);
     }, [stockTrades, optionTrades]);
 
     // Get visible columns based on includeColumns prop
