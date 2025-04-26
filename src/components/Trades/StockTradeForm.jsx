@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { OrderForm } from './OrderForm.jsx'
 import { addStockOrder, getTradeStockOrders, deleteTradeStockOrder, updateStockOrder, deleteAllTradeStockOrders } from '../../services/orders.js'
@@ -43,6 +43,10 @@ const getCurrentDateTime = () => {
     return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
 
+const normalizeOrderType = (type) => {
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+};
+
 function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
@@ -54,10 +58,11 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
     const [showTradeDeleteConfirmPopup, setShowTradeDeleteConfirmPopup] = useState(false);
     const [allorders, setallOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [strategies, setStrategies] = useState([]);
     const [tradeDetails, setTradeDetails] = useState(currentTrade || {
         tradeid: "",
         asset: "",
-        tradetype: "Long",
+        tradetype: "LONG",
         quantity: 0,
         entryprice: 0,
         capitalused: 0,
@@ -84,29 +89,50 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             }
             const response = await getTradeStockOrders(tradeid);
             if (response && Array.isArray(response)) {
-                setallOrders(response);
+                setallOrders(response.map(order => ({
+                    ...order,
+                    ordertype: normalizeOrderType(order.ordertype)
+                })));
             } else {
                 console.error('Invalid response format from getTradeStockOrders:', response);
                 setallOrders([]);
             }
-        } catch (error) {
-            console.error('Error fetching orders:', error);
+        } catch (err) {
+            console.error('Error fetching orders:', err);
             setallOrders([]);
+        }
+    }
+
+    async function fetchStrategies() {
+        try {
+            const response = await getStrategies();
+            if (response && Array.isArray(response)) {
+                setStrategies(response);
+            } else {
+                console.error('Invalid response format from getStrategies:', response);
+                setStrategies([]);
+            }
+        } catch (err) {
+            console.error('Error fetching strategies:', err);
+            setStrategies([]);
         }
     }
 
     useEffect(() => {
         if (isUpdate && tradeDetails.tradeid) {
             fetchOrders(tradeDetails.tradeid);
+            if (strategyid) {
+                fetchStrategies();
+            }
         }
-    }, [isUpdate, tradeDetails.tradeid]);
+    }, [isUpdate, tradeDetails.tradeid, strategyid]);
 
     // Update total when other fields change
     useEffect(() => {
         updateTradeDetails()
     }, [allorders]);
 
-    function updateTradeDetails() {
+    const updateTradeDetails = useCallback(() => {
         if (!allorders.length > 0)
             return;
         let entryorderquantity = 0;
@@ -124,14 +150,12 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                 let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
                 exitavgprice = newexitavgprice
                 exitorderquantity = newexitavgquantity
-                console.log(exitavgprice, exitorderquantity, order.quantity, order.price)
             }
             else if (tradeDetails.tradetype.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "BUY") {
                 let newexitavgquantity = exitorderquantity + Number(order.quantity);
                 let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
                 exitavgprice = newexitavgprice
                 exitorderquantity = newexitavgquantity
-                console.log(exitavgprice, exitorderquantity, order.quantity, order.price)
             }
             else if (tradeDetails.tradetype.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "SELL") {
                 let newentryquantity = entryorderquantity + Number(order.quantity);
@@ -155,8 +179,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
             lastmodifieddate: getCurrentDateTime()
         }));
-        console.log(tradeDetails)
-    }
+    }, [allorders, tradeDetails.tradetype]);
 
     async function createNewOrder(orderdetails) {
         if (isUpdate) {
@@ -308,7 +331,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Asset"
                                     name="asset"
-                                    value={tradeDetails.asset}
+                                    value={tradeDetails.asset || ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
@@ -320,8 +343,8 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                         onChange={handleTextChange}
                                         label="Trade Type"
                                     >
-                                        <MenuItem value="Long">Long</MenuItem>
-                                        <MenuItem value="Short">Short</MenuItem>
+                                        <MenuItem value="LONG">Long</MenuItem>
+                                        <MenuItem value="SHORT">Short</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Box>
@@ -330,14 +353,14 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Trade Quantity"
                                     name="quantity"
-                                    value={tradeDetails.quantity}
+                                    value={tradeDetails.quantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Entry Average Price"
                                     name="entryprice"
-                                    value={tradeDetails.entryprice}
+                                    value={tradeDetails.entryprice ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -347,14 +370,14 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Entry Date"
                                     name="entrydate"
-                                    value={tradeDetails.entrydate}
+                                    value={tradeDetails.entrydate || ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Open Quantity"
                                     name="openquantity"
-                                    value={tradeDetails.openquantity}
+                                    value={tradeDetails.openquantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -364,14 +387,14 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Closed Quantity"
                                     name="closedquantity"
-                                    value={tradeDetails.closedquantity}
+                                    value={tradeDetails.closedquantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Exit Average Price"
                                     name="exitaverageprice"
-                                    value={tradeDetails.exitaverageprice}
+                                    value={tradeDetails.exitaverageprice ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -381,14 +404,14 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Capital Used"
                                     name="capitalused"
-                                    value={tradeDetails.capitalused}
+                                    value={tradeDetails.capitalused ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Overall Return"
                                     name="overallreturn"
-                                    value={tradeDetails.overallreturn}
+                                    value={tradeDetails.overallreturn ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -398,7 +421,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Status"
                                     name="status"
-                                    value={tradeDetails.status}
+                                    value={tradeDetails.status || ""}
                                     disabled
                                     fullWidth
                                 />
@@ -406,7 +429,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                     label="Last Traded Price"
                                     name="ltp"
                                     type="number"
-                                    value={tradeDetails.ltp}
+                                    value={tradeDetails.ltp ?? ""}
                                     onChange={handleTextChange}
                                     inputProps={{ step: "0.01", min: "0" }}
                                     fullWidth
@@ -417,7 +440,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                                 <TextField
                                     label="Tags"
                                     name="tags"
-                                    value={tradeDetails.tags}
+                                    value={tradeDetails.tags || ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
@@ -485,7 +508,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
                         <TextField
                             label="Notes"
                             name="notes"
-                            value={tradeDetails.notes}
+                            value={tradeDetails.notes || ""}
                             onChange={handleTextChange}
                             multiline
                             rows={10}

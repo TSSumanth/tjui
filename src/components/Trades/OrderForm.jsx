@@ -13,13 +13,22 @@ import {
     Select,
 } from "@mui/material";
 import DateTimePicker from "../Generic/DateTimeComponent";
+import { parseISO } from 'date-fns';
+
+const normalizeOrderType = (type) => {
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+};
 
 function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
-    const [orderDetails, setOrderDetails] = useState(updateOrderdetails || {
+    const [orderDetails, setOrderDetails] = useState(updateOrderdetails ? {
+        ...updateOrderdetails,
+        ordertype: normalizeOrderType(updateOrderdetails.ordertype),
+        date: updateOrderdetails.date ? (typeof updateOrderdetails.date === 'string' ? parseISO(updateOrderdetails.date) : updateOrderdetails.date) : new Date()
+    } : {
         ordertype: "Buy",
         quantity: "",
         price: "",
-        date: "",
+        date: new Date(),
         notes: "",
         tags: "",
     });
@@ -86,7 +95,11 @@ function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
 
                     {/* Date & Time Picker */}
                     <FormControl fullWidth>
-                        <DateTimePicker name="date" onChange={handleDateTimeChange} />
+                        <DateTimePicker
+                            name="date"
+                            value={orderDetails.date}
+                            onChange={handleDateTimeChange}
+                        />
                     </FormControl>
 
                     {/* Notes Input */}

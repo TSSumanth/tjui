@@ -43,6 +43,10 @@ const getCurrentDateTime = () => {
     return `${year}/${month}/${day} ${hours}:${minutes}`;
 };
 
+const normalizeOrderType = (type) => {
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+};
+
 function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false, currentTrade, strategyid }) {
     const [showAddNewOrder, setShowAddNewOrder] = useState(false);
     const [showUpdateOrder, setShowUpdateOrder] = useState(false);
@@ -57,7 +61,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
     const [tradeDetails, setTradeDetails] = useState(currentTrade || {
         tradeid: "",
         asset: "",
-        tradetype: "Long",
+        tradetype: "LONG",
         quantity: 0,
         entryprice: 0,
         capitalused: 0,
@@ -78,6 +82,15 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         expiry: "",
         optiontype: "Call"
     });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
+    const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+    const [strategies, setStrategies] = useState([]);
+    const [showOrderForm, setShowOrderForm] = useState(false);
+    const [orderToEdit, setOrderToEdit] = useState(null);
+    const [showDeleteTradeConfirm, setShowDeleteTradeConfirm] = useState(false);
 
     useEffect(() => {
         if (currentTrade) {
@@ -88,29 +101,24 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
         }
     }, [currentTrade]);
 
-    async function fetchOrders(tradeid) {
+    const fetchOrders = async (tradeId) => {
         try {
-            if (!tradeid) {
-                console.error('No trade ID provided for fetching orders');
-                setallOrders([]);
-                return;
-            }
-            const response = await getTradeOptionOrders(tradeid);
-            if (response && Array.isArray(response)) {
-                setallOrders(response);
-            } else {
-                console.error('Invalid response format from getTradeOptionOrders:', response);
-                setallOrders([]);
-            }
-        } catch (error) {
-            console.error('Error fetching orders:', error);
-            setallOrders([]);
+            setLoading(true);
+            const data = await getTradeOptionOrders(tradeId || tradeDetails.tradeid);
+            setallOrders(data.map(order => ({
+                ...order,
+                ordertype: normalizeOrderType(order.ordertype)
+            })));
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-    }
+    };
 
     useEffect(() => {
         if (isUpdate && tradeDetails.tradeid) {
-            fetchOrders(tradeDetails.tradeid);
+            fetchOrders();
         }
     }, [isUpdate, tradeDetails.tradeid]);
 
@@ -192,8 +200,9 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
     async function updateOrder(order) {
         let response = await updateOptionOrder(order)
         if (response) {
-            await fetchOrders(order.tradeid);
+            await fetchOrders(order.tradeid || tradeDetails.tradeid);
             setShowUpdateOrder(false);
+            updateOptionTradeDetails();
         }
     }
 
@@ -210,9 +219,10 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
     async function deleteOrder(e) {
         let response = await deleteTradeOptionOrder(e.id)
         if (response === true) {
-            await fetchOrders(e.tradeid);
+            await fetchOrders(e.tradeid || tradeDetails.tradeid);
             setShowOrderDeleteConfirmPopup(false)
             setSelectedOrder(null);
+            updateOptionTradeDetails();
         } else {
             alert("Unable to delete order " + e.asset)
         }
@@ -315,14 +325,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Asset"
                                     name="asset"
-                                    value={tradeDetails.asset}
+                                    value={tradeDetails.asset || ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
                                 <TextField
                                     label="Strike Price"
                                     name="strikeprize"
-                                    value={tradeDetails.strikeprize}
+                                    value={tradeDetails.strikeprize ?? ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
@@ -332,7 +342,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Lot Size"
                                     name="lotsize"
-                                    value={tradeDetails.lotsize}
+                                    value={tradeDetails.lotsize ?? ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
@@ -354,14 +364,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Trade Quantity"
                                     name="quantity"
-                                    value={tradeDetails.quantity}
+                                    value={tradeDetails.quantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Entry Average Price"
                                     name="entryprice"
-                                    value={tradeDetails.entryprice}
+                                    value={tradeDetails.entryprice ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -371,14 +381,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Entry Date"
                                     name="entrydate"
-                                    value={tradeDetails.entrydate}
+                                    value={tradeDetails.entrydate || ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Open Quantity"
                                     name="openquantity"
-                                    value={tradeDetails.openquantity}
+                                    value={tradeDetails.openquantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -388,14 +398,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Closed Quantity"
                                     name="closedquantity"
-                                    value={tradeDetails.closedquantity}
+                                    value={tradeDetails.closedquantity ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Exit Average Price"
                                     name="exitaverageprice"
-                                    value={tradeDetails.exitaverageprice}
+                                    value={tradeDetails.exitaverageprice ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -405,14 +415,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Capital Used"
                                     name="capitalused"
-                                    value={tradeDetails.capitalused}
+                                    value={tradeDetails.capitalused ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Premium Paid"
                                     name="premiumamount"
-                                    value={tradeDetails.premiumamount}
+                                    value={tradeDetails.premiumamount ?? ""}
                                     disabled
                                     fullWidth
                                 />
@@ -422,14 +432,14 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Overall Return"
                                     name="overallreturn"
-                                    value={tradeDetails.overallreturn}
+                                    value={tradeDetails.overallreturn ?? ""}
                                     disabled
                                     fullWidth
                                 />
                                 <TextField
                                     label="Status"
                                     name="status"
-                                    value={tradeDetails.status}
+                                    value={tradeDetails.status || ""}
                                     disabled
                                     fullWidth
                                 />
@@ -440,7 +450,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                     label="Last Traded Price"
                                     name="ltp"
                                     type="number"
-                                    value={tradeDetails.ltp}
+                                    value={tradeDetails.ltp ?? ""}
                                     onChange={handleTextChange}
                                     inputProps={{ step: "0.01", min: "0" }}
                                     fullWidth
@@ -448,7 +458,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                                 <TextField
                                     label="Tags"
                                     name="tags"
-                                    value={tradeDetails.tags}
+                                    value={tradeDetails.tags || ""}
                                     onChange={handleTextChange}
                                     fullWidth
                                 />
@@ -516,7 +526,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
                         <TextField
                             label="Notes"
                             name="notes"
-                            value={tradeDetails.notes}
+                            value={tradeDetails.notes || ""}
                             onChange={handleTextChange}
                             multiline
                             rows={10}

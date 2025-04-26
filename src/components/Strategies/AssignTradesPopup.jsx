@@ -59,10 +59,14 @@ function AssignTradesToStrategy({ title, tradeDetails, onSubmit, open, onClose }
                 : optionTrades.push(trade.tradeid);
         });
 
+        // Defensive: always treat as arrays
+        const existingStockTrades = Array.isArray(selectedStrategy.stock_trades) ? selectedStrategy.stock_trades : [];
+        const existingOptionTrades = Array.isArray(selectedStrategy.option_trades) ? selectedStrategy.option_trades : [];
+
         const updatePayload = {
             ...selectedStrategy,
-            stock_trades: Array.from(new Set([...selectedStrategy.stock_trades, ...stockTrades])),
-            option_trades: Array.from(new Set([...selectedStrategy.option_trades, ...optionTrades])),
+            stock_trades: Array.from(new Set([...existingStockTrades, ...stockTrades])),
+            option_trades: Array.from(new Set([...existingOptionTrades, ...optionTrades])),
         };
 
         try {
