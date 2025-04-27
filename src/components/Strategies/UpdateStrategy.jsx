@@ -618,14 +618,9 @@ function UpdateStrategy({ id }) {
             const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
             if (openOptionTrades.length === 0) return null;
 
-            console.log('Open Option Trades:', openOptionTrades);
-
             // Find CE and PE positions
             const cePosition = openOptionTrades.find(trade => trade.asset.endsWith('CE'));
             const pePosition = openOptionTrades.find(trade => trade.asset.endsWith('PE'));
-
-            console.log('CE Position:', cePosition);
-            console.log('PE Position:', pePosition);
 
             // Calculate total premium paid across all positions
             const totalPremium = openOptionTrades.reduce((sum, trade) => {
@@ -633,12 +628,14 @@ function UpdateStrategy({ id }) {
                 const lotSize = parseInt(trade.lotsize) || 1;
                 const lots = quantity / lotSize;
                 const premium = parseFloat(trade.entryprice) || 0;
-                const positionPremium = trade.tradetype === 'LONG' ? premium * lots : -premium * lots;
-                console.log(`Position: ${trade.asset}, Quantity: ${quantity}, LotSize: ${lotSize}, Lots: ${lots}, Premium: ${premium}, Total: ${positionPremium}`);
+                // Calculate premium per lot: premium * lotSize
+                const premiumPerLot = premium * lotSize;
+                const positionPremium = trade.tradetype === 'LONG' ? premiumPerLot * lots : -premiumPerLot * lots;
                 return sum + positionPremium;
             }, 0);
 
-            console.log('Total Premium:', totalPremium);
+            // Calculate effective premium: (Total Premium - Realized P/L) / Lot Size
+            const effectivePremium = (totalPremium - plSummary.realizedPL) / (openOptionTrades[0]?.lotsize);
 
             let upsideBreakeven = null;
             let downsideBreakeven = null;
@@ -648,9 +645,8 @@ function UpdateStrategy({ id }) {
                 const ceQuantity = parseInt(cePosition.quantity) || 0;
                 const ceLotSize = parseInt(cePosition.lotsize) || 1;
                 const ceLots = ceQuantity / ceLotSize;
-                // For CE: Strike Price + (Total Premium / CE Lots)
-                upsideBreakeven = ceStrike + (totalPremium / ceLots);
-                console.log('CE Strike:', ceStrike, 'CE Lots:', ceLots, 'Upside BE:', upsideBreakeven);
+                // For CE: Strike Price + (Effective Premium / CE Lots)
+                upsideBreakeven = ceStrike + (effectivePremium / ceLots);
             }
 
             if (pePosition) {
@@ -658,17 +654,18 @@ function UpdateStrategy({ id }) {
                 const peQuantity = parseInt(pePosition.quantity) || 0;
                 const peLotSize = parseInt(pePosition.lotsize) || 1;
                 const peLots = peQuantity / peLotSize;
-                // For PE: Strike Price - (Total Premium / PE Lots)
-                downsideBreakeven = peStrike - (totalPremium / peLots);
-                console.log('PE Strike:', peStrike, 'PE Lots:', peLots, 'Downside BE:', downsideBreakeven);
+                // For PE: Strike Price - (Effective Premium / PE Lots)
+                downsideBreakeven = peStrike - (effectivePremium / peLots);
             }
 
             return {
                 totalPremium,
+                effectivePremium,
+                realizedPL: plSummary.realizedPL,
                 upsideBreakeven,
                 downsideBreakeven
             };
-        }, [optionTrades]);
+        }, [optionTrades, plSummary.realizedPL]);
 
         return (
             <Card sx={{ mb: 3 }}>
@@ -760,10 +757,14 @@ function UpdateStrategy({ id }) {
                                 </Typography>
 
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                                    <Alert severity="info" sx={{ mb: 2 }}>
+                                        Note: Breakeven calculations are rough estimates that consider your realized P/L from closed positions.
+                                        The actual breakeven may vary based on market conditions and position adjustments.
+                                    </Alert>
                                     {combinedBreakeven.upsideBreakeven !== null && (
                                         <Box>
                                             <Typography variant="caption" color="text.secondary">
-                                                Upside BE
+                                                Upside Breakeven
                                             </Typography>
                                             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                                 ₹{combinedBreakeven.upsideBreakeven.toFixed(2)}
@@ -773,7 +774,7 @@ function UpdateStrategy({ id }) {
                                     {combinedBreakeven.downsideBreakeven !== null && (
                                         <Box>
                                             <Typography variant="caption" color="text.secondary">
-                                                Downside BE
+                                                Downside Breakeven
                                             </Typography>
                                             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                                 ₹{combinedBreakeven.downsideBreakeven.toFixed(2)}
