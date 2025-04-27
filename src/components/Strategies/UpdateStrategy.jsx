@@ -661,10 +661,10 @@ function UpdateStrategy({ id }) {
                                 }}
                             >
                                 {plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP ? (
-                                    <>
+                                    <span>
                                         {plSummary.unrealizedPL >= 0 ? '+' : ''}
                                         ₹{plSummary.unrealizedPL.toFixed(2)}
-                                    </>
+                                    </span>
                                 ) : '-'}
                             </Typography>
                         </Grid>
@@ -681,15 +681,15 @@ function UpdateStrategy({ id }) {
                                 }}
                             >
                                 {plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP ? (
-                                    <>
+                                    <span>
                                         {(plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? '+' : ''}
                                         ₹{(plSummary.realizedPL + plSummary.unrealizedPL).toFixed(2)}
-                                    </>
+                                    </span>
                                 ) : (
-                                    <>
+                                    <span>
                                         ₹{plSummary.realizedPL.toFixed(2)}
                                         {hasOpenTrades && !hasOpenTradesWithZeroLTP && <span style={{ color: 'text.secondary' }}> (+ Unrealized P/L)</span>}
-                                    </>
+                                    </span>
                                 )}
                             </Typography>
                         </Grid>
@@ -1406,17 +1406,18 @@ function UpdateStrategy({ id }) {
                                                                 <CheckCircleIcon color="success" />
                                                             )}
                                                         </ListItemIcon>
-                                                        <ListItemText
-                                                            primary={item.description}
-                                                            secondary={
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                            <Typography variant="body1" component="span">
+                                                                {item.description}
+                                                            </Typography>
+                                                            <Box sx={{ mt: 0.5 }}>
                                                                 <Chip
                                                                     label={item.status}
                                                                     color={item.status === 'TODO' ? 'warning' : 'success'}
                                                                     size="small"
-                                                                    sx={{ mt: 0.5 }}
                                                                 />
-                                                            }
-                                                        />
+                                                            </Box>
+                                                        </Box>
                                                     </ListItem>
                                                 ))}
                                             </List>
