@@ -16,16 +16,15 @@ import {
     Snackbar,
     Alert as MuiAlert,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     TextField,
     Menu,
     MenuItem,
     Popper,
     ClickAwayListener,
-    Grow
+    Grow,
+    FormControl,
+    InputLabel,
+    Select
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
@@ -98,120 +97,61 @@ const calculateBreakeven = (positions) => {
     const optionPositions = positions.filter(p => p.tradingsymbol.endsWith('CE') || p.tradingsymbol.endsWith('PE'));
     if (optionPositions.length === 0) return null;
 
-    // Calculate net premium first
-    const totalNetPremium = optionPositions.reduce((sum, position) => {
-        const quantity = Math.abs(position.quantity);
-        return sum + (position.quantity > 0 ?
-            -position.average_price * quantity :
-            position.average_price * quantity);
+    // Find CE and PE positions
+    const cePosition = optionPositions.find(pos => pos.tradingsymbol.endsWith('CE'));
+    const pePosition = optionPositions.find(pos => pos.tradingsymbol.endsWith('PE'));
+
+    // Calculate total premium paid across all positions
+    const totalPremium = optionPositions.reduce((sum, pos) => {
+        const quantity = parseInt(pos.quantity) || 0;
+        const premium = parseFloat(pos.average_price) || 0;
+        const positionPremium = pos.quantity > 0 ? premium * quantity : -premium * quantity;
+        return sum + positionPremium;
     }, 0);
 
-    // If all positions are closed or squared off, return early
-    if (optionPositions.every(p => p.quantity === 0)) {
+    let upsideBreakeven = null;
+    let downsideBreakeven = null;
+
+    if (cePosition) {
+        const optionDetails = extractOptionDetails(cePosition.tradingsymbol);
+        if (optionDetails) {
+            const ceStrike = optionDetails.strike;
+            const ceQuantity = parseInt(cePosition.quantity) || 0;
+            if (ceQuantity > 0) {
+                // For CE: Strike Price + (Total Premium / CE Quantity)
+                upsideBreakeven = ceStrike + (totalPremium / ceQuantity);
+            }
+        }
+    }
+
+    if (pePosition) {
+        const optionDetails = extractOptionDetails(pePosition.tradingsymbol);
+        if (optionDetails) {
+            const peStrike = optionDetails.strike;
+            const peQuantity = parseInt(pePosition.quantity) || 0;
+            if (peQuantity > 0) {
+                // For PE: Strike Price - (Total Premium / PE Quantity)
+                downsideBreakeven = peStrike - (totalPremium / peQuantity);
+            }
+        }
+    }
+
+    // Only return breakeven points if we have valid calculations
+    const breakevenPoints = [downsideBreakeven, upsideBreakeven].filter(point => point !== null && !isNaN(point));
+    if (breakevenPoints.length === 0) {
         return {
             breakevenPoints: [],
-            netPremium: totalNetPremium,
-            perLotPremium: totalNetPremium
+            netPremium: totalPremium,
+            perLotPremium: totalPremium,
+            currentPrice: positions[0]?.last_price
         };
-    }
-
-    // Get current underlying price
-    const currentPrice = positions[0].last_price;
-    if (!currentPrice) return null;
-
-    // Pre-process option details
-    const optionDetails = optionPositions.map(position => {
-        const details = extractOptionDetails(position.tradingsymbol);
-        if (!details) return null;
-
-        return {
-            ...details,
-            quantity: Math.abs(position.quantity),
-            isLong: position.quantity > 0,
-            averagePrice: position.average_price
-        };
-    }).filter(Boolean);
-
-    if (optionDetails.length === 0) return null;
-
-    // Find min and max strike prices
-    const strikes = optionDetails.map(d => d.strike);
-    const minStrike = Math.min(...strikes);
-    const maxStrike = Math.max(...strikes);
-    const range = maxStrike - minStrike;
-
-    // Create sample points with wider range
-    const samplePoints = [];
-    const startPrice = Math.max(0, minStrike - range * 1.0); // Increased range significantly
-    const endPrice = maxStrike + range * 1.0; // Increased range significantly
-    const step = range / 100; // More sample points for accuracy
-
-    // Calculate P&L at each price point
-    for (let price = startPrice; price <= endPrice; price += step) {
-        const pnl = optionDetails.reduce((total, option) => {
-            let optionValue = 0;
-            if (option.type === 'CE') {
-                optionValue = Math.max(0, price - option.strike);
-            } else {
-                optionValue = Math.max(0, option.strike - price);
-            }
-
-            const pnl = option.isLong ?
-                (optionValue - option.averagePrice) * option.quantity :
-                (option.averagePrice - optionValue) * option.quantity;
-
-            return total + pnl;
-        }, 0);
-
-        samplePoints.push({ price, pnl });
-    }
-
-    // Find breakeven points with improved logic
-    const breakevenPoints = [];
-    let lastSign = Math.sign(samplePoints[0].pnl);
-
-    for (let i = 1; i < samplePoints.length; i++) {
-        const currentSign = Math.sign(samplePoints[i].pnl);
-
-        if (currentSign !== lastSign) {
-            const prev = samplePoints[i - 1];
-            const curr = samplePoints[i];
-
-            // Linear interpolation to find exact breakeven point
-            const ratio = Math.abs(prev.pnl) / (Math.abs(prev.pnl) + Math.abs(curr.pnl));
-            const breakeven = prev.price + (curr.price - prev.price) * ratio;
-            breakevenPoints.push(Math.round(breakeven * 100) / 100);
-
-            lastSign = currentSign;
-        }
-    }
-
-    // Sort and ensure we have both upper and lower breakeven points
-    const sortedBreakevenPoints = breakevenPoints.sort((a, b) => a - b);
-
-    // If we only have one breakeven point, we need to find the other one
-    if (sortedBreakevenPoints.length === 1) {
-        const singlePoint = sortedBreakevenPoints[0];
-        const totalPnL = optionDetails.reduce((sum, option) => {
-            const pnl = option.isLong ?
-                -option.averagePrice * option.quantity :
-                option.averagePrice * option.quantity;
-            return sum + pnl;
-        }, 0);
-
-        // If total P&L is positive, we need a lower breakeven
-        // If total P&L is negative, we need an upper breakeven
-        if (totalPnL > 0) {
-            sortedBreakevenPoints.unshift(0); // Add lower breakeven at 0
-        } else {
-            sortedBreakevenPoints.push(maxStrike * 2); // Add upper breakeven at 2x max strike
-        }
     }
 
     return {
-        breakevenPoints: sortedBreakevenPoints,
-        netPremium: totalNetPremium,
-        perLotPremium: totalNetPremium
+        breakevenPoints: breakevenPoints.sort((a, b) => a - b),
+        netPremium: totalPremium,
+        perLotPremium: totalPremium,
+        currentPrice: positions[0]?.last_price
     };
 };
 
@@ -300,6 +240,18 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const menuButton = menuAnchorEl;
         handleMenuClose();
         onOpenOrderDialog(menuButton, selectedPosition, underlying, true);
+    };
+
+    const handleStopLoss = () => {
+        if (!selectedPosition) {
+            console.warn('No position selected for stop loss');
+            return;
+        }
+
+        console.log('Setting stop loss for position:', selectedPosition);
+        const menuButton = menuAnchorEl;
+        handleMenuClose();
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, false);
     };
 
     const renderPositionRow = (position) => {
@@ -457,6 +409,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 </MenuItem>
                                 <MenuItem onClick={handleAddMore}>
                                     <Typography variant="body2">Add More</Typography>
+                                </MenuItem>
+                                <MenuItem onClick={handleStopLoss}>
+                                    <Typography variant="body2">Stop Loss Order</Typography>
                                 </MenuItem>
                             </Menu>
                         </>
@@ -619,8 +574,23 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     );
 };
 
-const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price, underlying, isAdding, onQuantityChange, onPriceChange, onSubmit, loading }) => {
+const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price, underlying, isAdding, onQuantityChange, onPriceChange, onSubmit, loading, isStopLoss }) => {
+    const [orderType, setOrderType] = useState(isStopLoss ? 'SL' : 'MARKET'); // MARKET, LIMIT, SL, SL-M
+    const [triggerPrice, setTriggerPrice] = useState('');
+
     if (!open || !anchorEl) return null;
+
+    const handleOrderTypeChange = (e) => {
+        setOrderType(e.target.value);
+        // Reset price fields when changing order type
+        if (e.target.value === 'MARKET') {
+            setTriggerPrice('');
+        }
+    };
+
+    const handleTriggerPriceChange = (e) => {
+        setTriggerPrice(e.target.value);
+    };
 
     return (
         <Popper
@@ -655,7 +625,7 @@ const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price,
                             <Box>
                                 <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="h6" component="h2">
-                                        {isAdding ? 'Add Position' : 'Close Position'}
+                                        {isAdding ? 'Add Position' : isStopLoss ? 'Stop Loss Order' : 'Close Position'}
                                     </Typography>
                                     <IconButton size="small" onClick={onClose}>
                                         <Close fontSize="small" />
@@ -671,7 +641,7 @@ const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price,
                                         : `${position?.quantity > 0 ? 'SELL' : 'BUY'} ${position?.product}`}
                                 </Typography>
 
-                                <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+                                <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     <TextField
                                         label="Quantity"
                                         type="text"
@@ -681,20 +651,64 @@ const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price,
                                         size="small"
                                         inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                                     />
-                                    <TextField
-                                        label="Price (Optional)"
-                                        type="text"
-                                        value={price || ''}
-                                        onChange={onPriceChange}
-                                        fullWidth
-                                        size="small"
-                                        helperText="Leave empty for market order"
-                                        inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
-                                    />
+
+                                    {!isStopLoss && (
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel>Order Type</InputLabel>
+                                            <Select
+                                                value={orderType}
+                                                label="Order Type"
+                                                onChange={handleOrderTypeChange}
+                                            >
+                                                <MenuItem value="MARKET">Market</MenuItem>
+                                                <MenuItem value="LIMIT">Limit</MenuItem>
+                                                <MenuItem value="SL">Stop Loss</MenuItem>
+                                                <MenuItem value="SL-M">Stop Loss Market</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    )}
+
+                                    {orderType === 'LIMIT' && (
+                                        <TextField
+                                            label="Price"
+                                            type="text"
+                                            value={price || ''}
+                                            onChange={onPriceChange}
+                                            fullWidth
+                                            size="small"
+                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
+                                        />
+                                    )}
+
+                                    {(orderType === 'SL' || orderType === 'SL-M') && (
+                                        <TextField
+                                            label="Trigger Price"
+                                            type="text"
+                                            value={triggerPrice}
+                                            onChange={handleTriggerPriceChange}
+                                            fullWidth
+                                            size="small"
+                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
+                                        />
+                                    )}
+
+                                    {orderType === 'SL' && (
+                                        <TextField
+                                            label="Price"
+                                            type="text"
+                                            value={price || ''}
+                                            onChange={onPriceChange}
+                                            fullWidth
+                                            size="small"
+                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
+                                        />
+                                    )}
                                 </Box>
 
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-                                    {price ? 'Limit Order' : 'Market Order'}
+                                    {orderType === 'MARKET' ? 'Market Order' :
+                                        orderType === 'LIMIT' ? 'Limit Order' :
+                                            orderType === 'SL' ? 'Stop Loss Limit Order' : 'Stop Loss Market Order'}
                                 </Typography>
 
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
@@ -702,16 +716,18 @@ const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price,
                                         Cancel
                                     </Button>
                                     <Button
-                                        onClick={onSubmit}
+                                        onClick={() => onSubmit(orderType, triggerPrice)}
                                         variant="contained"
                                         color={isAdding ? "primary" : "error"}
                                         size="small"
-                                        disabled={!quantity || loading}
+                                        disabled={!quantity || loading ||
+                                            ((orderType === 'LIMIT' || orderType === 'SL') && !price) ||
+                                            ((orderType === 'SL' || orderType === 'SL-M') && !triggerPrice)}
                                     >
                                         {loading ? (
                                             <CircularProgress size={20} color="inherit" />
                                         ) : (
-                                            isAdding ? 'Add Position' : 'Close Position'
+                                            isAdding ? 'Add Position' : isStopLoss ? 'Place Stop Loss' : 'Close Position'
                                         )}
                                     </Button>
                                 </Box>
@@ -778,21 +794,53 @@ const Positions = () => {
         }
     }, [orderDialog.open]);
 
-    const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding = false) => {
+    const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding = false, isStopLoss = false) => {
+        // Check if we're in market hours
+        const now = new Date();
+        const day = now.getDay();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const currentTime = hours * 100 + minutes;
+        const isMarketOpen = day !== 0 && day !== 6 && currentTime >= 915 && currentTime <= 1530;
+
+        if (!isMarketOpen) {
+            setSnackbar({
+                open: true,
+                message: 'Markets are closed. Trading hours are Monday to Friday, 9:15 AM to 3:30 PM IST.',
+                severity: 'warning'
+            });
+            return;
+        }
+
         console.log('Opening order dialog with data:', {
             tradingsymbol: position?.tradingsymbol,
             quantity: position?.quantity,
             position,
             underlying,
-            isAdding
+            isAdding,
+            isStopLoss
         });
 
-        if (!position?.tradingsymbol || !position?.quantity) {
-            console.error('Invalid position data:', {
-                position,
-                tradingsymbol: position?.tradingsymbol,
-                quantity: position?.quantity
-            });
+        // Enhanced validation
+        if (!position) {
+            console.error('Position object is null or undefined');
+            return;
+        }
+
+        if (!position.tradingsymbol) {
+            console.error('Invalid position data: missing tradingsymbol', position);
+            return;
+        }
+
+        if (typeof position.quantity === 'undefined' || position.quantity === null) {
+            console.error('Invalid position data: missing or invalid quantity', position);
+            return;
+        }
+
+        // Ensure quantity is a number
+        const quantity = Math.abs(Number(position.quantity));
+        if (isNaN(quantity)) {
+            console.error('Invalid position data: quantity is not a valid number', position);
             return;
         }
 
@@ -800,10 +848,11 @@ const Positions = () => {
             open: true,
             anchorEl,
             position,
-            quantity: Math.abs(position.quantity).toString(),
+            quantity: quantity.toString(),
             price: position.last_price?.toString() || '',
             underlying,
-            isAdding: Boolean(isAdding)
+            isAdding: Boolean(isAdding),
+            isStopLoss: Boolean(isStopLoss)
         };
 
         console.log('Setting dialog state:', dialogState);
@@ -860,11 +909,28 @@ const Positions = () => {
         }));
     };
 
-    const handleClosePosition = async () => {
+    const handleClosePosition = async (orderType = 'MARKET', triggerPrice = '') => {
         if (!orderDialog.position) return;
 
         const { position, quantity, price, isAdding } = orderDialog;
         const tradingsymbol = position.tradingsymbol;
+
+        // Check if we're in market hours
+        const now = new Date();
+        const day = now.getDay();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const currentTime = hours * 100 + minutes;
+        const isMarketOpen = day !== 0 && day !== 6 && currentTime >= 915 && currentTime <= 1530;
+
+        if (!isMarketOpen) {
+            setSnackbar({
+                open: true,
+                message: 'Markets are closed. Trading hours are Monday to Friday, 9:15 AM to 3:30 PM IST.',
+                severity: 'warning'
+            });
+            return;
+        }
 
         setLoadingPositions(prev => ({ ...prev, [tradingsymbol]: true }));
         try {
@@ -874,18 +940,20 @@ const Positions = () => {
                     tradingsymbol: position.tradingsymbol,
                     exchange: position.exchange,
                     transaction_type: position.quantity > 0 ? 'BUY' : 'SELL',
-                    order_type: price ? 'LIMIT' : 'MARKET',
+                    order_type: orderType,
                     quantity: parseInt(quantity, 10),
                     product: position.product,
                     validity: 'DAY',
-                    ...(price && { price: parseFloat(price) })
+                    ...(price && { price: parseFloat(price) }),
+                    ...(triggerPrice && { trigger_price: parseFloat(triggerPrice) })
                 };
             } else {
                 orderParams = {
                     ...createClosePositionOrder(position),
                     quantity: parseInt(quantity, 10),
-                    order_type: price ? 'LIMIT' : 'MARKET',
-                    ...(price && { price: parseFloat(price) })
+                    order_type: orderType,
+                    ...(price && { price: parseFloat(price) }),
+                    ...(triggerPrice && { trigger_price: parseFloat(triggerPrice) })
                 };
             }
 
@@ -987,7 +1055,7 @@ const Positions = () => {
                 key={underlying}
                 positions={[...openPositions, ...closedPositions]}
                 underlying={underlying}
-                onOpenOrderDialog={(position, isAdding) => handleOpenOrderDialog(position, underlying, isAdding)}
+                onOpenOrderDialog={(anchorEl, position, isAdding) => handleOpenOrderDialog(anchorEl, position, underlying, isAdding)}
                 loadingPositions={loadingPositions}
             />
         ));
@@ -1083,6 +1151,7 @@ const Positions = () => {
                 onPriceChange={(e) => setOrderDialog(prev => ({ ...prev, price: e.target.value }))}
                 onSubmit={handleClosePosition}
                 loading={loadingPositions[orderDialog.position?.tradingsymbol]}
+                isStopLoss={orderDialog.isStopLoss}
             />
 
             <Snackbar
