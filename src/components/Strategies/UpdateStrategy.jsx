@@ -613,6 +613,63 @@ function UpdateStrategy({ id }) {
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
 
+        // Calculate combined breakeven range
+        const combinedBreakeven = React.useMemo(() => {
+            const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
+            if (openOptionTrades.length === 0) return null;
+
+            console.log('Open Option Trades:', openOptionTrades);
+
+            // Find CE and PE positions
+            const cePosition = openOptionTrades.find(trade => trade.asset.endsWith('CE'));
+            const pePosition = openOptionTrades.find(trade => trade.asset.endsWith('PE'));
+
+            console.log('CE Position:', cePosition);
+            console.log('PE Position:', pePosition);
+
+            // Calculate total premium paid across all positions
+            const totalPremium = openOptionTrades.reduce((sum, trade) => {
+                const quantity = parseInt(trade.quantity) || 0;
+                const lotSize = parseInt(trade.lotsize) || 1;
+                const lots = quantity / lotSize;
+                const premium = parseFloat(trade.entryprice) || 0;
+                const positionPremium = trade.tradetype === 'LONG' ? premium * lots : -premium * lots;
+                console.log(`Position: ${trade.asset}, Quantity: ${quantity}, LotSize: ${lotSize}, Lots: ${lots}, Premium: ${premium}, Total: ${positionPremium}`);
+                return sum + positionPremium;
+            }, 0);
+
+            console.log('Total Premium:', totalPremium);
+
+            let upsideBreakeven = null;
+            let downsideBreakeven = null;
+
+            if (cePosition) {
+                const ceStrike = parseFloat(cePosition.strikeprize) || 0;
+                const ceQuantity = parseInt(cePosition.quantity) || 0;
+                const ceLotSize = parseInt(cePosition.lotsize) || 1;
+                const ceLots = ceQuantity / ceLotSize;
+                // For CE: Strike Price + (Total Premium / CE Lots)
+                upsideBreakeven = ceStrike + (totalPremium / ceLots);
+                console.log('CE Strike:', ceStrike, 'CE Lots:', ceLots, 'Upside BE:', upsideBreakeven);
+            }
+
+            if (pePosition) {
+                const peStrike = parseFloat(pePosition.strikeprize) || 0;
+                const peQuantity = parseInt(pePosition.quantity) || 0;
+                const peLotSize = parseInt(pePosition.lotsize) || 1;
+                const peLots = peQuantity / peLotSize;
+                // For PE: Strike Price - (Total Premium / PE Lots)
+                downsideBreakeven = peStrike - (totalPremium / peLots);
+                console.log('PE Strike:', peStrike, 'PE Lots:', peLots, 'Downside BE:', downsideBreakeven);
+            }
+
+            return {
+                totalPremium,
+                upsideBreakeven,
+                downsideBreakeven
+            };
+        }, [optionTrades]);
+
         return (
             <Card sx={{ mb: 3 }}>
                 <CardContent>
@@ -693,6 +750,39 @@ function UpdateStrategy({ id }) {
                                 )}
                             </Typography>
                         </Grid>
+
+                        {/* Option Positions Breakeven Section */}
+                        {optionTrades.some(trade => trade.status === 'OPEN') && combinedBreakeven && (
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Breakeven Points
+                                </Typography>
+
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                                    {combinedBreakeven.upsideBreakeven !== null && (
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Upside BE
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                                ₹{combinedBreakeven.upsideBreakeven.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                    {combinedBreakeven.downsideBreakeven !== null && (
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Downside BE
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                                ₹{combinedBreakeven.downsideBreakeven.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Grid>
+                        )}
                     </Grid>
                 </CardContent>
             </Card>
