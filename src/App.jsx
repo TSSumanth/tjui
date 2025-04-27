@@ -9,7 +9,7 @@ import Trades from './pages/Trades';
 import Report from './pages/ProfitLossReport';
 import StrategyPage from './pages/MyStrategies';
 import UpdateStrategyPage from './pages/UpdateStrategy';
-import FNOInstrumentsPage from './pages/FNOInstruments';
+import TradingInstrumentsPage from './pages/TradingInstruments';
 import ActionItemsPage from './pages/ActionItems';
 import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
 import Dashboard from './pages/DashBoardManagement';
@@ -26,7 +26,7 @@ function App() {
                     <Route path="/zerodha/login" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/account" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/portfolio" element={<Portfolio />} />
-                    <Route path="/zerodha/fno-instruments" element={<FNOInstrumentsPage />} />
+                    <Route path="/zerodha/trading-instruments" element={<TradingInstrumentsPage />} />
                     <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
                     <Route path="/marketanalysis" element={<MarketAnalysis />} />
                     <Route path="/trades" element={<Trades />} />

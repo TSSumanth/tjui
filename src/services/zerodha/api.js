@@ -82,8 +82,8 @@ export const getOrders = async () => {
     return response.data;
 };
 
-export const getInstruments = async () => {
-    const response = await api.get('/api/zerodha/instruments');
+export const getInstruments = async (params = {}) => {
+    const response = await api.get('/api/zerodha/instruments', { params });
     return response.data;
 };
 

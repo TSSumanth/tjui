@@ -28,6 +28,7 @@ import SessionStatus from '../zerodha/SessionStatus';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { getLoginUrl } from '../../services/zerodha/authentication';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
@@ -278,6 +279,11 @@ const ButtonGroup = () => {
                 "Account": {
                     path: "/zerodha/account",
                     icon: <AccountBalanceIcon />,
+                    requiresSession: true
+                },
+                "Trading Instruments": {
+                    path: "/zerodha/trading-instruments",
+                    icon: <ShowChartIcon />,
                     requiresSession: true
                 },
                 "Algo Strategies": {
