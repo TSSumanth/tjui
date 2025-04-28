@@ -480,20 +480,22 @@ function UpdateStrategy({ id }) {
         let unrealizedPL = 0;
         const hasAllLTP = checkAllTradesHaveLTP();
 
-        // Calculate for stock trades
+        // Realized P/L: sum of overallreturn for all trades (open and closed)
         stockTrades.forEach(trade => {
-            if (trade.status === 'CLOSED') {
-                realizedPL += parseFloat(trade.overallreturn || 0);
-            } else if (trade.status === 'OPEN' && hasAllLTP) {
+            realizedPL += parseFloat(trade.overallreturn || 0);
+        });
+        optionTrades.forEach(trade => {
+            realizedPL += parseFloat(trade.overallreturn || 0);
+        });
+
+        // Unrealized P/L: only for open trades with LTP
+        stockTrades.forEach(trade => {
+            if (trade.status === 'OPEN' && hasAllLTP) {
                 unrealizedPL += calculateUnrealizedPL(trade);
             }
         });
-
-        // Calculate for option trades
         optionTrades.forEach(trade => {
-            if (trade.status === 'CLOSED') {
-                realizedPL += parseFloat(trade.overallreturn || 0);
-            } else if (trade.status === 'OPEN' && hasAllLTP) {
+            if (trade.status === 'OPEN' && hasAllLTP) {
                 unrealizedPL += calculateUnrealizedPL(trade);
             }
         });
@@ -1292,7 +1294,7 @@ function UpdateStrategy({ id }) {
                                                             <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
                                                             <TableCell>{trade.asset}</TableCell>
                                                             <TableCell>{trade.strikeprize}</TableCell>
-                                                            <TableCell>{trade.quantity / trade.lotsize}</TableCell>
+                                                            <TableCell>{trade.openquantity / trade.lotsize}</TableCell>
                                                             <TableCell>
                                                                 <Chip
                                                                     label={trade.tradetype}

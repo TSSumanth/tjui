@@ -204,13 +204,11 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
     const handleMenuClick = (event, position) => {
         event.stopPropagation();
-        console.log('Menu clicked for position:', {
-            tradingsymbol: position.tradingsymbol,
-            quantity: position.quantity,
-            position
-        });
         setMenuAnchorEl(event.currentTarget);
         setSelectedPosition(position);
+        setTimeout(() => {
+            onOpenOrderDialog(event.currentTarget, position, underlying, false);
+        }, 0);
     };
 
     const handleMenuClose = () => {
@@ -659,6 +657,7 @@ const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price,
                                                 value={orderType}
                                                 label="Order Type"
                                                 onChange={handleOrderTypeChange}
+                                                onClick={e => e.stopPropagation()}
                                             >
                                                 <MenuItem value="MARKET">Market</MenuItem>
                                                 <MenuItem value="LIMIT">Limit</MenuItem>
