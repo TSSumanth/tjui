@@ -183,7 +183,7 @@ const ZerodhaAccount = () => {
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <Header />
-            <Container maxWidth="lg" sx={{ py: 4 }}>
+            <Container maxWidth={false} disableGutters sx={{ py: 4, px: 3 }}>
                 {/* Header Section */}
                 <Box sx={{
                     display: 'flex',
@@ -217,13 +217,15 @@ const ZerodhaAccount = () => {
                 {/* Main Content */}
                 <Grid container spacing={3}>
                     {accountInfo?.margins?.equity && (
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sx={{ p: 0 }}>
                             <Stack spacing={3}>
                                 {/* Margin Information */}
                                 <Paper sx={{
                                     p: 3,
                                     borderRadius: 2,
-                                    boxShadow: theme.shadows[2]
+                                    boxShadow: theme.shadows[2],
+                                    width: '100%',
+                                    m: 0
                                 }}>
                                     <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <AccountBalanceWalletIcon sx={{ color: 'primary.main' }} />
@@ -286,7 +288,9 @@ const ZerodhaAccount = () => {
                                 <Paper sx={{
                                     p: 3,
                                     borderRadius: 2,
-                                    boxShadow: theme.shadows[2]
+                                    boxShadow: theme.shadows[2],
+                                    width: '100%',
+                                    m: 0
                                 }}>
                                     <Box sx={{ mb: 3 }}>
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -370,7 +374,7 @@ const ZerodhaAccount = () => {
                                                 })()}
                                             </Box>
                                         )}
-            </Box>
+                                    </Box>
                                     <TableContainer>
                                         <Table size="small" sx={{
                                             '& .MuiTableCell-root': {
@@ -387,63 +391,75 @@ const ZerodhaAccount = () => {
                                                     <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Units</TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Average Cost</TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Current NAV</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Invested Value</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Current Value</TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>P&L</TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>P&L %</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {accountInfo?.mutualFunds?.map((fund, index) => (
-                                                    <TableRow
-                                                        key={index}
-                                                        sx={{
-                                                            '&:nth-of-type(odd)': {
-                                                                bgcolor: alpha(theme.palette.primary.main, 0.02)
-                                                            },
-                                                            '&:hover': {
-                                                                bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                                            }
-                                                        }}
-                                                    >
-                                                        <TableCell sx={{ maxWidth: '40%' }}>
-                                                            <Typography noWrap variant="body2">
-                                                                {fund.scheme_name}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                            {fund.units.toFixed(3)}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                            ₹{formatCurrency(fund.average_cost)}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                            ₹{formatCurrency(fund.current_nav)}
-                                                        </TableCell>
-                                                        <TableCell align="right">
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{
-                                                                    color: fund.pnl >= 0 ? 'success.main' : 'error.main',
-                                                                    fontFamily: 'monospace',
-                                                                    fontWeight: 'medium'
-                                                                }}
-                                                            >
-                                                                ₹{formatCurrency(fund.pnl)}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell align="right">
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{
-                                                                    color: fund.pnl_percentage >= 0 ? 'success.main' : 'error.main',
-                                                                    fontFamily: 'monospace',
-                                                                    fontWeight: 'medium'
-                                                                }}
-                                                            >
-                                                                {fund.pnl_percentage.toFixed(2)}%
-                                                            </Typography>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
+                                                {accountInfo?.mutualFunds?.map((fund, index) => {
+                                                    const investedValue = fund.units * fund.average_cost;
+                                                    const currentValue = fund.units * fund.current_nav;
+                                                    return (
+                                                        <TableRow
+                                                            key={index}
+                                                            sx={{
+                                                                '&:nth-of-type(odd)': {
+                                                                    bgcolor: alpha(theme.palette.primary.main, 0.02)
+                                                                },
+                                                                '&:hover': {
+                                                                    bgcolor: alpha(theme.palette.primary.main, 0.05)
+                                                                }
+                                                            }}
+                                                        >
+                                                            <TableCell sx={{ maxWidth: '40%' }}>
+                                                                <Typography noWrap variant="body2">
+                                                                    {fund.scheme_name}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                                                                {fund.units.toFixed(3)}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                                                                ₹{formatCurrency(fund.average_cost)}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                                                                ₹{formatCurrency(fund.current_nav)}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                                                                ₹{formatCurrency(investedValue)}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                                                                ₹{formatCurrency(currentValue)}
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        color: fund.pnl >= 0 ? 'success.main' : 'error.main',
+                                                                        fontFamily: 'monospace',
+                                                                        fontWeight: 'medium'
+                                                                    }}
+                                                                >
+                                                                    ₹{formatCurrency(fund.pnl)}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        color: fund.pnl_percentage >= 0 ? 'success.main' : 'error.main',
+                                                                        fontFamily: 'monospace',
+                                                                        fontWeight: 'medium'
+                                                                    }}
+                                                                >
+                                                                    {fund.pnl_percentage.toFixed(2)}%
+                                                                </Typography>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
                                             </TableBody>
                                         </Table>
                                     </TableContainer>
