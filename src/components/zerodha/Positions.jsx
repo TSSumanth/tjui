@@ -30,6 +30,7 @@ import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, createClosePositionOrder } from '../../services/zerodha/api';
+import OrderPopup from './OrderPopup';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -206,9 +207,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         event.stopPropagation();
         setMenuAnchorEl(event.currentTarget);
         setSelectedPosition(position);
-        setTimeout(() => {
-            onOpenOrderDialog(event.currentTarget, position, underlying, false);
-        }, 0);
     };
 
     const handleMenuClose = () => {
@@ -225,7 +223,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         console.log('Closing position:', selectedPosition);
         const menuButton = menuAnchorEl;
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, false);
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, false, false);
     };
 
     const handleAddMore = () => {
@@ -237,7 +235,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         console.log('Adding to position:', selectedPosition);
         const menuButton = menuAnchorEl;
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, true);
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, true, false);
     };
 
     const handleStopLoss = () => {
@@ -249,7 +247,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         console.log('Setting stop loss for position:', selectedPosition);
         const menuButton = menuAnchorEl;
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, false);
+        onOpenOrderDialog(menuButton, selectedPosition, underlying, false, true);
     };
 
     const renderPositionRow = (position) => {
@@ -572,173 +570,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     );
 };
 
-const FloatingOrderCard = ({ open, anchorEl, onClose, position, quantity, price, underlying, isAdding, onQuantityChange, onPriceChange, onSubmit, loading, isStopLoss }) => {
-    const [orderType, setOrderType] = useState(isStopLoss ? 'SL' : 'MARKET'); // MARKET, LIMIT, SL, SL-M
-    const [triggerPrice, setTriggerPrice] = useState('');
-
-    if (!open || !anchorEl) return null;
-
-    const handleOrderTypeChange = (e) => {
-        setOrderType(e.target.value);
-        // Reset price fields when changing order type
-        if (e.target.value === 'MARKET') {
-            setTriggerPrice('');
-        }
-    };
-
-    const handleTriggerPriceChange = (e) => {
-        setTriggerPrice(e.target.value);
-    };
-
-    return (
-        <Popper
-            open={open}
-            anchorEl={anchorEl}
-            placement="right-start"
-            transition
-            style={{ zIndex: 1300 }}
-            modifiers={[
-                {
-                    name: 'offset',
-                    options: {
-                        offset: [0, 8],
-                    },
-                },
-            ]}
-        >
-            {({ TransitionProps }) => (
-                <Grow {...TransitionProps}>
-                    <Paper
-                        elevation={3}
-                        sx={{
-                            width: '400px',
-                            p: 2,
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            bgcolor: 'background.paper'
-                        }}
-                    >
-                        <ClickAwayListener onClickAway={onClose}>
-                            <Box>
-                                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="h6" component="h2">
-                                        {isAdding ? 'Add Position' : isStopLoss ? 'Stop Loss Order' : 'Close Position'}
-                                    </Typography>
-                                    <IconButton size="small" onClick={onClose}>
-                                        <Close fontSize="small" />
-                                    </IconButton>
-                                </Box>
-
-                                <Typography variant="subtitle1" gutterBottom>
-                                    {position?.tradingsymbol}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    {isAdding
-                                        ? `${position?.quantity > 0 ? 'BUY' : 'SELL'} ${position?.product}`
-                                        : `${position?.quantity > 0 ? 'SELL' : 'BUY'} ${position?.product}`}
-                                </Typography>
-
-                                <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    <TextField
-                                        label="Quantity"
-                                        type="text"
-                                        value={quantity || ''}
-                                        onChange={onQuantityChange}
-                                        fullWidth
-                                        size="small"
-                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                                    />
-
-                                    {!isStopLoss && (
-                                        <FormControl fullWidth size="small">
-                                            <InputLabel>Order Type</InputLabel>
-                                            <Select
-                                                value={orderType}
-                                                label="Order Type"
-                                                onChange={handleOrderTypeChange}
-                                                onClick={e => e.stopPropagation()}
-                                            >
-                                                <MenuItem value="MARKET">Market</MenuItem>
-                                                <MenuItem value="LIMIT">Limit</MenuItem>
-                                                <MenuItem value="SL">Stop Loss</MenuItem>
-                                                <MenuItem value="SL-M">Stop Loss Market</MenuItem>
-                                            </Select>
-                                        </FormControl>
-                                    )}
-
-                                    {orderType === 'LIMIT' && (
-                                        <TextField
-                                            label="Price"
-                                            type="text"
-                                            value={price || ''}
-                                            onChange={onPriceChange}
-                                            fullWidth
-                                            size="small"
-                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
-                                        />
-                                    )}
-
-                                    {(orderType === 'SL' || orderType === 'SL-M') && (
-                                        <TextField
-                                            label="Trigger Price"
-                                            type="text"
-                                            value={triggerPrice}
-                                            onChange={handleTriggerPriceChange}
-                                            fullWidth
-                                            size="small"
-                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
-                                        />
-                                    )}
-
-                                    {orderType === 'SL' && (
-                                        <TextField
-                                            label="Price"
-                                            type="text"
-                                            value={price || ''}
-                                            onChange={onPriceChange}
-                                            fullWidth
-                                            size="small"
-                                            inputProps={{ inputMode: 'decimal', pattern: '[0-9]*\\.?[0-9]*' }}
-                                        />
-                                    )}
-                                </Box>
-
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-                                    {orderType === 'MARKET' ? 'Market Order' :
-                                        orderType === 'LIMIT' ? 'Limit Order' :
-                                            orderType === 'SL' ? 'Stop Loss Limit Order' : 'Stop Loss Market Order'}
-                                </Typography>
-
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-                                    <Button onClick={onClose} size="small">
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        onClick={() => onSubmit(orderType, triggerPrice)}
-                                        variant="contained"
-                                        color={isAdding ? "primary" : "error"}
-                                        size="small"
-                                        disabled={!quantity || loading ||
-                                            ((orderType === 'LIMIT' || orderType === 'SL') && !price) ||
-                                            ((orderType === 'SL' || orderType === 'SL-M') && !triggerPrice)}
-                                    >
-                                        {loading ? (
-                                            <CircularProgress size={20} color="inherit" />
-                                        ) : (
-                                            isAdding ? 'Add Position' : isStopLoss ? 'Place Stop Loss' : 'Close Position'
-                                        )}
-                                    </Button>
-                                </Box>
-                            </Box>
-                        </ClickAwayListener>
-                    </Paper>
-                </Grow>
-            )}
-        </Popper>
-    );
-};
-
 const Positions = () => {
     const { positions, loading, error } = useZerodha();
     const [orderDialog, setOrderDialog] = useState({
@@ -794,23 +625,6 @@ const Positions = () => {
     }, [orderDialog.open]);
 
     const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding = false, isStopLoss = false) => {
-        // Check if we're in market hours
-        const now = new Date();
-        const day = now.getDay();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        const currentTime = hours * 100 + minutes;
-        const isMarketOpen = day !== 0 && day !== 6 && currentTime >= 915 && currentTime <= 1530;
-
-        if (!isMarketOpen) {
-            setSnackbar({
-                open: true,
-                message: 'Markets are closed. Trading hours are Monday to Friday, 9:15 AM to 3:30 PM IST.',
-                severity: 'warning'
-            });
-            return;
-        }
-
         console.log('Opening order dialog with data:', {
             tradingsymbol: position?.tradingsymbol,
             quantity: position?.quantity,
@@ -843,6 +657,20 @@ const Positions = () => {
             return;
         }
 
+        // Determine transaction type based on action
+        const isLong = position.quantity > 0;
+        let transactionType;
+        if (isAdding) {
+            // For adding, use same direction as current position
+            transactionType = isLong ? 'BUY' : 'SELL';
+        } else if (isStopLoss) {
+            // For stop loss, use opposite direction
+            transactionType = isLong ? 'SELL' : 'BUY';
+        } else {
+            // For closing, use opposite direction
+            transactionType = isLong ? 'SELL' : 'BUY';
+        }
+
         const dialogState = {
             open: true,
             anchorEl,
@@ -851,7 +679,8 @@ const Positions = () => {
             price: position.last_price?.toString() || '',
             underlying,
             isAdding: Boolean(isAdding),
-            isStopLoss: Boolean(isStopLoss)
+            isStopLoss: Boolean(isStopLoss),
+            transactionType
         };
 
         console.log('Setting dialog state:', dialogState);
@@ -1054,7 +883,7 @@ const Positions = () => {
                 key={underlying}
                 positions={[...openPositions, ...closedPositions]}
                 underlying={underlying}
-                onOpenOrderDialog={(anchorEl, position, isAdding) => handleOpenOrderDialog(anchorEl, position, underlying, isAdding)}
+                onOpenOrderDialog={handleOpenOrderDialog}
                 loadingPositions={loadingPositions}
             />
         ));
@@ -1137,21 +966,23 @@ const Positions = () => {
 
             {positionTables}
 
-            <FloatingOrderCard
-                open={orderDialog.open && !!orderDialog.position?.tradingsymbol}
-                anchorEl={orderDialog.anchorEl}
-                onClose={handleCloseOrderDialog}
-                position={orderDialog.position}
-                quantity={orderDialog.quantity}
-                price={orderDialog.price}
-                underlying={orderDialog.underlying}
-                isAdding={orderDialog.isAdding}
-                onQuantityChange={(e) => setOrderDialog(prev => ({ ...prev, quantity: e.target.value }))}
-                onPriceChange={(e) => setOrderDialog(prev => ({ ...prev, price: e.target.value }))}
-                onSubmit={handleClosePosition}
-                loading={loadingPositions[orderDialog.position?.tradingsymbol]}
-                isStopLoss={orderDialog.isStopLoss}
-            />
+            {orderDialog.open && !!orderDialog.position?.tradingsymbol && (
+                <OrderPopup
+                    open={orderDialog.open}
+                    anchorEl={orderDialog.anchorEl}
+                    onClose={handleCloseOrderDialog}
+                    position={orderDialog.position}
+                    quantity={orderDialog.quantity}
+                    price={orderDialog.price}
+                    underlying={orderDialog.underlying}
+                    isAdding={orderDialog.isAdding}
+                    onQuantityChange={(e) => setOrderDialog(prev => ({ ...prev, quantity: e.target.value }))}
+                    onPriceChange={(e) => setOrderDialog(prev => ({ ...prev, price: e.target.value }))}
+                    onSubmit={handleClosePosition}
+                    loading={loadingPositions[orderDialog.position?.tradingsymbol]}
+                    isStopLoss={orderDialog.isStopLoss}
+                />
+            )}
 
             <Snackbar
                 open={snackbar.open}
