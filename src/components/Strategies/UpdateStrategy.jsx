@@ -732,7 +732,7 @@ function UpdateStrategy({ id }) {
                             <Typography
                                 variant="h6"
                                 sx={{
-                                    color: plSummary.realizedPL >= 0 ? 'success.main' : 'error.main',
+                                    color: (plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? 'success.main' : 'error.main',
                                     fontWeight: 'bold'
                                 }}
                             >

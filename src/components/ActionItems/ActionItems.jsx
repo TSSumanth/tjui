@@ -22,10 +22,13 @@ import PersonIcon from '@mui/icons-material/Person';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import UndoIcon from '@mui/icons-material/Undo';
 
 const ActionItems = () => {
     const [activeActionItems, setActiveActionItems] = useState([]);
     const [completedActionItems, setCompletedActionItems] = useState([]);
+    const [invalidActionItems, setInvalidActionItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -49,16 +52,27 @@ const ActionItems = () => {
         }
     };
 
+    const fetchInvalidActionItems = async () => {
+        try {
+            const items = await getActionItems({ status: "INVALID" });
+            setInvalidActionItems(items);
+        } catch (error) {
+            console.error('Error fetching invalid action items:', error);
+        }
+    };
+
     const fetchActionItems = async () => {
         try {
             setLoading(true);
             setError(null);
-            const [activeData, completedData] = await Promise.all([
+            const [activeData, completedData, invalidData] = await Promise.all([
                 getActionItems("TODO"),
-                getActionItems("COMPLETED")
+                getActionItems("COMPLETED"),
+                getActionItems("INVALID")
             ]);
             setActiveActionItems(activeData);
             setCompletedActionItems(completedData);
+            setInvalidActionItems(invalidData);
         } catch (error) {
             console.error("Error fetching action items:", error);
             setError("Failed to fetch action items. Please try again later.");
@@ -82,6 +96,38 @@ const ActionItems = () => {
         } catch (error) {
             console.error("Error updating action item:", error);
             setError("Failed to update action item. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const markInvalid = async (item) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const updatedItem = { ...item, status: "INVALID" };
+            await updateActionItem(updatedItem);
+            await fetchActionItems();
+            setSuccessMessage("Action item marked as invalid!");
+        } catch (error) {
+            console.error("Error marking action item as invalid:", error);
+            setError("Failed to mark action item as invalid. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const markActive = async (item) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const updatedItem = { ...item, status: "TODO" };
+            await updateActionItem(updatedItem);
+            await fetchActionItems();
+            setSuccessMessage("Action item moved back to active!");
+        } catch (error) {
+            console.error("Error moving action item to active:", error);
+            setError("Failed to move action item to active. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -143,9 +189,9 @@ const ActionItems = () => {
                                         variant="outlined"
                                     />
                                     <Chip
-                                        icon={item.status === 'COMPLETED' ? <CheckCircleIcon /> : <CheckCircleOutlineIcon />}
+                                        icon={item.status === 'COMPLETED' ? <CheckCircleIcon /> : item.status === 'INVALID' ? <CancelIcon color="error" /> : <CheckCircleOutlineIcon />}
                                         label={item.status}
-                                        color={item.status === 'COMPLETED' ? 'success' : 'default'}
+                                        color={item.status === 'COMPLETED' ? 'success' : item.status === 'INVALID' ? 'error' : 'default'}
                                         size="small"
                                     />
                                 </Stack>
@@ -165,6 +211,40 @@ const ActionItems = () => {
                                             }}
                                         >
                                             <CheckCircleOutlineIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+                                {isActive && (
+                                    <Tooltip title="Mark as Invalid">
+                                        <IconButton
+                                            color="secondary"
+                                            onClick={() => markInvalid(item)}
+                                            disabled={loading}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'secondary.light',
+                                                    color: 'white'
+                                                }
+                                            }}
+                                        >
+                                            <CancelIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+                                {!isActive && (
+                                    <Tooltip title="Move to Active">
+                                        <IconButton
+                                            color="primary"
+                                            onClick={() => markActive(item)}
+                                            disabled={loading}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: 'primary.light',
+                                                    color: 'white'
+                                                }
+                                            }}
+                                        >
+                                            <UndoIcon />
                                         </IconButton>
                                     </Tooltip>
                                 )}
@@ -225,7 +305,7 @@ const ActionItems = () => {
                 {renderActionItems(activeActionItems, true)}
             </Paper>
 
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
                 <Typography variant="h5" sx={{
                     fontWeight: "bold",
                     color: "success.main",
@@ -234,6 +314,17 @@ const ActionItems = () => {
                     Completed Action Items
                 </Typography>
                 {renderActionItems(completedActionItems, false)}
+            </Paper>
+
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="h5" sx={{
+                    fontWeight: "bold",
+                    color: "error.main",
+                    mb: 3
+                }}>
+                    Invalid Action Items
+                </Typography>
+                {renderActionItems(invalidActionItems, false)}
             </Paper>
 
             {showModal && (

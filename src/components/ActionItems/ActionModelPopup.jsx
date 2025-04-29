@@ -129,6 +129,7 @@ function CreateActionItem({ isOpen, onClose, onSave, tradeId, tradeType, asset }
                         >
                             <MenuItem value="TODO">TODO</MenuItem>
                             <MenuItem value="COMPLETED">COMPLETED</MenuItem>
+                            <MenuItem value="INVALID">INVALID</MenuItem>
                         </Select>
                     </FormControl>
 
