@@ -172,6 +172,7 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
 );
 
 const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions }) => {
+    // Initialize expanded state to true by default
     const [expanded, setExpanded] = useState(true);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
@@ -202,6 +203,14 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             return acc;
         }, { dayPnL: 0, totalPnL: 0 });
     }, [positions]);
+
+    // Debug log for positions data
+    console.log(`PositionTable ${underlying} render:`, {
+        positionsCount: positions.length,
+        expanded,
+        dayPnL,
+        totalPnL
+    });
 
     const handleMenuClick = (event, position) => {
         event.stopPropagation();
@@ -431,6 +440,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 }}
                 onClick={() => setExpanded(!expanded)}
             >
+                {/* Header content */}
                 <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
@@ -536,7 +546,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 </Box>
             </Box>
 
-            {expanded && (
+            {expanded && positions.length > 0 && (
                 <TableContainer
                     component={Paper}
                     elevation={0}
@@ -561,7 +571,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {positions.map(renderPositionRow)}
+                            {positions.map(position => renderPositionRow(position))}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -572,6 +582,13 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
 const Positions = () => {
     const { positions, loading, error } = useZerodha();
+
+    // Keep track of whether dialog was manually closed
+    const wasManuallyClosed = React.useRef(false);
+
+    // Store the last valid dialog state
+    const lastValidDialogState = React.useRef(null);
+
     const [orderDialog, setOrderDialog] = useState({
         open: false,
         anchorEl: null,
@@ -579,165 +596,123 @@ const Positions = () => {
         quantity: '',
         price: '',
         underlying: '',
-        isAdding: false
+        isAdding: false,
+        isStopLoss: false,
+        transactionType: ''
     });
+
     const [loadingPositions, setLoadingPositions] = useState({});
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-    // Refs for dialog state management
-    const dialogStateRef = React.useRef(null);
-    const lastPositionRef = React.useRef(null);
-    const isDialogOpenRef = React.useRef(false);
-    const positionUpdateCount = React.useRef(0);
+    // Preserve position reference during updates
+    const positionRef = React.useRef(null);
 
-    // Process positions data with memoization
+    // Memoize the positions data processing
     const { dayPositions, netPositions } = React.useMemo(() => {
-        console.log('Positions memo update:', {
-            hasPositions: !!positions,
-            hasDay: !!positions?.day,
-            hasNet: !!positions?.net,
-            dialogOpen: isDialogOpenRef.current,
-            dialogState: dialogStateRef.current,
-            lastPosition: lastPositionRef.current
-        });
-
         if (!positions || !positions.day || !positions.net) {
             return { dayPositions: [], netPositions: [] };
         }
-
         return {
             dayPositions: positions.day,
             netPositions: positions.net
         };
     }, [positions]);
 
-    // Effect to sync dialog state with refs
+    // Effect to preserve dialog state during position updates
     React.useEffect(() => {
-        if (orderDialog.open !== isDialogOpenRef.current) {
-            console.log('Dialog state changed:', {
-                newState: orderDialog.open,
-                oldState: isDialogOpenRef.current,
-                hasDialogState: !!dialogStateRef.current,
-                hasLastPosition: !!lastPositionRef.current
-            });
-            isDialogOpenRef.current = orderDialog.open;
+        // Skip if dialog was manually closed
+        if (wasManuallyClosed.current) {
+            wasManuallyClosed.current = false;
+            return;
         }
-    }, [orderDialog.open]);
 
-    const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding = false, isStopLoss = false) => {
-        console.log('Opening order dialog with data:', {
-            tradingsymbol: position?.tradingsymbol,
-            quantity: position?.quantity,
-            position,
-            underlying,
-            isAdding,
-            isStopLoss
-        });
+        // If we have a last valid state and the dialog is unexpectedly closed, restore it
+        if (lastValidDialogState.current && !orderDialog.open && !wasManuallyClosed.current) {
+            console.log('Restoring dialog state after auto-sync');
+            setOrderDialog(lastValidDialogState.current);
+        }
+    }, [positions]);
 
-        // Enhanced validation
+    // Effect to update position details in dialog without closing it
+    React.useEffect(() => {
+        if (!orderDialog.open || !orderDialog.position?.tradingsymbol) return;
+
+        const currentPosition = orderDialog.position;
+        const allPositions = [...(positions?.net || []), ...(positions?.day || [])];
+        const updatedPosition = allPositions.find(p => p.tradingsymbol === currentPosition.tradingsymbol);
+
+        if (updatedPosition) {
+            // Store current dialog state before updating
+            const newDialogState = {
+                ...orderDialog,
+                position: {
+                    ...updatedPosition,
+                    // Preserve user-entered values
+                    quantity: orderDialog.quantity || updatedPosition.quantity,
+                    price: orderDialog.price || updatedPosition.last_price,
+                    // Keep other fields from updated position
+                    average_price: updatedPosition.average_price,
+                    product: updatedPosition.product,
+                    exchange: updatedPosition.exchange
+                }
+            };
+
+            // Update last valid state
+            lastValidDialogState.current = newDialogState;
+
+            // Update dialog state
+            setOrderDialog(newDialogState);
+        }
+    }, [positions]);
+
+    const handleOpenOrderDialog = React.useCallback((anchorEl, position, underlying, isAdding = false, isStopLoss = false) => {
         if (!position) {
             console.error('Position object is null or undefined');
             return;
         }
 
-        if (!position.tradingsymbol) {
-            console.error('Invalid position data: missing tradingsymbol', position);
-            return;
-        }
+        // Store position reference
+        positionRef.current = position;
 
-        if (typeof position.quantity === 'undefined' || position.quantity === null) {
-            console.error('Invalid position data: missing or invalid quantity', position);
-            return;
-        }
-
-        // Ensure quantity is a number
         const quantity = Math.abs(Number(position.quantity));
-        if (isNaN(quantity)) {
-            console.error('Invalid position data: quantity is not a valid number', position);
-            return;
-        }
-
-        // Determine transaction type based on action
         const isLong = position.quantity > 0;
-        let transactionType;
-        if (isAdding) {
-            // For adding, use same direction as current position
-            transactionType = isLong ? 'BUY' : 'SELL';
-        } else if (isStopLoss) {
-            // For stop loss, use opposite direction
-            transactionType = isLong ? 'SELL' : 'BUY';
-        } else {
-            // For closing, use opposite direction
-            transactionType = isLong ? 'SELL' : 'BUY';
-        }
+        const transactionType = isAdding
+            ? (isLong ? 'BUY' : 'SELL')
+            : (isLong ? 'SELL' : 'BUY');
 
-        const dialogState = {
+        const newDialogState = {
             open: true,
             anchorEl,
             position,
             quantity: quantity.toString(),
             price: position.last_price?.toString() || '',
             underlying,
-            isAdding: Boolean(isAdding),
-            isStopLoss: Boolean(isStopLoss),
+            isAdding,
+            isStopLoss,
             transactionType
         };
 
-        console.log('Setting dialog state:', dialogState);
+        // Store the new dialog state
+        lastValidDialogState.current = newDialogState;
+        wasManuallyClosed.current = false;
 
-        setOrderDialog(dialogState);
-        dialogStateRef.current = dialogState;
-        lastPositionRef.current = position;
-        isDialogOpenRef.current = true;
-    };
+        setOrderDialog(newDialogState);
+    }, []);
 
-    // Effect to handle position updates
-    React.useEffect(() => {
-        if (!positions || !orderDialog.open || !orderDialog.position?.tradingsymbol) return;
+    const handleCloseOrderDialog = React.useCallback(() => {
+        // Mark as manually closed
+        wasManuallyClosed.current = true;
+        lastValidDialogState.current = null;
 
-        const currentPosition = orderDialog.position;
-        const allPositions = [...(positions?.net || []), ...(positions?.day || [])];
-        const updatedPosition = allPositions.find(p => p.tradingsymbol === currentPosition.tradingsymbol);
-
-        console.log('Position update check:', {
-            dialogOpen: orderDialog.open,
-            currentSymbol: currentPosition.tradingsymbol,
-            foundUpdatedPosition: !!updatedPosition,
-            updatedPosition
-        });
-
-        if (updatedPosition) {
-            setOrderDialog(prev => ({
-                ...prev,
-                position: {
-                    ...updatedPosition,
-                    average_price: currentPosition.average_price || updatedPosition.average_price,
-                    quantity: currentPosition.quantity || updatedPosition.quantity,
-                    product: currentPosition.product || updatedPosition.product,
-                    exchange: currentPosition.exchange || updatedPosition.exchange
-                }
-            }));
-        }
-    }, [positions]);
-
-    const handleCloseOrderDialog = () => {
-        console.log('Closing order dialog');
-        dialogStateRef.current = null;
-        lastPositionRef.current = null;
-        isDialogOpenRef.current = false;
         setOrderDialog(prev => ({
             ...prev,
-            open: false,
-            anchorEl: null,
-            position: null,
-            quantity: '',
-            price: '',
-            underlying: '',
-            isAdding: false
+            open: false
         }));
-    };
+        // Clear position reference
+        positionRef.current = null;
+    }, []);
 
-    const handleClosePosition = async (orderType = 'MARKET', triggerPrice = '') => {
+    const handleClosePosition = React.useCallback(async (orderType = 'MARKET', triggerPrice = '') => {
         if (!orderDialog.position) return;
 
         const { position, quantity, price, isAdding } = orderDialog;
@@ -792,9 +767,6 @@ const Positions = () => {
                     message: `Successfully placed ${isAdding ? 'add' : 'close'} order for ${tradingsymbol}`,
                     severity: 'success'
                 });
-                dialogStateRef.current = null;
-                lastPositionRef.current = null;
-                isDialogOpenRef.current = false;
                 handleCloseOrderDialog();
             } else {
                 throw new Error(response.message || 'Failed to place order');
@@ -809,10 +781,11 @@ const Positions = () => {
         } finally {
             setLoadingPositions(prev => ({ ...prev, [tradingsymbol]: false }));
         }
-    };
+    }, [orderDialog, handleCloseOrderDialog]);
 
-    // Group positions by underlying
+    // Memoize grouped positions calculation
     const groupedPositions = React.useMemo(() => {
+        console.log('Processing positions:', { dayPositions, netPositions });
         const groups = {};
 
         // Process net positions
@@ -873,21 +846,9 @@ const Positions = () => {
             }
         });
 
+        console.log('Grouped positions:', groups);
         return groups;
     }, [dayPositions, netPositions]);
-
-    // Memoize the position table to prevent unnecessary re-renders
-    const positionTables = React.useMemo(() => {
-        return Object.entries(groupedPositions).map(([underlying, { openPositions, closedPositions }]) => (
-            <PositionTable
-                key={underlying}
-                positions={[...openPositions, ...closedPositions]}
-                underlying={underlying}
-                onOpenOrderDialog={handleOpenOrderDialog}
-                loadingPositions={loadingPositions}
-            />
-        ));
-    }, [groupedPositions, loadingPositions]);
 
     if (loading) {
         return (
@@ -904,6 +865,15 @@ const Positions = () => {
             </Alert>
         );
     }
+
+    // Add debug logging for positions data
+    console.log('Positions component render:', {
+        hasPositions: !!positions,
+        dayLength: positions?.day?.length,
+        netLength: positions?.net?.length,
+        loading,
+        error
+    });
 
     if (!positions || (!positions.day?.length && !positions.net?.length)) {
         return (
@@ -964,9 +934,34 @@ const Positions = () => {
                 </Typography>
             </Box>
 
-            {positionTables}
+            {/* Debug info */}
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                    Total Positions: {Object.values(groupedPositions).reduce((acc, group) =>
+                        acc + group.openPositions.length + group.closedPositions.length, 0
+                    )}
+                </Typography>
+            </Box>
 
-            {orderDialog.open && !!orderDialog.position?.tradingsymbol && (
+            {/* Position Tables */}
+            {Object.entries(groupedPositions).map(([underlying, { openPositions, closedPositions }]) => {
+                console.log(`Rendering table for ${underlying}:`, {
+                    openCount: openPositions.length,
+                    closedCount: closedPositions.length,
+                    positions: [...openPositions, ...closedPositions]
+                });
+                return (
+                    <PositionTable
+                        key={underlying}
+                        positions={[...openPositions, ...closedPositions]}
+                        underlying={underlying}
+                        onOpenOrderDialog={handleOpenOrderDialog}
+                        loadingPositions={loadingPositions}
+                    />
+                );
+            })}
+
+            {orderDialog.open && (
                 <OrderPopup
                     open={orderDialog.open}
                     anchorEl={orderDialog.anchorEl}
@@ -976,11 +971,12 @@ const Positions = () => {
                     price={orderDialog.price}
                     underlying={orderDialog.underlying}
                     isAdding={orderDialog.isAdding}
+                    isStopLoss={orderDialog.isStopLoss}
+                    transactionType={orderDialog.transactionType}
                     onQuantityChange={(e) => setOrderDialog(prev => ({ ...prev, quantity: e.target.value }))}
                     onPriceChange={(e) => setOrderDialog(prev => ({ ...prev, price: e.target.value }))}
                     onSubmit={handleClosePosition}
                     loading={loadingPositions[orderDialog.position?.tradingsymbol]}
-                    isStopLoss={orderDialog.isStopLoss}
                 />
             )}
 
