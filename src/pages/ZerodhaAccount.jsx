@@ -9,7 +9,6 @@ import {
     Divider,
     CircularProgress,
     Stack,
-    Chip,
     Table,
     TableBody,
     TableCell,
@@ -25,8 +24,6 @@ import { getAccountInfo } from '../services/zerodha/api';
 import { getLoginUrl } from '../services/zerodha/authentication';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import { formatCurrency } from '../utils/formatters';

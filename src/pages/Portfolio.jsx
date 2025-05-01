@@ -7,7 +7,6 @@ import Orders from '../components/zerodha/Orders';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import ShowChartIcon from '@mui/icons-material/ShowChart';
 import useScrollToTop from '../hooks/useScrollToTop';
 import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
