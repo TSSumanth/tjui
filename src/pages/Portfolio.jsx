@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
-import Header from '../components/Header/Header';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
 import Orders from '../components/zerodha/Orders';
@@ -139,7 +138,6 @@ const Portfolio = () => {
     if (localLoading || loading) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Header />
                 <Container maxWidth="lg">
                     <Box sx={{
                         mt: 8,
@@ -158,7 +156,6 @@ const Portfolio = () => {
     if (!isAuth || !sessionActive) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Header />
                 <Container maxWidth="md" sx={{ mt: 8 }}>
                     <Paper sx={{
                         p: 4,
@@ -193,7 +190,6 @@ const Portfolio = () => {
     // Show portfolio when authenticated and session is active
     return (
         <Box>
-            <Header />
             <Container maxWidth={false} sx={{ mt: 4, px: { xs: 2, sm: 3, md: 4 } }}>
                 {/* Auto-sync switch */}
                 <Box sx={{

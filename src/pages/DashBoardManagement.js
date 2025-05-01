@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import Header from '../components/Header/Header'
+import React, { useState, useEffect } from 'react';
 import LineChartMUI from '../components/Dashboard/LineChart'
 import { getReportByDateRange } from "../services/profitlossreport";
 
@@ -63,7 +62,6 @@ function Dashboard() {
     if (isLoading) {
         return (
             <div>
-                <Header />
                 <div>Loading...</div>
             </div>
         );
@@ -72,7 +70,6 @@ function Dashboard() {
     if (error) {
         return (
             <div>
-                <Header />
                 <div className="error-message">{error}</div>
             </div>
         );
@@ -80,7 +77,6 @@ function Dashboard() {
 
     return (
         <div>
-            <Header />
             <LineChartMUI
                 data={profitLossData}
                 title="Profit Loss Report for Current Financial Year"

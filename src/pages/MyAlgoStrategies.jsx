@@ -1,11 +1,10 @@
 import React from 'react';
 import { Box, Container, Typography } from '@mui/material';
-import Header from '../components/Header/Header';
+
 
 const MyAlgoStrategiesPage = () => {
     return (
         <Box>
-            <Header />
             <Container>
                 <Box sx={{
                     mt: 4,

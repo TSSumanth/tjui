@@ -100,11 +100,15 @@ const PagenationTable = ({ columns, initialdata, DeleteRequest, UpdateRequest, C
     };
 
     const handleUpdateRecord = async (updatedRecord) => {
-        const success = await UpdateRequest(updatedRecord);
+        const recordWithOriginalDate = {
+            ...updatedRecord,
+            originalDate: recordToEdit.date
+        };
+        const success = await UpdateRequest(recordWithOriginalDate);
         if (success) {
             setData((prevData) =>
                 prevData.map((record) =>
-                    record.date === updatedRecord.date ? updatedRecord : record
+                    record.date === recordToEdit.date ? updatedRecord : record
                 )
             );
             setIsEditModalOpen(false);

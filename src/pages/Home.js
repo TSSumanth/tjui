@@ -14,21 +14,18 @@ import {
     ListItemIcon,
     Chip,
     CircularProgress,
-    Alert
+    Alert,
 } from '@mui/material';
-import {
-    TrendingUp as TrendingUpIcon,
-    Psychology as PsychologyIcon,
-    Assessment as AssessmentIcon,
-    AccountBalance as AccountBalanceIcon,
-    Add as AddIcon,
-    ListAlt as ListAltIcon
-} from '@mui/icons-material';
 import { Link } from 'react-router-dom';
-import Header from '../components/Header/Header';
+import AddIcon from '@mui/icons-material/Add';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import useScrollToTop from '../hooks/useScrollToTop';
 import { getStockTrades, getOptionTrades } from '../services/trades';
 import { getOpenStrategies } from '../services/strategies';
-import useScrollToTop from '../hooks/useScrollToTop';
 
 function Home() {
     const [loading, setLoading] = useState(true);
@@ -113,7 +110,6 @@ function Home() {
     if (loading) {
         return (
             <div>
-                <Header />
                 <Box sx={{ p: 3, textAlign: 'center' }}>
                     <CircularProgress />
                 </Box>
@@ -124,7 +120,6 @@ function Home() {
     if (error) {
         return (
             <div>
-                <Header />
                 <Box sx={{ p: 3 }}>
                     <Alert severity="error">{error}</Alert>
                 </Box>
@@ -134,7 +129,6 @@ function Home() {
 
     return (
         <div>
-            <Header />
             <Box sx={{ p: 3 }}>
                 {/* Quick Stats */}
                 <Grid container spacing={3} sx={{ mb: 4 }}>

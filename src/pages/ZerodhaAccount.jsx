@@ -23,7 +23,6 @@ import { Link } from 'react-router-dom';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getAccountInfo } from '../services/zerodha/api';
 import { getLoginUrl } from '../services/zerodha/authentication';
-import Header from '../components/Header/Header';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
@@ -129,7 +128,6 @@ const ZerodhaAccount = () => {
     if (sessionStatus === 'checking') {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Header />
                 <Container maxWidth="lg">
                     <Box sx={{
                         mt: 8,
@@ -147,7 +145,6 @@ const ZerodhaAccount = () => {
     if (sessionStatus === 'inactive') {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Header />
                 <Container maxWidth="lg">
                     <Box sx={{
                         mt: 8,
@@ -182,7 +179,6 @@ const ZerodhaAccount = () => {
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-            <Header />
             <Container maxWidth={false} disableGutters sx={{ py: 4, px: 3 }}>
                 {/* Header Section */}
                 <Box sx={{

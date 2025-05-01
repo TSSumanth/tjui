@@ -26,7 +26,7 @@ import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import SessionStatus from '../zerodha/SessionStatus';
 import { useZerodha } from '../../context/ZerodhaContext';
-import { getLoginUrl } from '../../services/zerodha/authentication';
+import { getLoginUrl, handleLoginCallback } from '../../services/zerodha/authentication';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 
@@ -73,21 +73,53 @@ const Header = () => {
 
             const handleMessage = async (event) => {
                 console.log('Received postMessage event:', event);
-                console.log('Event origin:', event.origin);
                 console.log('Event data:', event.data);
 
                 if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
-                    console.log('Authentication successful, storing tokens...');
-                    localStorage.setItem('zerodha_access_token', event.data.data.access_token);
-                    localStorage.setItem('zerodha_public_token', event.data.data.public_token);
-                    window.removeEventListener('message', handleMessage);
-                    console.log('Checking session after successful login...');
-                    await checkSession(true);
-                    console.log('Reloading page to update session state...');
-                    window.location.reload();
+                    console.log('Received auth success, storing tokens...');
+                    try {
+                        const { access_token, public_token } = event.data.data;
+
+                        // Store tokens
+                        localStorage.setItem('zerodha_access_token', access_token);
+                        localStorage.setItem('zerodha_public_token', public_token);
+
+                        // Verify tokens were stored
+                        const storedAccessToken = localStorage.getItem('zerodha_access_token');
+                        const storedPublicToken = localStorage.getItem('zerodha_public_token');
+                        console.log('Stored tokens:', { storedAccessToken, storedPublicToken });
+
+                        if (!storedAccessToken || !storedPublicToken) {
+                            throw new Error('Failed to store tokens in localStorage');
+                        }
+
+                        // Check session
+                        const sessionValid = await checkSession(true);
+                        console.log('Session check result:', sessionValid);
+
+                        if (sessionValid) {
+                            console.log('Session is valid, navigating to account page...');
+                            window.removeEventListener('message', handleMessage);
+                            // Navigate to Zerodha account page
+                            window.location.href = '/zerodha/account';
+                        } else {
+                            console.error('Session check failed after login');
+                            localStorage.removeItem('zerodha_access_token');
+                            localStorage.removeItem('zerodha_public_token');
+                            throw new Error('Failed to validate session after login');
+                        }
+                    } catch (err) {
+                        console.error('Error during post-login process:', err);
+                        localStorage.removeItem('zerodha_access_token');
+                        localStorage.removeItem('zerodha_public_token');
+                        throw err;
+                    } finally {
+                        setLoading(false);
+                    }
                 } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
-                    console.error('Authentication error:', event.data.error);
+                    console.error('Auth error:', event.data.error);
                     window.removeEventListener('message', handleMessage);
+                    setLoading(false);
                 }
             };
 

@@ -42,7 +42,7 @@ export const getLoginUrl = async () => {
     try {
         const response = await api.get('/api/zerodha/login-url');
         if (response.data && response.data.success) {
-            return response.data.loginUrl;
+            return response.data.url;
         } else {
             throw new Error('Failed to get login URL');
         }
@@ -88,8 +88,18 @@ export const getInstruments = async (params = {}) => {
 };
 
 export const getAccountInfo = async () => {
-    const response = await api.get('/api/zerodha/account');
-    return response.data;
+    try {
+        const response = await api.get('/api/zerodha/account');
+        console.log('Account info response:', response.data);
+        if (response.data && response.data.success) {
+            return response.data;
+        } else {
+            throw new Error(response.data?.error || 'Failed to get account info');
+        }
+    } catch (error) {
+        console.error('Error in getAccountInfo:', error.response?.data || error);
+        throw error;
+    }
 };
 
 export const isAuthenticated = () => {

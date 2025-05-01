@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Typography, Container, Tabs, Tab, Grid, Card, CardContent, Stack, Chip, Button, CircularProgress } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
-import Header from '../components/Header/Header';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
 import Orders from '../components/zerodha/Orders';
@@ -62,7 +61,6 @@ const PortfolioDetailsPage = () => {
 
     return (
         <div>
-            <Header />
             <Container maxWidth="lg" sx={{ mt: 4 }}>
                 {/* Header with Sync Status */}
                 <Box mb={3} display="flex" justifyContent="space-between" alignItems="center">

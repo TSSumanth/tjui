@@ -36,14 +36,13 @@ export const deleteEntry = async (date) => {
 };
 
 export const updateEntry = async (entryobject) => {
-    console.log(entryobject)
+    const originalDate = entryobject.originalDate;
     const response = await axios.patch(API_URLS.PL_ENTRY, entryobject, {
         params: {
-            date: entryobject.date
+            date: originalDate
         }
     });
-    console.log(response.status)
-    if (!(response.status === 200)) {
+    if (response.status !== 200) {
         throw new Error("Failed to update record");
     }
     return true;

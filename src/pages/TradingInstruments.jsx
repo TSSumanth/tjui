@@ -1,15 +1,27 @@
-import React from 'react';
-import { Container, Box, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Box, Container, Typography, Grid, Paper, Button, Stack, CircularProgress } from '@mui/material';
+import { Link, useNavigate } from 'react-router-dom';
+import { getActionItems } from '../services/actionitems';
+import { useZerodha } from '../context/ZerodhaContext';
+import { formatCurrency } from '../utils/formatters';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import LinkIcon from '@mui/icons-material/Link';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 import TradingInstrumentsComponent from '../components/zerodha/TradingInstruments';
-import Header from '../components/Header/Header';
 
 const TradingInstrumentsPage = () => {
     const navigate = useNavigate();
 
     return (
         <div>
-            <Header />
             <Container maxWidth={false} sx={{ mt: 4, px: 4 }}>
                 <Box mb={3} display="flex" justifyContent="space-between" alignItems="center">
                     <Button
