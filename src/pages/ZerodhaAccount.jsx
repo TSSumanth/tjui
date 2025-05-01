@@ -29,7 +29,7 @@ import { formatCurrency } from '../utils/formatters';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 
 const ZerodhaAccount = () => {
-    const { isAuth, sessionActive, accountInfo, fetchData, handleLogout } = useZerodha();
+    const { isAuth, sessionActive, accountInfo, fetchData } = useZerodha();
     const [loading, setLoading] = useState(false);
     const theme = useTheme();
 
