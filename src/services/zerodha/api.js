@@ -135,4 +135,16 @@ export const createCloseHoldingOrder = (holding) => {
     };
 };
 
+// Cancel an open order
+export const cancelZerodhaOrder = async (orderId) => {
+    const response = await api.post(`/api/zerodha/order/${orderId}/cancel`);
+    return response.data;
+};
+
+// Modify an open order
+export const modifyZerodhaOrder = async (orderId, data) => {
+    const response = await api.post(`/api/zerodha/order/${orderId}/modify`, data);
+    return response.data;
+};
+
 export default api; 
