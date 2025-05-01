@@ -20,48 +20,24 @@ import {
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useZerodha } from '../context/ZerodhaContext';
-import { getAccountInfo } from '../services/zerodha/api';
 import { getLoginUrl } from '../services/zerodha/authentication';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import { formatCurrency } from '../utils/formatters';
+import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 
 const ZerodhaAccount = () => {
-    const { isAuth, fetchData, handleLogout } = useZerodha();
-    const [accountInfo, setAccountInfo] = useState(null);
-    const [sessionStatus, setSessionStatus] = useState('checking');
+    const { isAuth, sessionActive, accountInfo, fetchData, handleLogout } = useZerodha();
     const [loading, setLoading] = useState(false);
     const theme = useTheme();
 
     useEffect(() => {
-        checkSession();
-    }, []);
-
-    const checkSession = async () => {
-        try {
-            setSessionStatus('checking');
-            console.log('Checking session status...');
-            const response = await getAccountInfo();
-            console.log('Account info response:', response);
-
-            if (response.success) {
-                console.log('Session is active');
-                setSessionStatus('active');
-                setAccountInfo(response.data);
-            } else {
-                console.log('Session is inactive:', response.error);
-                setSessionStatus('inactive');
-                setAccountInfo(null);
-            }
-        } catch (err) {
-            console.error('Error checking session:', err);
-            console.error('Error details:', err.response?.data || err.message);
-            setSessionStatus('inactive');
-            setAccountInfo(null);
+        if (sessionActive) {
+            fetchData(true);
         }
-    };
+    }, [sessionActive, fetchData]);
 
     const handleConnect = async () => {
         try {
@@ -91,7 +67,7 @@ const ZerodhaAccount = () => {
                     localStorage.setItem('zerodha_access_token', event.data.data.access_token);
                     localStorage.setItem('zerodha_public_token', event.data.data.public_token);
                     window.removeEventListener('message', handleMessage);
-                    checkSession();
+                    fetchData(true);
                 } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
                     console.error('Auth error:', event.data.error);
                     window.removeEventListener('message', handleMessage);
@@ -104,42 +80,17 @@ const ZerodhaAccount = () => {
                 if (authWindow.closed) {
                     clearInterval(checkWindow);
                     window.removeEventListener('message', handleMessage);
-                    checkSession();
+                    fetchData(true);
                 }
             }, 500);
         } catch (err) {
             console.error('Error connecting:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleDisconnect = async () => {
-        try {
-            await handleLogout();
-            setSessionStatus('inactive');
-            setAccountInfo(null);
-        } catch (err) {
-            console.error('Error disconnecting:', err);
-        }
-    };
-
-    if (sessionStatus === 'checking') {
-        return (
-            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Container maxWidth="lg">
-                    <Box sx={{
-                        mt: 8,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                    }}>
-                        <CircularProgress />
-                    </Box>
-                </Container>
-            </Box>
-        );
-    }
-
-    if (sessionStatus === 'inactive') {
+    if (!isAuth) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
                 <Container maxWidth="lg">
@@ -174,9 +125,27 @@ const ZerodhaAccount = () => {
         );
     }
 
+    if (!sessionActive) {
+        return (
+            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+                <Container maxWidth="lg">
+                    <Box sx={{
+                        mt: 8,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <CircularProgress />
+                    </Box>
+                </Container>
+            </Box>
+        );
+    }
+
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-            <Container maxWidth={false} disableGutters sx={{ py: 4, px: 3 }}>
+            <ZerodhaSubHeader />
+            <Container maxWidth={false} disableGutters sx={{ py: 2, px: 2 }}>
                 {/* Header Section */}
                 <Box sx={{
                     display: 'flex',
@@ -192,7 +161,7 @@ const ZerodhaAccount = () => {
                         <Button
                             variant="outlined"
                             startIcon={<RefreshIcon />}
-                            onClick={checkSession}
+                            onClick={() => fetchData(true)}
                         >
                             Refresh
                         </Button>
@@ -208,246 +177,136 @@ const ZerodhaAccount = () => {
                 </Box>
 
                 {/* Main Content */}
-                <Grid container spacing={3}>
-                    {accountInfo?.margins?.equity && (
-                        <Grid item xs={12} sx={{ p: 0 }}>
-                            <Stack spacing={3}>
-                                {/* Margin Information */}
-                                <Paper sx={{
-                                    p: 3,
-                                    borderRadius: 2,
-                                    boxShadow: theme.shadows[2],
-                                    width: '100%',
-                                    m: 0
-                                }}>
-                                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <AccountBalanceWalletIcon sx={{ color: 'primary.main' }} />
-                                        Margin Information
-                                    </Typography>
-                                    <Divider sx={{ mb: 3 }} />
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                                        gap: 2
-                                    }}>
-                                        {[
-                                            {
-                                                label: 'Available',
-                                                value: accountInfo.margins.equity.available,
-                                                color: 'success'
-                                            },
-                                            {
-                                                label: 'Utilized',
-                                                value: accountInfo.margins.equity.utilised,
-                                                color: 'warning'
-                                            },
-                                            {
-                                                label: 'Net',
-                                                value: accountInfo.margins.equity.net,
-                                                color: 'info'
-                                            },
-                                            {
-                                                label: 'Exposure',
-                                                value: accountInfo.margins.equity.exposure,
-                                                color: 'error'
-                                            },
-                                            {
-                                                label: 'Option Premium',
-                                                value: accountInfo.margins.equity.optionPremium,
-                                                color: 'secondary'
-                                            }
-                                        ].map((item, index) => (
+                {accountInfo && (
+                    <Grid container spacing={3}>
+                        {/* Account Summary */}
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 3 }}>
+                                <Typography variant="h6" gutterBottom>
+                                    Account Summary
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Client ID
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {accountInfo.clientId}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Name
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {accountInfo.name}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6} md={3}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Email
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {accountInfo.email}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+                        {/* Margins */}
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 3 }}>
+                                <Typography variant="h6" gutterBottom>
+                                    Equity Margins
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    {[
+                                        {
+                                            label: 'Available',
+                                            value: accountInfo.margins.equity.available,
+                                            color: 'success'
+                                        },
+                                        {
+                                            label: 'Utilized',
+                                            value: accountInfo.margins.equity.utilised,
+                                            color: 'warning'
+                                        },
+                                        {
+                                            label: 'Net',
+                                            value: accountInfo.margins.equity.net,
+                                            color: 'info'
+                                        },
+                                        {
+                                            label: 'Exposure',
+                                            value: accountInfo.margins.equity.exposure,
+                                            color: 'error'
+                                        },
+                                        {
+                                            label: 'Option Premium',
+                                            value: accountInfo.margins.equity.optionPremium,
+                                            color: 'secondary'
+                                        }
+                                    ].map((item, index) => (
+                                        <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
                                             <Paper
-                                                key={index}
                                                 sx={{
-                                                    p: 2.5,
-                                                    borderRadius: 2,
-                                                    background: `linear-gradient(45deg, ${alpha(theme.palette[item.color].main, 0.05)}, ${alpha(theme.palette[item.color].main, 0.1)})`,
-                                                    border: `1px solid ${alpha(theme.palette[item.color].main, 0.1)}`
+                                                    p: 2,
+                                                    bgcolor: alpha(theme.palette[item.color].main, 0.1),
+                                                    border: `1px solid ${alpha(theme.palette[item.color].main, 0.2)}`
                                                 }}
                                             >
-                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                <Typography variant="subtitle2" color="text.secondary">
                                                     {item.label}
                                                 </Typography>
-                                                <Typography variant="h6" color={`${item.color}.main`} noWrap fontWeight="500">
+                                                <Typography variant="h6" color={`${item.color}.main`}>
                                                     ₹{formatCurrency(item.value)}
                                                 </Typography>
                                             </Paper>
-                                        ))}
-                                    </Box>
-                                </Paper>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </Paper>
+                        </Grid>
 
-                                {/* Mutual Fund Holdings */}
-                                <Paper sx={{
-                                    p: 3,
-                                    borderRadius: 2,
-                                    boxShadow: theme.shadows[2],
-                                    width: '100%',
-                                    m: 0
-                                }}>
-                                    <Box sx={{ mb: 3 }}>
-                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <ShowChartIcon sx={{ color: 'primary.main' }} />
-                                            Mutual Fund Holdings
-                                        </Typography>
-                                        <Divider sx={{ mb: 2 }} />
-                                        {accountInfo?.mutualFunds?.length > 0 && (
-                                            <Box sx={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                                                gap: 2,
-                                                mb: 3
-                                            }}>
-                                                {(() => {
-                                                    const totalInvestment = accountInfo.mutualFunds.reduce(
-                                                        (sum, fund) => sum + (fund.average_cost * fund.units), 0
-                                                    );
-                                                    const currentValue = accountInfo.mutualFunds.reduce(
-                                                        (sum, fund) => sum + (fund.current_nav * fund.units), 0
-                                                    );
-                                                    const totalPnL = currentValue - totalInvestment;
-                                                    const totalPnLPercentage = totalInvestment > 0
-                                                        ? ((currentValue - totalInvestment) / totalInvestment) * 100
-                                                        : 0;
-
-                                                    return (
-                                                        <>
-                                                            <Paper
-                                                                sx={{
-                                                                    p: 2.5,
-                                                                    borderRadius: 2,
-                                                                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.05)}, ${alpha(theme.palette.primary.main, 0.1)})`,
-                                                                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-                                                                }}
-                                                            >
-                                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                                                    Total Investment
-                                                                </Typography>
-                                                                <Typography variant="h6" color="primary.main" noWrap fontWeight="500">
-                                                                    ₹{formatCurrency(totalInvestment)}
-                                                                </Typography>
-                                                            </Paper>
-                                                            <Paper
-                                                                sx={{
-                                                                    p: 2.5,
-                                                                    borderRadius: 2,
-                                                                    background: `linear-gradient(45deg, ${alpha(theme.palette.info.main, 0.05)}, ${alpha(theme.palette.info.main, 0.1)})`,
-                                                                    border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
-                                                                }}
-                                                            >
-                                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                                                    Current Value
-                                                                </Typography>
-                                                                <Typography variant="h6" color="info.main" noWrap fontWeight="500">
-                                                                    ₹{formatCurrency(currentValue)}
-                                                                </Typography>
-                                                            </Paper>
-                                                            <Paper
-                                                                sx={{
-                                                                    p: 2.5,
-                                                                    borderRadius: 2,
-                                                                    background: `linear-gradient(45deg, ${alpha(theme.palette[totalPnL >= 0 ? 'success' : 'error'].main, 0.05)}, ${alpha(theme.palette[totalPnL >= 0 ? 'success' : 'error'].main, 0.1)})`,
-                                                                    border: `1px solid ${alpha(theme.palette[totalPnL >= 0 ? 'success' : 'error'].main, 0.1)}`
-                                                                }}
-                                                            >
-                                                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                                                    Total P&L ({totalPnLPercentage.toFixed(2)}%)
-                                                                </Typography>
-                                                                <Typography
-                                                                    variant="h6"
-                                                                    color={totalPnL >= 0 ? 'success.main' : 'error.main'}
-                                                                    noWrap
-                                                                    fontWeight="500"
-                                                                >
-                                                                    ₹{formatCurrency(totalPnL)}
-                                                                </Typography>
-                                                            </Paper>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </Box>
-                                        )}
-                                    </Box>
+                        {/* Mutual Funds */}
+                        {accountInfo.mutualFunds && accountInfo.mutualFunds.length > 0 && (
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 3 }}>
+                                    <Typography variant="h6" gutterBottom>
+                                        Mutual Fund Holdings
+                                    </Typography>
                                     <TableContainer>
-                                        <Table size="small" sx={{
-                                            '& .MuiTableCell-root': {
-                                                py: 1.5,
-                                                fontSize: '0.875rem'
-                                            },
-                                            '& .MuiTableHead-root': {
-                                                bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                            }
-                                        }}>
+                                        <Table>
                                             <TableHead>
                                                 <TableRow>
-                                                    <TableCell sx={{ width: '40%', fontWeight: 600 }}>Scheme Name</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Units</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Average Cost</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Current NAV</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Invested Value</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>Current Value</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>P&L</TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>P&L %</TableCell>
+                                                    <TableCell>Scheme</TableCell>
+                                                    <TableCell align="right">Units</TableCell>
+                                                    <TableCell align="right">Average Cost</TableCell>
+                                                    <TableCell align="right">Current NAV</TableCell>
+                                                    <TableCell align="right">Current Value</TableCell>
+                                                    <TableCell align="right">P&L</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {accountInfo?.mutualFunds?.map((fund, index) => {
-                                                    const investedValue = fund.units * fund.average_cost;
+                                                {accountInfo.mutualFunds.map((fund, index) => {
                                                     const currentValue = fund.units * fund.current_nav;
+                                                    const investedValue = fund.units * fund.average_cost;
+                                                    const pnl = currentValue - investedValue;
+                                                    const pnlPercentage = (pnl / investedValue) * 100;
+
                                                     return (
-                                                        <TableRow
-                                                            key={index}
-                                                            sx={{
-                                                                '&:nth-of-type(odd)': {
-                                                                    bgcolor: alpha(theme.palette.primary.main, 0.02)
-                                                                },
-                                                                '&:hover': {
-                                                                    bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                                                }
-                                                            }}
-                                                        >
-                                                            <TableCell sx={{ maxWidth: '40%' }}>
-                                                                <Typography noWrap variant="body2">
-                                                                    {fund.scheme_name}
-                                                                </Typography>
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                                {fund.units.toFixed(3)}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                                ₹{formatCurrency(fund.average_cost)}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                                ₹{formatCurrency(fund.current_nav)}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                                ₹{formatCurrency(investedValue)}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
-                                                                ₹{formatCurrency(currentValue)}
-                                                            </TableCell>
+                                                        <TableRow key={index}>
+                                                            <TableCell>{fund.scheme_name}</TableCell>
+                                                            <TableCell align="right">{fund.units.toFixed(2)}</TableCell>
+                                                            <TableCell align="right">₹{formatCurrency(fund.average_cost)}</TableCell>
+                                                            <TableCell align="right">₹{formatCurrency(fund.current_nav)}</TableCell>
+                                                            <TableCell align="right">₹{formatCurrency(currentValue)}</TableCell>
                                                             <TableCell align="right">
                                                                 <Typography
-                                                                    variant="body2"
-                                                                    sx={{
-                                                                        color: fund.pnl >= 0 ? 'success.main' : 'error.main',
-                                                                        fontFamily: 'monospace',
-                                                                        fontWeight: 'medium'
-                                                                    }}
+                                                                    color={pnl >= 0 ? 'success.main' : 'error.main'}
                                                                 >
-                                                                    ₹{formatCurrency(fund.pnl)}
-                                                                </Typography>
-                                                            </TableCell>
-                                                            <TableCell align="right">
-                                                                <Typography
-                                                                    variant="body2"
-                                                                    sx={{
-                                                                        color: fund.pnl_percentage >= 0 ? 'success.main' : 'error.main',
-                                                                        fontFamily: 'monospace',
-                                                                        fontWeight: 'medium'
-                                                                    }}
-                                                                >
-                                                                    {fund.pnl_percentage.toFixed(2)}%
+                                                                    ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
                                                                 </Typography>
                                                             </TableCell>
                                                         </TableRow>
@@ -457,10 +316,10 @@ const ZerodhaAccount = () => {
                                         </Table>
                                     </TableContainer>
                                 </Paper>
-                            </Stack>
-                        </Grid>
-                    )}
-                </Grid>
+                            </Grid>
+                        )}
+                    </Grid>
+                )}
             </Container>
         </Box>
     );

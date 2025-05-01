@@ -9,7 +9,7 @@ import {
     IconButton,
     Badge,
 } from '@mui/material';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import HomeIcon from '@mui/icons-material/Home';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -20,122 +20,28 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
-import SessionStatus from '../zerodha/SessionStatus';
 import { useZerodha } from '../../context/ZerodhaContext';
-import { getLoginUrl, handleLoginCallback } from '../../services/zerodha/authentication';
-import LinkOffIcon from '@mui/icons-material/LinkOff';
-import ShowChartIcon from '@mui/icons-material/ShowChart';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
-    const { sessionActive, isAuth, checkSession } = useZerodha();
+    const { sessionActive, isAuth } = useZerodha();
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
 
     // Debug logging for session state
     useEffect(() => {
         console.log('Header session state:', { sessionActive, isAuth });
     }, [sessionActive, isAuth]);
 
-    // Only check session on mount
-    useEffect(() => {
-        if (isAuth) {
-            checkSession();
-        }
-    }, [isAuth, checkSession]);
-
-    const handleConnect = async () => {
-        try {
-            setLoading(true);
-            console.log('Starting Zerodha connection process...');
-            const loginUrl = await getLoginUrl();
-            console.log('Received login URL:', loginUrl);
-
-            if (!loginUrl) {
-                console.error('No login URL received from server');
-                throw new Error('Failed to get login URL from server');
-            }
-
-            console.log('Opening Zerodha login window...');
-            const authWindow = window.open(
-                loginUrl,
-                'Zerodha Login',
-                'width=800,height=600,status=yes,scrollbars=yes'
-            );
-
-            if (!authWindow) {
-                console.error('Failed to open popup window');
-                throw new Error('Please allow popups for this site to proceed with authentication');
-            }
-
-            const handleMessage = async (event) => {
-                console.log('Received postMessage event:', event);
-                console.log('Event data:', event.data);
-
-                if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
-                    console.log('Received auth success, storing tokens...');
-                    try {
-                        const { access_token, public_token } = event.data.data;
-
-                        // Store tokens
-                        localStorage.setItem('zerodha_access_token', access_token);
-                        localStorage.setItem('zerodha_public_token', public_token);
-
-                        // Verify tokens were stored
-                        const storedAccessToken = localStorage.getItem('zerodha_access_token');
-                        const storedPublicToken = localStorage.getItem('zerodha_public_token');
-                        console.log('Stored tokens:', { storedAccessToken, storedPublicToken });
-
-                        if (!storedAccessToken || !storedPublicToken) {
-                            throw new Error('Failed to store tokens in localStorage');
-                        }
-
-                        // Check session
-                        const sessionValid = await checkSession(true);
-                        console.log('Session check result:', sessionValid);
-
-                        if (sessionValid) {
-                            console.log('Session is valid, navigating to account page...');
-                            window.removeEventListener('message', handleMessage);
-                            // Navigate to Zerodha account page
-                            window.location.href = '/zerodha/account';
-                        } else {
-                            console.error('Session check failed after login');
-                            localStorage.removeItem('zerodha_access_token');
-                            localStorage.removeItem('zerodha_public_token');
-                            throw new Error('Failed to validate session after login');
-                        }
-                    } catch (err) {
-                        console.error('Error during post-login process:', err);
-                        localStorage.removeItem('zerodha_access_token');
-                        localStorage.removeItem('zerodha_public_token');
-                        throw err;
-                    } finally {
-                        setLoading(false);
-                    }
-                } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
-                    console.error('Auth error:', event.data.error);
-                    window.removeEventListener('message', handleMessage);
-                    setLoading(false);
-                }
-            };
-
-            window.addEventListener('message', handleMessage);
-
-            const checkWindow = setInterval(() => {
-                if (authWindow.closed) {
-                    console.log('Auth window was closed');
-                    clearInterval(checkWindow);
-                    window.removeEventListener('message', handleMessage);
-                    setLoading(false);
-                }
-            }, 500);
-        } catch (err) {
-            console.error('Error in handleConnect:', err);
-            setLoading(false);
+    const handleZerodhaClick = () => {
+        if (sessionActive) {
+            navigate('/zerodha/account');
+        } else {
+            navigate('/zerodha/login');
         }
     };
 
@@ -154,16 +60,21 @@ const Header = () => {
         return () => clearInterval(interval);
     }, []);
 
+    const isActive = (path) => {
+        return location.pathname === path;
+    };
+
     return (
         <>
             <AppBar
                 position="fixed"
                 sx={{
-                    backgroundColor: "#1976d2",
+                    backgroundColor: "#1a237e",
                     top: 0,
                     margin: 0,
                     padding: 0,
-                    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+                    boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.2)",
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                     zIndex: 1000
                 }}
             >
@@ -171,6 +82,7 @@ const Header = () => {
                     sx={{
                         display: "flex",
                         justifyContent: "space-between",
+                        alignItems: "center",
                         minHeight: "64px",
                         padding: "0 24px",
                         maxWidth: "1400px",
@@ -178,78 +90,81 @@ const Header = () => {
                         width: "100%"
                     }}
                 >
-                    {/* Left section - Logo and Home */}
-                    <Box sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        minWidth: '200px'
-                    }}>
-                        <Link to="/" style={{ textDecoration: "none" }}>
+                    {/* Left section - Logo and Menu */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {/* Logo */}
+                        <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
                             <img
                                 src="/logo.png"
                                 alt="Logo"
                                 style={{ height: 40 }}
                             />
                         </Link>
+
+                        {/* Menu Items */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <ButtonGroup />
+                        </Box>
+                    </Box>
+
+                    {/* Right section - Actions */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {/* Zerodha Button */}
                         <Button
-                            component={Link}
-                            to="/"
                             variant="contained"
-                            startIcon={<HomeIcon />}
+                            startIcon={<AccountBalanceIcon />}
+                            onClick={handleZerodhaClick}
                             sx={{
-                                bgcolor: "white",
-                                color: "#1976d2",
-                                minWidth: "100px",
-                                padding: "6px 12px",
-                                "&:hover": { bgcolor: "#e3f2fd" }
+                                backgroundColor: "white",
+                                color: "#1a237e",
+                                minWidth: "120px",
+                                padding: "8px 16px",
+                                textTransform: 'none',
+                                fontSize: '0.9rem',
+                                fontWeight: 500,
+                                borderRadius: '8px',
+                                boxShadow: 'none',
+                                transition: 'all 0.2s ease',
+                                "&:hover": {
+                                    backgroundColor: "#e3f2fd",
+                                    transform: 'translateY(-1px)',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }
                             }}
                         >
-                            Home
+                            Zerodha
                         </Button>
-                    </Box>
 
-                    {/* Center section - Navigation */}
-                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 2, alignItems: 'center' }}>
-                        <ButtonGroup />
-                        {!sessionActive && (
-                            <Button
-                                onClick={handleConnect}
-                                variant="contained"
-                                disabled={loading}
-                                startIcon={<AccountBalanceIcon />}
-                                sx={{
-                                    bgcolor: "white",
-                                    color: "#1976d2",
-                                    minWidth: "120px",
-                                    padding: "6px 12px",
-                                    "&:hover": { bgcolor: "#e3f2fd" }
-                                }}
-                            >
-                                {loading ? "Connecting..." : "Connect Zerodha"}
-                            </Button>
-                        )}
-                    </Box>
-
-                    {/* Right section - Notifications */}
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        minWidth: '200px',
-                        justifyContent: 'flex-end'
-                    }}>
+                        {/* Action Items */}
                         <IconButton
                             component={Link}
                             to="/actionitems"
                             sx={{
                                 color: 'white',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderRadius: '8px',
+                                padding: '8px',
+                                transition: 'all 0.2s ease',
                                 '&:hover': {
-                                    bgcolor: 'rgba(255, 255, 255, 0.08)'
+                                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                    transform: 'translateY(-1px)'
                                 }
                             }}
                         >
-                            <Badge badgeContent={actionItemsCount} color="error">
+                            <Badge
+                                badgeContent={actionItemsCount}
+                                color="error"
+                                sx={{
+                                    '& .MuiBadge-badge': {
+                                        backgroundColor: '#f44336',
+                                        color: 'white',
+                                        fontSize: '0.7rem',
+                                        height: '18px',
+                                        minWidth: '18px',
+                                        padding: '0 4px'
+                                    }
+                                }}
+                            >
                                 <NotificationsIcon />
                             </Badge>
                         </IconButton>
@@ -267,7 +182,6 @@ const ButtonGroup = () => {
     const [activeMenu, setActiveMenu] = useState(null);
     const [showCreateStrategy, setShowCreateStrategy] = useState(false);
     const location = useLocation();
-    const { isAuth, sessionActive } = useZerodha();
 
     const menuItems = {
         "Trading": {
@@ -298,43 +212,6 @@ const ButtonGroup = () => {
                 "Tag Management": { path: "/tagmanagement", icon: <LocalOfferIcon /> },
                 "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> }
             }
-        },
-        "Zerodha": {
-            icon: <AccountBalanceIcon />,
-            requiresSession: true,
-            items: {
-                "Portfolio": {
-                    path: "/zerodha/portfolio",
-                    icon: <AccountBalanceWalletIcon />,
-                    requiresSession: true
-                },
-                "Account": {
-                    path: "/zerodha/account",
-                    icon: <AccountBalanceIcon />,
-                    requiresSession: true
-                },
-                "Trading Instruments": {
-                    path: "/zerodha/trading-instruments",
-                    icon: <ShowChartIcon />,
-                    requiresSession: true
-                },
-                "Algo Strategies": {
-                    path: "/zerodha/algo-strategies",
-                    icon: <PsychologyIcon />,
-                    requiresSession: true
-                },
-                "Disconnect": {
-                    path: "#",
-                    icon: <LinkOffIcon />,
-                    requiresSession: true,
-                    onClick: () => {
-                        handleClose();
-                        localStorage.removeItem('zerodha_access_token');
-                        localStorage.removeItem('zerodha_public_token');
-                        window.location.reload();
-                    }
-                }
-            }
         }
     };
 
@@ -354,95 +231,108 @@ const ButtonGroup = () => {
 
     const handleCreateStrategySubmit = () => {
         setShowCreateStrategy(false);
-        // Optionally refresh the strategies list or navigate to My Strategies
     };
 
     return (
         <>
-            <Box sx={{ display: "flex", gap: 1 }}>
-                {Object.entries(menuItems).map(([menuName, { icon, items, requiresSession }]) => {
-                    // Skip Zerodha menu if not authenticated
-                    if (menuName === "Zerodha" && !sessionActive) {
-                        return null;
+            <Box sx={{
+                display: "flex",
+                gap: 4,
+                '& > button': {
+                    position: 'relative',
+                    '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '2px',
+                        backgroundColor: 'white',
+                        transform: 'scaleX(0)',
+                        transition: 'transform 0.3s ease',
+                    },
+                    '&:hover::after': {
+                        transform: 'scaleX(1)',
                     }
-
-                    return (
-                        <React.Fragment key={menuName}>
-                            <Button
-                                onClick={(e) => handleClick(e, menuName)}
-                                variant="contained"
-                                startIcon={icon}
-                                endIcon={<KeyboardArrowDownIcon />}
-                                sx={{
-                                    backgroundColor: "white",
-                                    color: "#1976d2",
-                                    minWidth: "120px",
-                                    padding: "6px 12px",
-                                    "&:hover": { backgroundColor: "#e3f2fd" }
-                                }}
-                            >
-                                {menuName}
-                            </Button>
-                            <Menu
-                                anchorEl={anchorEl}
-                                open={activeMenu === menuName}
-                                onClose={handleClose}
-                                anchorOrigin={{
-                                    vertical: 'bottom',
-                                    horizontal: 'left',
-                                }}
-                                transformOrigin={{
-                                    vertical: 'top',
-                                    horizontal: 'left',
-                                }}
-                                PaperProps={{
-                                    sx: {
-                                        mt: 1,
-                                        minWidth: "200px",
-                                        boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
-                                        "& .MuiMenuItem-root": {
-                                            padding: "8px 16px",
-                                            "&:hover": {
-                                                backgroundColor: "#e3f2fd"
-                                            }
+                }
+            }}>
+                {Object.entries(menuItems).map(([menuName, { icon, items }]) => (
+                    <React.Fragment key={menuName}>
+                        <Button
+                            onClick={(e) => handleClick(e, menuName)}
+                            startIcon={icon}
+                            endIcon={<KeyboardArrowDownIcon />}
+                            sx={{
+                                color: 'white',
+                                textTransform: 'none',
+                                fontSize: '1rem',
+                                fontWeight: isActive(Object.values(items).find(item => item.path === location.pathname)?.path) ? 600 : 400,
+                                "&:hover": {
+                                    backgroundColor: "transparent",
+                                    color: 'white'
+                                },
+                                minWidth: 'auto',
+                                px: 2,
+                                py: 1,
+                                '& .MuiSvgIcon-root': {
+                                    color: 'white'
+                                }
+                            }}
+                        >
+                            {menuName}
+                        </Button>
+                        <Menu
+                            anchorEl={anchorEl}
+                            open={activeMenu === menuName}
+                            onClose={handleClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'left',
+                            }}
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    mt: 1,
+                                    minWidth: "200px",
+                                    boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
+                                    "& .MuiMenuItem-root": {
+                                        padding: "8px 16px",
+                                        "&:hover": {
+                                            backgroundColor: "#e3f2fd"
                                         }
                                     }
-                                }}
-                            >
-                                {Object.entries(items).map(([label, { path, icon, onClick, requiresSession: itemRequiresSession }]) => {
-                                    // Skip items that require session when we don't have one
-                                    if (itemRequiresSession && !sessionActive) {
-                                        return null;
-                                    }
-
-                                    return (
-                                        <MenuItem
-                                            key={path}
-                                            component={onClick ? 'button' : Link}
-                                            to={onClick ? undefined : path}
-                                            onClick={onClick || handleClose}
-                                            selected={isActive(path)}
-                                            sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 1,
-                                                color: isActive(path) ? "#1976d2" : "inherit",
-                                                fontWeight: isActive(path) ? 600 : 400,
-                                                width: "100%",
-                                                border: "none",
-                                                background: "none",
-                                                cursor: "pointer"
-                                            }}
-                                        >
-                                            {icon}
-                                            {label}
-                                        </MenuItem>
-                                    );
-                                })}
-                            </Menu>
-                        </React.Fragment>
-                    );
-                })}
+                                }
+                            }}
+                        >
+                            {Object.entries(items).map(([label, { path, icon, onClick }]) => (
+                                <MenuItem
+                                    key={path}
+                                    component={onClick ? 'button' : Link}
+                                    to={onClick ? undefined : path}
+                                    onClick={onClick || handleClose}
+                                    selected={isActive(path)}
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        color: isActive(path) ? "#1976d2" : "inherit",
+                                        fontWeight: isActive(path) ? 600 : 400,
+                                        width: "100%",
+                                        border: "none",
+                                        background: "none",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    {icon}
+                                    {label}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </React.Fragment>
+                ))}
             </Box>
 
             {showCreateStrategy && (

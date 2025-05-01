@@ -6,6 +6,9 @@ const ZerodhaContext = createContext();
 const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
+const SESSION_CHECK_INTERVAL = 2000; // 2 seconds
+const FETCH_INTERVAL = 10000; // 10 seconds
+const AUTO_SYNC_INTERVAL = 10000; // 10 seconds
 
 // Function to check if current time is within market hours
 const isMarketHours = () => {
@@ -43,6 +46,8 @@ export const ZerodhaProvider = ({ children }) => {
     const lastFetchTime = useRef(0);
     const fetchTimeoutRef = useRef(null);
     const retryCount = useRef(0);
+    const isMounted = useRef(true);
+    const sessionCheckTimeoutRef = useRef(null);
 
     // Helper function to make API calls with retry logic
     const makeApiCallWithRetry = async (apiCall, errorMessage) => {
@@ -60,116 +65,124 @@ export const ZerodhaProvider = ({ children }) => {
         }
     };
 
-    const checkSession = useCallback(async (forceCheck = false) => {
+    // Check session status
+    const checkSession = useCallback(async (force = false) => {
+        if (!isMounted.current) return false;
+
         const now = Date.now();
-        if (!forceCheck && now - lastChecked < 2000) {
-            return sessionActive;
+        if (!force && now - lastChecked < SESSION_CHECK_INTERVAL) {
+            return Boolean(sessionActive);
         }
 
         try {
-            setError(null);
             const response = await makeApiCallWithRetry(
                 () => getAccountInfo(),
                 'Failed to check session'
             );
 
-            if (response.success) {
-                setAccountInfo(response.data);
-                setSessionActive(true);
-                setIsAuth(true);
-                setLastChecked(now);
-                return true;
-            } else {
-                setSessionActive(false);
-                setAccountInfo(null);
-                if (!isAuth) {
+            const currentSessionState = Boolean(sessionActive);
+            console.log('Session check response:', {
+                success: response?.success,
+                hasData: !!response?.data,
+                currentSessionActive: currentSessionState,
+                responseData: response?.data
+            });
+
+            if (!response || !response.success) {
+                console.log('Setting session to inactive due to invalid response');
+                if (isMounted.current) {
+                    setSessionActive(false);
                     setIsAuth(false);
                 }
                 return false;
             }
+
+            // If we have a successful response with data, consider the session valid
+            const isValid = Boolean(response.success && response.data);
+            console.log('Session validity check:', {
+                isValid,
+                success: response.success,
+                hasData: !!response.data
+            });
+
+            if (isMounted.current) {
+                console.log('Updating session state:', {
+                    newSessionActive: isValid,
+                    previousSessionActive: currentSessionState
+                });
+                setSessionActive(isValid);
+                setLastChecked(now);
+                setAccountInfo(response.data);
+                setIsAuth(true);
+            }
+            return isValid;
         } catch (err) {
             console.error('Error checking session:', err);
-            setError(err.message);
-            setSessionActive(false);
-            setAccountInfo(null);
+            if (isMounted.current) {
+                setSessionActive(false);
+                setIsAuth(false);
+            }
             return false;
         }
-    }, [isAuth, lastChecked, sessionActive]);
+    }, [sessionActive, lastChecked]);
 
+    // Fetch data
     const fetchData = useCallback(async (force = false) => {
+        if (!isMounted.current) return;
+
         const now = Date.now();
-        if (!force && now - lastFetchTime.current < FETCH_COOLDOWN) {
+        if (!force && now - lastFetchTime.current < FETCH_INTERVAL) {
             return;
-        }
-
-        if (!isAuth || !sessionActive) {
-            return;
-        }
-
-        // Clear any pending fetch timeout
-        if (fetchTimeoutRef.current) {
-            clearTimeout(fetchTimeoutRef.current);
         }
 
         try {
             setLoading(true);
             setError(null);
 
-            const [holdingsResponse, positionsResponse, ordersResponse] = await Promise.all([
-                makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings'),
-                makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions'),
-                makeApiCallWithRetry(() => getOrders(), 'Failed to fetch orders')
-            ]);
+            // Only fetch if we have a valid session
+            if (await checkSession()) {
+                const [holdingsRes, positionsRes, ordersRes] = await Promise.all([
+                    makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings'),
+                    makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions'),
+                    makeApiCallWithRetry(() => getOrders(), 'Failed to fetch orders')
+                ]);
 
-            setHoldings(holdingsResponse.data || []);
-            setPositions(positionsResponse.data || []);
-            setOrders(ordersResponse.data || []);
+                if (isMounted.current) {
+                    if (holdingsRes) setHoldings(holdingsRes.data || []);
+                    if (positionsRes) setPositions(positionsRes.data || []);
+                    if (ordersRes) setOrders(ordersRes.data || []);
+                }
+            }
+
             lastFetchTime.current = now;
-            retryCount.current = 0;
         } catch (err) {
             console.error('Error fetching data:', err);
-            setError(err.message);
-            // Schedule a retry after FETCH_COOLDOWN if it's an insufficient resources error
-            if (err.message?.includes('ERR_INSUFFICIENT_RESOURCES')) {
-                fetchTimeoutRef.current = setTimeout(() => fetchData(true), FETCH_COOLDOWN);
+            if (isMounted.current) {
+                setError(err.message);
             }
         } finally {
-            setLoading(false);
-        }
-    }, [isAuth, sessionActive]);
-
-    const handleLogout = useCallback(async () => {
-        try {
-            await logout();
-            localStorage.removeItem('zerodha_access_token');
-            localStorage.removeItem('zerodha_public_token');
-            setIsAuth(false);
-            setSessionActive(false);
-            setAccountInfo(null);
-            setHoldings([]);
-            setPositions([]);
-            setOrders([]);
-            setError(null);
-            isInitialLoadDone.current = false;
-            if (fetchTimeoutRef.current) {
-                clearTimeout(fetchTimeoutRef.current);
+            if (isMounted.current) {
+                setLoading(false);
             }
-        } catch (err) {
-            console.error('Error during logout:', err);
-            setError(err.message);
         }
-    }, []);
+    }, [checkSession]);
 
     // Initial setup effect
     useEffect(() => {
+        isMounted.current = true;
+
         const initializeApp = async () => {
-            if (isInitialLoadDone.current) return;
+            if (isInitialLoadDone.current || !isMounted.current) return;
 
             const token = localStorage.getItem('zerodha_access_token');
+            console.log('Initializing app with token:', !!token);
+
             if (token) {
                 setIsAuth(true);
                 const isSessionValid = await checkSession(true);
-                if (isSessionValid) {
+                console.log('Initial session check result:', isSessionValid);
+
+                if (isSessionValid && isMounted.current) {
                     await fetchData(true);
                     setIsAutoSync(isMarketHours());
                     isInitialLoadDone.current = true;
@@ -180,37 +193,53 @@ export const ZerodhaProvider = ({ children }) => {
         initializeApp();
 
         return () => {
-            if (fetchTimeoutRef.current) {
-                clearTimeout(fetchTimeoutRef.current);
+            isMounted.current = false;
+            if (sessionCheckTimeoutRef.current) {
+                clearTimeout(sessionCheckTimeoutRef.current);
             }
         };
-    }, [checkSession, fetchData]);
+    }, []);
 
-    // Auto-sync effect with increased interval
+    // Auto-sync effect
     useEffect(() => {
-        let interval;
+        if (!isAutoSync || !isMarketHours()) return;
 
-        if (isAuth && sessionActive && isAutoSync && isInitialLoadDone.current) {
-            interval = setInterval(async () => {
-                const isMarketOpen = isMarketHours();
-                if (!isMarketOpen) {
-                    setIsAutoSync(false);
-                    return;
-                }
-                await fetchData();
-            }, FETCH_COOLDOWN); // Use the same cooldown period for the interval
-        }
-
-        return () => {
-            if (interval) {
-                clearInterval(interval);
-            }
+        const syncData = async () => {
+            if (!isMounted.current) return;
+            await fetchData();
         };
-    }, [isAuth, sessionActive, isAutoSync, fetchData]);
+
+        const intervalId = setInterval(syncData, AUTO_SYNC_INTERVAL);
+        return () => clearInterval(intervalId);
+    }, [isAutoSync, fetchData]);
+
+    const handleLogout = useCallback(async () => {
+        try {
+            await logout();
+            localStorage.removeItem('zerodha_access_token');
+            localStorage.removeItem('zerodha_public_token');
+            if (isMounted.current) {
+                setIsAuth(false);
+                setSessionActive(false);
+                setAccountInfo(null);
+                setHoldings([]);
+                setPositions([]);
+                setOrders([]);
+                setError(null);
+                setIsAutoSync(false);
+                isInitialLoadDone.current = false;
+            }
+        } catch (err) {
+            console.error('Error during logout:', err);
+            if (isMounted.current) {
+                setError(err.message);
+            }
+        }
+    }, []);
 
     const value = {
         isAuth,
-        sessionActive,
+        sessionActive: Boolean(sessionActive),
         accountInfo,
         loading,
         error,

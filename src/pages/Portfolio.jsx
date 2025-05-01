@@ -10,6 +10,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import useScrollToTop from '../hooks/useScrollToTop';
 import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
+import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -137,6 +138,7 @@ const Portfolio = () => {
     if (localLoading || loading) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+                <ZerodhaSubHeader />
                 <Container maxWidth="lg">
                     <Box sx={{
                         mt: 8,
@@ -155,6 +157,7 @@ const Portfolio = () => {
     if (!isAuth || !sessionActive) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+                <ZerodhaSubHeader />
                 <Container maxWidth="md" sx={{ mt: 8 }}>
                     <Paper sx={{
                         p: 4,
@@ -188,7 +191,8 @@ const Portfolio = () => {
 
     // Show portfolio when authenticated and session is active
     return (
-        <Box>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+            <ZerodhaSubHeader />
             <Container maxWidth={false} sx={{ mt: 4, px: { xs: 2, sm: 3, md: 4 } }}>
                 {/* Auto-sync switch */}
                 <Box sx={{

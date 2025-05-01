@@ -1,10 +1,11 @@
 import React from 'react';
 import { Box, Container, Typography } from '@mui/material';
-
+import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 
 const MyAlgoStrategiesPage = () => {
     return (
-        <Box>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+            <ZerodhaSubHeader />
             <Container>
                 <Box sx={{
                     mt: 4,
