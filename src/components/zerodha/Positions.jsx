@@ -51,10 +51,11 @@ const formatPercentage = (value) => {
 
 const getPositionType = (tradingsymbol) => {
     if (!tradingsymbol) return 'Stock';
-    const symbol = tradingsymbol.toUpperCase();
+    const symbol = tradingsymbol.toUpperCase().trim();
     if (symbol.endsWith('FUT')) {
         return 'Future';
-    } else if (symbol.endsWith('CE') || symbol.endsWith('PE')) {
+    } else if (/^[A-Z]+\d{2}[A-Z]+\d+(CE|PE)$/.test(symbol)) {
+        // Matches typical option format: SYMBOL+DATE+STRIKE+CE/PE
         return 'Option';
     }
     return 'Stock';
