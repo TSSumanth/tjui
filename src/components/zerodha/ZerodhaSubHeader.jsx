@@ -21,15 +21,8 @@ const ZerodhaSubHeader = () => {
     const location = useLocation();
     const { sessionActive, handleLogout } = useZerodha();
 
-    console.log('ZerodhaSubHeader Debug:', {
-        pathname: location.pathname,
-        sessionActive,
-        shouldRender: sessionActive
-    });
-
     // Only render if we have an active session
     if (!sessionActive) {
-        console.log('ZerodhaSubHeader not rendering due to inactive session');
         return null;
     }
 

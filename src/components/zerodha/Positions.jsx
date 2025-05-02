@@ -87,7 +87,6 @@ const extractOptionDetails = (tradingsymbol) => {
             type: match[4]
         };
     } catch (error) {
-        console.warn('Error parsing option details:', error);
         return null;
     }
 };
@@ -238,33 +237,27 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
     const handleClosePosition = () => {
         if (!selectedPosition) {
-            console.warn('No position selected for closing');
             return;
         }
 
-        console.log('Closing position:', selectedPosition);
         onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, false);
         handleMenuClose();
     };
 
     const handleAddMore = () => {
         if (!selectedPosition) {
-            console.warn('No position selected for adding');
             return;
         }
 
-        console.log('Adding to position:', selectedPosition);
         onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, true, false);
         handleMenuClose();
     };
 
     const handleStopLoss = () => {
         if (!selectedPosition) {
-            console.warn('No position selected for stop loss');
             return;
         }
 
-        console.log('Setting stop loss for position:', selectedPosition);
         onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, true);
         handleMenuClose();
     };
@@ -656,7 +649,6 @@ const Positions = () => {
     };
 
     const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding, isStopLossOrder) => {
-        console.log('Opening order dialog:', { anchorEl, position, underlying, isAdding, isStopLossOrder });
         setOrderDialogAnchorEl(anchorEl);
         setSelectedPosition(position);
         setSelectedUnderlying(underlying);
@@ -717,11 +709,9 @@ const Positions = () => {
                 trigger_price: triggerPrice ? parseFloat(triggerPrice) : undefined
             };
 
-            console.log('Placing order:', order);
             await placeOrder(order);
             handleCloseOrderDialog();
         } catch (error) {
-            console.error('Error placing order:', error);
             alert(error.message || 'Failed to place order');
         } finally {
             setLoading(false);

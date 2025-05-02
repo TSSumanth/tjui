@@ -17,9 +17,36 @@ import { formatCurrency } from '../../utils/formatters';
 
 const Holdings = () => {
     const { holdings, loadingStates } = useZerodha();
-    const isLoading = loadingStates.holdings;
+    const [prevHoldings, setPrevHoldings] = React.useState(null);
+    const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+    const [isUpdating, setIsUpdating] = React.useState(false);
 
-    if (isLoading) {
+    // Track initial load
+    React.useEffect(() => {
+        if (holdings && holdings.length > 0) {
+            setIsInitialLoad(false);
+        }
+    }, [holdings]);
+
+    // Track previous holdings for smooth updates
+    React.useEffect(() => {
+        if (holdings) {
+            setPrevHoldings(holdings);
+        }
+    }, [holdings]);
+
+    // Handle smooth updates
+    React.useEffect(() => {
+        if (prevHoldings && holdings) {
+            setIsUpdating(true);
+            const timer = setTimeout(() => {
+                setIsUpdating(false);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [holdings, prevHoldings]);
+
+    if (isInitialLoad && loadingStates.holdings) {
         return (
             <Box>
                 <Box sx={{ width: '100%', mb: 2 }}>
@@ -76,11 +103,26 @@ const Holdings = () => {
                                 </TableCell>
                                 <TableCell align="right">{quantity}</TableCell>
                                 <TableCell align="right">₹{formatCurrency(avgPrice)}</TableCell>
-                                <TableCell align="right">₹{formatCurrency(lastPrice)}</TableCell>
-                                <TableCell align="right">₹{formatCurrency(currentValue)}</TableCell>
+                                <TableCell align="right"
+                                    sx={{
+                                        fontFamily: 'monospace',
+                                        transition: isUpdating ? 'color 0.3s ease' : 'none'
+                                    }}
+                                >
+                                    ₹{formatCurrency(lastPrice)}
+                                </TableCell>
+                                <TableCell align="right"
+                                    sx={{
+                                        fontFamily: 'monospace',
+                                        transition: isUpdating ? 'color 0.3s ease' : 'none'
+                                    }}
+                                >
+                                    ₹{formatCurrency(currentValue)}
+                                </TableCell>
                                 <TableCell align="right">
                                     <Typography
                                         color={pnl >= 0 ? 'success.main' : 'error.main'}
+                                        sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
                                     >
                                         ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
                                     </Typography>
@@ -88,6 +130,7 @@ const Holdings = () => {
                                 <TableCell align="right">
                                     <Typography
                                         color={dayChange >= 0 ? 'success.main' : 'error.main'}
+                                        sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
                                     >
                                         ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
                                     </Typography>

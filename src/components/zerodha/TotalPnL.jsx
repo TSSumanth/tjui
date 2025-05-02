@@ -4,7 +4,6 @@ import { useZerodha } from '../../context/ZerodhaContext';
 
 const TotalPnL = () => {
     const { pnl, loading, error } = useZerodha();
-    console.log('TotalPnL render:', { pnl, loading, error }); // Debug log
 
     const formatCurrency = (value) => {
         if (value === null || value === undefined || isNaN(value)) {
