@@ -90,6 +90,19 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
         setSelectedOrder(null);
     };
 
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'COMPLETE':
+                return 'success';
+            case 'CANCELLED':
+                return 'default';
+            case 'TRIGGER PENDING':
+                return 'info';
+            default:
+                return 'warning';
+        }
+    };
+
     if (!orders.length) return null;
     return (
         <Box mb={4}>
@@ -104,8 +117,10 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
                             <TableCell>Status</TableCell>
                             <TableCell>Type</TableCell>
                             <TableCell>Symbol</TableCell>
+                            <TableCell>Transaction</TableCell>
                             <TableCell>Quantity</TableCell>
                             <TableCell>Price</TableCell>
+                            <TableCell>Trigger Price</TableCell>
                             <TableCell>Time</TableCell>
                             {showActions && <TableCell align="right">Actions</TableCell>}
                         </TableRow>
@@ -117,14 +132,23 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
                                 <TableCell>
                                     <Chip
                                         label={order.status}
-                                        color={order.status === 'COMPLETE' ? 'success' : order.status === 'CANCELLED' ? 'default' : 'warning'}
+                                        color={getStatusColor(order.status)}
                                         size="small"
                                     />
                                 </TableCell>
                                 <TableCell>{order.order_type}</TableCell>
                                 <TableCell>{order.tradingsymbol}</TableCell>
+                                <TableCell>
+                                    <Chip
+                                        label={order.transaction_type}
+                                        color={order.transaction_type === 'BUY' ? 'success' : 'error'}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                </TableCell>
                                 <TableCell>{order.quantity}</TableCell>
-                                <TableCell>{order.price}</TableCell>
+                                <TableCell>{formatCurrency(order.price)}</TableCell>
+                                <TableCell>{order.trigger_price ? formatCurrency(order.trigger_price) : '-'}</TableCell>
                                 <TableCell>{formatOrderTime(order.order_timestamp)}</TableCell>
                                 {showActions && (
                                     <TableCell align="right">
@@ -138,7 +162,7 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
                                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                                         >
-                                            {(order.status === 'OPEN' || order.status === 'AMO REQ RECEIVED') && [
+                                            {(order.status === 'OPEN' || order.status === 'AMO REQ RECEIVED' || order.status === 'TRIGGER PENDING') && [
                                                 <MenuItem key="modify" onClick={() => { handleMenuClose(); onModify(order); }}>Modify</MenuItem>,
                                                 <MenuItem key="cancel" onClick={() => { handleMenuClose(); onCancel(order); }}>Cancel</MenuItem>
                                             ]}
@@ -225,6 +249,7 @@ function Orders() {
 
     // Split orders by status
     const openOrders = orders.filter(o => o.status === 'OPEN' || o.status === 'AMO REQ RECEIVED');
+    const triggerPendingOrders = orders.filter(o => o.status === 'TRIGGER PENDING');
     const completedOrders = orders.filter(o => o.status === 'COMPLETE');
     const cancelledOrders = orders.filter(o => o.status === 'CANCELLED');
 
@@ -234,6 +259,7 @@ function Orders() {
                 Orders
             </Typography>
             <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
+            <OrdersTable orders={triggerPendingOrders} title="Stop Loss Orders (Trigger Pending)" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} />
             <OrdersTable orders={cancelledOrders} title="Cancelled Orders" showActions={false} />
             <ModifyOrderDialog

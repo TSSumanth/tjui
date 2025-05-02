@@ -173,11 +173,12 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
     </TableCell>
 );
 
-const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions }) => {
+const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions }) => {
     // Initialize expanded state to true by default
     const [expanded, setExpanded] = useState(true);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -206,13 +207,16 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }, { dayPnL: 0, totalPnL: 0 });
     }, [positions]);
 
-    // Debug log for positions data
-    console.log(`PositionTable ${underlying} render:`, {
-        positionsCount: positions.length,
-        expanded,
-        dayPnL,
-        totalPnL
-    });
+    // Handle smooth updates
+    React.useEffect(() => {
+        if (prevPositions && positions) {
+            setIsUpdating(true);
+            const timer = setTimeout(() => {
+                setIsUpdating(false);
+            }, 300); // Short animation duration
+            return () => clearTimeout(timer);
+        }
+    }, [positions, prevPositions]);
 
     const handleMenuClick = (event, position) => {
         event.stopPropagation();
@@ -225,6 +229,12 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         setSelectedPosition(null);
     };
 
+    const handleMenuKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            handleMenuClose();
+        }
+    };
+
     const handleClosePosition = () => {
         if (!selectedPosition) {
             console.warn('No position selected for closing');
@@ -232,9 +242,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }
 
         console.log('Closing position:', selectedPosition);
-        const menuButton = menuAnchorEl;
+        onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, false);
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, false, false);
     };
 
     const handleAddMore = () => {
@@ -244,9 +253,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }
 
         console.log('Adding to position:', selectedPosition);
-        const menuButton = menuAnchorEl;
+        onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, true, false);
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, true, false);
     };
 
     const handleStopLoss = () => {
@@ -256,21 +264,21 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }
 
         console.log('Setting stop loss for position:', selectedPosition);
-        const menuButton = menuAnchorEl;
+        onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, true);
         handleMenuClose();
-        onOpenOrderDialog(menuButton, selectedPosition, underlying, false, true);
     };
 
     const renderPositionRow = (position) => {
         const lastPrice = Number(position.last_price) || 0;
         const closePrice = Number(position.close_price) || lastPrice;
-        const quantity = position.is_closed ? position.closed_quantity : Number(position.quantity) || 0;
+        const quantity = Number(position.quantity) || 0;
         const isNegativeQuantity = quantity < 0;
         const positionType = getPositionType(position.tradingsymbol);
+        const isClosed = quantity === 0 || position.is_closed;
 
         // For closed positions, show total P&L in Day's P&L column
         let dayPnL;
-        if (position.is_closed) {
+        if (isClosed) {
             dayPnL = Number(position.pnl) || 0;
         } else {
             // For futures, calculate based on position direction (quantity)
@@ -299,21 +307,21 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         // Total P&L remains as is
         const totalPnL = Number(position.pnl) || 0;
 
-
         return (
             <TableRow
-                key={position.tradingsymbol + (position.is_closed ? '-closed' : '')}
+                key={position.tradingsymbol + (isClosed ? '-closed' : '')}
                 sx={{
-                    bgcolor: position.is_closed ? 'grey.50' : 'background.paper',
+                    bgcolor: isClosed ? 'grey.50' : 'background.paper',
                     '&:hover': {
-                        bgcolor: position.is_closed ? 'grey.100' : 'grey.50'
-                    }
+                        bgcolor: isClosed ? 'grey.100' : 'grey.50'
+                    },
+                    transition: isUpdating ? 'background-color 0.3s ease' : 'none'
                 }}
             >
                 <StyledTableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {position.tradingsymbol}
-                        {position.is_closed && (
+                        {isClosed && (
                             <Chip
                                 label="Closed"
                                 size="small"
@@ -343,7 +351,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 <StyledTableCell
                     align="right"
                     sx={{
-                        color: isNegativeQuantity ? 'error.main' : 'inherit'
+                        color: quantity < 0 ? 'error.main' : 'inherit',
+                        transition: isUpdating ? 'color 0.3s ease' : 'none'
                     }}
                 >
                     {quantity}
@@ -352,12 +361,13 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     {formatCurrency(position.average_price)}
                 </StyledTableCell>
                 <StyledTableCell align="right">
-                    {formatCurrency(position.is_closed ? position.closing_price : position.last_price)}
+                    {formatCurrency(isClosed ? position.closing_price : position.last_price)}
                 </StyledTableCell>
                 <StyledTableCell
                     align="right"
                     sx={{
-                        color: dayPnL >= 0 ? 'success.main' : 'error.main'
+                        color: dayPnL >= 0 ? 'success.main' : 'error.main',
+                        transition: isUpdating ? 'color 0.3s ease' : 'none'
                     }}
                 >
                     {formatCurrency(dayPnL)}
@@ -365,7 +375,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 <StyledTableCell
                     align="right"
                     sx={{
-                        color: totalPnL >= 0 ? 'success.main' : 'error.main'
+                        color: totalPnL >= 0 ? 'success.main' : 'error.main',
+                        transition: isUpdating ? 'color 0.3s ease' : 'none'
                     }}
                 >
                     {formatCurrency(totalPnL)}
@@ -373,13 +384,14 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 <StyledTableCell
                     align="right"
                     sx={{
-                        color: position.pnl >= 0 ? 'success.main' : 'error.main'
+                        color: totalPnL >= 0 ? 'success.main' : 'error.main',
+                        transition: isUpdating ? 'color 0.3s ease' : 'none'
                     }}
                 >
                     {formatPercentage(calculateChangePercentage(position))}
                 </StyledTableCell>
                 <StyledTableCell align="right">
-                    {position.is_closed ? (
+                    {isClosed ? (
                         <Typography
                             variant="body2"
                             sx={{
@@ -395,13 +407,18 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 size="small"
                                 onClick={(e) => handleMenuClick(e, position)}
                                 disabled={loadingPositions[position.tradingsymbol]}
+                                aria-label={`Actions for ${position.tradingsymbol}`}
+                                aria-haspopup="true"
+                                aria-controls={Boolean(menuAnchorEl) && selectedPosition?.tradingsymbol === position.tradingsymbol ? `position-menu-${position.tradingsymbol}` : undefined}
                             >
                                 <MoreVert fontSize="small" />
                             </IconButton>
                             <Menu
+                                id={`position-menu-${position.tradingsymbol}`}
                                 anchorEl={menuAnchorEl}
                                 open={Boolean(menuAnchorEl) && selectedPosition?.tradingsymbol === position.tradingsymbol}
                                 onClose={handleMenuClose}
+                                onKeyDown={handleMenuKeyDown}
                                 anchorOrigin={{
                                     vertical: 'bottom',
                                     horizontal: 'right',
@@ -409,6 +426,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 transformOrigin={{
                                     vertical: 'top',
                                     horizontal: 'right',
+                                }}
+                                MenuListProps={{
+                                    'aria-labelledby': `position-menu-${position.tradingsymbol}`,
                                 }}
                             >
                                 <MenuItem onClick={handleClosePosition}>
@@ -438,7 +458,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     borderLeftColor: 'primary.main',
                     '&:hover': {
                         bgcolor: 'grey.50'
-                    }
+                    },
+                    transition: isUpdating ? 'background-color 0.3s ease' : 'none'
                 }}
                 onClick={() => setExpanded(!expanded)}
             >
@@ -483,7 +504,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 border: '1px solid',
                                 borderColor: 'divider',
                                 fontWeight: 500,
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                transition: isUpdating ? 'background-color 0.3s ease' : 'none'
                             }}>
                                 {calculateBreakeven(positions).breakevenPoints.length > 0
                                     ? `Breakeven: ↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
@@ -492,14 +514,16 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             <Box sx={{
                                 color: 'text.secondary',
                                 fontFamily: 'monospace',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                transition: isUpdating ? 'color 0.3s ease' : 'none'
                             }}>
                                 Net Premium: {formatCurrency(calculateBreakeven(positions).netPremium)}
                             </Box>
                             <Box sx={{
                                 color: 'text.secondary',
                                 fontFamily: 'monospace',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                transition: isUpdating ? 'color 0.3s ease' : 'none'
                             }}>
                                 Current: {formatCurrency(calculateBreakeven(positions).currentPrice)}
                             </Box>
@@ -519,7 +543,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             sx={{
                                 fontFamily: 'monospace',
                                 color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                transition: isUpdating ? 'color 0.3s ease' : 'none'
                             }}
                         >
                             Day: {formatCurrency(dayPnL)}
@@ -528,7 +553,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             sx={{
                                 fontFamily: 'monospace',
                                 color: totalPnL >= 0 ? 'success.main' : 'error.main',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                transition: isUpdating ? 'color 0.3s ease' : 'none'
                             }}
                         >
                             Total: {formatCurrency(totalPnL)}
@@ -555,7 +581,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     sx={{
                         mt: 1,
                         border: '1px solid',
-                        borderColor: 'divider'
+                        borderColor: 'divider',
+                        transition: isUpdating ? 'border-color 0.3s ease' : 'none'
                     }}
                 >
                     <Table size="small">
@@ -584,19 +611,58 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
 const Positions = () => {
     const { positions, loadingStates } = useZerodha();
-    const isLoading = loadingStates.positions;
+    const [prevPositions, setPrevPositions] = React.useState(null);
+    const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const [orderDialogAnchorEl, setOrderDialogAnchorEl] = React.useState(null);
     const [selectedPosition, setSelectedPosition] = React.useState(null);
     const [selectedUnderlying, setSelectedUnderlying] = React.useState(null);
     const [isAddingMore, setIsAddingMore] = React.useState(false);
     const [isStopLoss, setIsStopLoss] = React.useState(false);
+    const [quantity, setQuantity] = React.useState('');
+    const [price, setPrice] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
+
+    // Track initial load
+    React.useEffect(() => {
+        if (positions && positions.net && positions.net.length > 0) {
+            setIsInitialLoad(false);
+        }
+    }, [positions]);
+
+    // Update previous positions when positions change
+    React.useEffect(() => {
+        if (positions) {
+            setPrevPositions(positions);
+        }
+    }, [positions]);
+
+    const getTransactionType = (position, isAdding, isStopLoss) => {
+        const isShortPosition = position.quantity < 0;
+
+        if (isStopLoss) {
+            // For short positions, stop-loss is a BUY order
+            // For long positions, stop-loss is a SELL order
+            return isShortPosition ? 'BUY' : 'SELL';
+        }
+
+        if (isAdding) {
+            // When adding to position, use same direction as current position
+            return isShortPosition ? 'SELL' : 'BUY';
+        }
+
+        // When closing position, use opposite direction of current position
+        return isShortPosition ? 'BUY' : 'SELL';
+    };
 
     const handleOpenOrderDialog = (anchorEl, position, underlying, isAdding, isStopLossOrder) => {
+        console.log('Opening order dialog:', { anchorEl, position, underlying, isAdding, isStopLossOrder });
         setOrderDialogAnchorEl(anchorEl);
         setSelectedPosition(position);
         setSelectedUnderlying(underlying);
         setIsAddingMore(isAdding);
         setIsStopLoss(isStopLossOrder);
+        setQuantity(Math.abs(position.quantity).toString());
+        setPrice(position.last_price.toString());
     };
 
     const handleCloseOrderDialog = () => {
@@ -605,9 +671,64 @@ const Positions = () => {
         setSelectedUnderlying(null);
         setIsAddingMore(false);
         setIsStopLoss(false);
+        setQuantity('');
+        setPrice('');
+        setLoading(false);
     };
 
-    if (isLoading) {
+    const handleQuantityChange = (e) => {
+        setQuantity(e.target.value);
+    };
+
+    const handlePriceChange = (e) => {
+        setPrice(e.target.value);
+    };
+
+    const handleSubmit = async (orderType, triggerPrice) => {
+        if (!selectedPosition) return;
+
+        setLoading(true);
+        try {
+            const transactionType = getTransactionType(selectedPosition, isAddingMore, isStopLoss);
+            const isShortPosition = selectedPosition.quantity < 0;
+
+            // Validate trigger price for stop-loss orders
+            if (isStopLoss) {
+                const lastPrice = parseFloat(selectedPosition.last_price);
+                const triggerPriceNum = parseFloat(triggerPrice);
+
+                if (transactionType === 'SELL' && triggerPriceNum >= lastPrice) {
+                    throw new Error('For SELL stop-loss orders, trigger price must be lower than the last traded price');
+                }
+                if (transactionType === 'BUY' && triggerPriceNum <= lastPrice) {
+                    throw new Error('For BUY stop-loss orders, trigger price must be higher than the last traded price');
+                }
+            }
+
+            const order = {
+                tradingsymbol: selectedPosition.tradingsymbol,
+                exchange: selectedPosition.exchange,
+                transaction_type: transactionType,
+                order_type: orderType,
+                quantity: parseInt(quantity),
+                price: parseFloat(price),
+                product: selectedPosition.product,
+                trigger_price: triggerPrice ? parseFloat(triggerPrice) : undefined
+            };
+
+            console.log('Placing order:', order);
+            await placeOrder(order);
+            handleCloseOrderDialog();
+        } catch (error) {
+            console.error('Error placing order:', error);
+            alert(error.message || 'Failed to place order');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Only show loading state on initial load
+    if (isInitialLoad && loadingStates.positions) {
         return (
             <Box>
                 <Box sx={{ width: '100%', mb: 2 }}>
@@ -654,18 +775,25 @@ const Positions = () => {
                     underlying={underlying}
                     onOpenOrderDialog={handleOpenOrderDialog}
                     loadingPositions={{}}
+                    prevPositions={prevPositions}
                 />
             ))}
 
             {selectedPosition && (
                 <OrderPopup
-                    anchorEl={orderDialogAnchorEl}
-                    position={selectedPosition}
-                    underlying={selectedUnderlying}
-                    isOpen={Boolean(orderDialogAnchorEl)}
+                    open={Boolean(orderDialogAnchorEl)}
                     onClose={handleCloseOrderDialog}
-                    isAddingMore={isAddingMore}
+                    position={selectedPosition}
+                    quantity={quantity}
+                    price={price}
+                    underlying={selectedUnderlying}
+                    isAdding={isAddingMore}
                     isStopLoss={isStopLoss}
+                    onQuantityChange={handleQuantityChange}
+                    onPriceChange={handlePriceChange}
+                    onSubmit={handleSubmit}
+                    loading={loading}
+                    transactionType={getTransactionType(selectedPosition, isAddingMore, isStopLoss)}
                 />
             )}
         </Box>

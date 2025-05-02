@@ -209,14 +209,14 @@ const ZerodhaSubHeader = () => {
                             onClick={handleDisconnect}
                             size="small"
                             sx={{
-                                color: 'white',
+                                color: 'error.main',
                                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                 borderRadius: '50%',
                                 p: 1.2,
                                 transition: 'all 0.2s',
                                 '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                                    color: '#90caf9',
+                                    backgroundColor: 'rgba(211, 47, 47, 0.15)',
+                                    color: 'error.light',
                                     transform: 'translateY(-2px)'
                                 }
                             }}
