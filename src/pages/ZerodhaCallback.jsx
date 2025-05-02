@@ -15,7 +15,7 @@ const ZerodhaCallback = () => {
         }
 
         // If we get here, something went wrong
-        window.opener.postMessage({
+            window.opener.postMessage({
             type: 'ZERODHA_AUTH_ERROR',
             error: 'No request token found'
         }, '*');

@@ -295,6 +295,45 @@ const ZerodhaAccount = () => {
                                         <Typography variant="h6" gutterBottom>
                                             Mutual Fund Holdings
                                         </Typography>
+                                        {accountInfo.mutualFunds && accountInfo.mutualFunds.length > 0 && (() => {
+                                            const totalInvested = accountInfo.mutualFunds.reduce((sum, fund) => sum + (fund.units * fund.average_cost), 0);
+                                            const currentValue = accountInfo.mutualFunds.reduce((sum, fund) => sum + (fund.units * fund.current_nav), 0);
+                                            const totalPL = currentValue - totalInvested;
+                                            return (
+                                                <Box sx={{ display: 'flex', gap: 3, mb: 3 }}>
+                                                    <Paper elevation={2} sx={{ p: 2, minWidth: 180, textAlign: 'center' }}>
+                                                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                            Invested
+                                                        </Typography>
+                                                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                                            ₹{formatCurrency(totalInvested)}
+                                                        </Typography>
+                                                    </Paper>
+                                                    <Paper elevation={2} sx={{ p: 2, minWidth: 180, textAlign: 'center' }}>
+                                                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                            Current Value
+                                                        </Typography>
+                                                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                                            ₹{formatCurrency(currentValue)}
+                                                        </Typography>
+                                                    </Paper>
+                                                    <Paper elevation={2} sx={{ p: 2, minWidth: 180, textAlign: 'center' }}>
+                                                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                            Total P/L
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="h6"
+                                                            sx={{
+                                                                fontWeight: 700,
+                                                                color: totalPL >= 0 ? 'success.main' : 'error.main'
+                                                            }}
+                                                        >
+                                                            ₹{formatCurrency(totalPL)}
+                                                        </Typography>
+                                                    </Paper>
+                                                </Box>
+                                            );
+                                        })()}
                                         <TableContainer>
                                             <Table>
                                                 <TableHead>
