@@ -31,7 +31,7 @@ export const getOpenStrategies = async () => {
     }
 };
 
-export const getStrategies = async (filter) => {
+export const getStrategies = async (filter = {}) => {
     try {
         // Format date parameters if they exist
         const formattedFilter = {

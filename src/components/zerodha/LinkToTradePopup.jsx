@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getStockTrades, addNewStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade, updateStockTrade } from '../../services/trades';
 import { addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders } from '../../services/orders';
 import moment from 'moment';
+import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
 
 function isOptionOrFuture(order) {
     // Check if it's from NFO exchange
@@ -59,6 +60,8 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
     const [creating, setCreating] = useState(false);
     const [lotSize, setLotSize] = useState('');
     const [lotSizeError, setLotSizeError] = useState('');
+    const [showAssignStrategy, setShowAssignStrategy] = useState(false);
+    const [newlyCreatedTrade, setNewlyCreatedTrade] = useState(null);
 
     useEffect(() => {
         if (open && zerodhaOrder) {
@@ -131,46 +134,57 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                 await addOptionOrder(orderPayload);
                 // Fetch all orders for the trade
                 const allorders = await getTradeOptionOrders(selectedTradeId);
+                // Get the selected trade's tradetype from openTrades
+                const selectedTrade = openTrades.find(t => t.tradeid === selectedTradeId);
+                let tradeType = selectedTrade?.tradetype || 'LONG';
                 // Recalculate trade fields
                 let entryorderquantity = 0;
                 let exitorderquantity = 0;
                 let entryavgprice = 0;
                 let exitavgprice = 0;
-                let tradeType = allorders[0]?.tradetype || 'LONG';
                 allorders.forEach(order => {
-                    if (tradeType.toUpperCase() === "LONG" && order.ordertype.toUpperCase() === "BUY") {
-                        let newentryquantity = entryorderquantity + Number(order.quantity);
-                        let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
-                        entryavgprice = newentryavgprice
-                        entryorderquantity = newentryquantity
-                    } else if (tradeType.toUpperCase() === "LONG" && order.ordertype.toUpperCase() === "SELL") {
-                        let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                        let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
-                        exitavgprice = newexitavgprice
-                        exitorderquantity = newexitavgquantity
-                    }
-                    else if (tradeType.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "BUY") {
-                        let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                        let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
-                        exitavgprice = newexitavgprice
-                        exitorderquantity = newexitavgquantity
-                    }
-                    else if (tradeType.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "SELL") {
-                        let newentryquantity = entryorderquantity + Number(order.quantity);
-                        let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
-                        entryavgprice = newentryavgprice
-                        entryorderquantity = newentryquantity
+                    if (tradeType.toUpperCase() === "LONG") {
+                        if (order.ordertype.toUpperCase() === "BUY") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "SELL") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    } else if (tradeType.toUpperCase() === "SHORT") {
+                        if (order.ordertype.toUpperCase() === "SELL") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "BUY") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
                     }
                 });
                 const contracts = entryorderquantity * lotSize;
-                const opencontracts = (entryorderquantity - exitorderquantity) * lotSize;
+                const opencontracts = Math.max(entryorderquantity - exitorderquantity, 0) * lotSize;
                 const closedcontracts = exitorderquantity * lotSize;
                 const status = (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN";
                 const entrydate = allorders[0]?.date;
                 const exitdate = (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1]?.date : '';
                 const finalexitprice = (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : "0";
-                const capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat(((entryorderquantity * entryavgprice) * lotSize) - ((exitorderquantity * exitavgprice) * lotSize)).toFixed(2) : 0;
-                const overallreturn = parseFloat((tradeType.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice * lotSize) - (exitorderquantity * entryavgprice * lotSize) : (exitorderquantity * entryavgprice * lotSize) - (exitorderquantity * exitavgprice * lotSize))).toFixed(2);
+                let capitalused = 0;
+                let overallreturn = 0;
+                if (tradeType.toUpperCase() === "LONG") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * exitavgprice * lotSize) - (exitorderquantity * entryavgprice * lotSize)).toFixed(2);
+                } else if (tradeType.toUpperCase() === "SHORT") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * entryavgprice * lotSize) - (exitorderquantity * exitavgprice * lotSize)).toFixed(2);
+                }
                 const lastmodifieddate = moment().format('YYYY-MM-DD');
                 // Update the trade
                 await updateOptionTrade({
@@ -203,45 +217,56 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                 await addStockOrder(orderPayload);
                 // Fetch all orders for the trade
                 const allorders = await getTradeStockOrders(selectedTradeId);
+                // Get the selected trade's tradetype from openTrades
+                const selectedTrade = openTrades.find(t => t.tradeid === selectedTradeId);
+                let tradeType = selectedTrade?.tradetype || 'LONG';
                 // Recalculate trade fields
                 let entryorderquantity = 0;
                 let exitorderquantity = 0;
                 let entryavgprice = 0;
                 let exitavgprice = 0;
-                let tradeType = allorders[0]?.tradetype || 'LONG';
                 allorders.forEach(order => {
-                    if (tradeType.toUpperCase() === "LONG" && order.ordertype.toUpperCase() === "BUY") {
-                        let newentryquantity = entryorderquantity + Number(order.quantity);
-                        let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
-                        entryavgprice = newentryavgprice
-                        entryorderquantity = newentryquantity
-                    } else if (tradeType.toUpperCase() === "LONG" && order.ordertype.toUpperCase() === "SELL") {
-                        let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                        let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
-                        exitavgprice = newexitavgprice
-                        exitorderquantity = newexitavgquantity
-                    }
-                    else if (tradeType.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "BUY") {
-                        let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                        let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
-                        exitavgprice = newexitavgprice
-                        exitorderquantity = newexitavgquantity
-                    }
-                    else if (tradeType.toUpperCase() === "SHORT" && order.ordertype.toUpperCase() === "SELL") {
-                        let newentryquantity = entryorderquantity + Number(order.quantity);
-                        let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
-                        entryavgprice = newentryavgprice
-                        entryorderquantity = newentryquantity
+                    if (tradeType.toUpperCase() === "LONG") {
+                        if (order.ordertype.toUpperCase() === "BUY") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "SELL") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    } else if (tradeType.toUpperCase() === "SHORT") {
+                        if (order.ordertype.toUpperCase() === "SELL") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "BUY") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
                     }
                 });
-                const openquantity = entryorderquantity - exitorderquantity;
+                const openquantity = Math.max(entryorderquantity - exitorderquantity, 0);
                 const closedquantity = exitorderquantity;
                 const status = (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN";
                 const entrydate = allorders[0]?.date;
                 const exitdate = (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1]?.date : '';
                 const finalexitprice = (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : "0";
-                const capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
-                const overallreturn = parseFloat((tradeType.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice) : (exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice))).toFixed(2);
+                let capitalused = 0;
+                let overallreturn = 0;
+                if (tradeType.toUpperCase() === "LONG") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice)).toFixed(2);
+                } else if (tradeType.toUpperCase() === "SHORT") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2);
+                }
                 const lastmodifieddate = getFormattedDate(zerodhaOrder.order_timestamp);
                 // Update the trade
                 await updateStockTrade({
@@ -280,6 +305,7 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
         try {
             const lots = lotSize > 0 ? Math.floor(zerodhaOrder.quantity / lotSize) : zerodhaOrder.quantity;
             const newTradeId = uuidv4();
+            let tradePayload;
             if (isOption) {
                 // Option/Future order
                 const strikeprize = extractStrikePrice(zerodhaOrder);
@@ -295,24 +321,79 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     lotsize: lotSize
                 };
                 await addOptionOrder(orderPayload);
-                // Now create the trade
-                const contracts = lots * lotSize;
+                // Fetch all orders for the trade (should be just one, but keeps logic consistent)
+                const allorders = await getTradeOptionOrders(newTradeId);
+                // Recalculate trade fields (same as update logic)
+                let entryorderquantity = 0;
+                let exitorderquantity = 0;
+                let entryavgprice = 0;
+                let exitavgprice = 0;
+                let tradeType = orderPayload.ordertype === 'BUY' ? 'LONG' : 'SHORT';
+                allorders.forEach(order => {
+                    if (tradeType.toUpperCase() === "LONG") {
+                        if (order.ordertype.toUpperCase() === "BUY") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "SELL") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    } else if (tradeType.toUpperCase() === "SHORT") {
+                        if (order.ordertype.toUpperCase() === "SELL") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "BUY") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    }
+                });
+                const contracts = entryorderquantity * lotSize;
+                const opencontracts = Math.max(entryorderquantity - exitorderquantity, 0) * lotSize;
+                const closedcontracts = exitorderquantity * lotSize;
+                const status = (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN";
+                const entrydate = allorders[0]?.date;
+                const exitdate = (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1]?.date : '';
+                const finalexitprice = (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : "0";
+                let capitalused = 0;
+                let overallreturn = 0;
+                if (tradeType.toUpperCase() === "LONG") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * exitavgprice * lotSize) - (exitorderquantity * entryavgprice * lotSize)).toFixed(2);
+                } else if (tradeType.toUpperCase() === "SHORT") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * entryavgprice * lotSize) - (exitorderquantity * exitavgprice * lotSize)).toFixed(2);
+                }
                 const lastModifiedDate = moment(zerodhaOrder.order_timestamp).format('YYYY-MM-DD');
-                const tradePayload = {
+                tradePayload = {
                     tradeid: newTradeId,
                     asset: zerodhaOrder.tradingsymbol,
-                    tradetype: zerodhaOrder.transaction_type === 'BUY' ? 'LONG' : 'SHORT',
+                    tradetype: tradeType,
                     quantity: contracts,
-                    entryprice: zerodhaOrder.price,
-                    entrydate: getFormattedDate(zerodhaOrder.order_timestamp),
-                    openquantity: contracts,
-                    status: 'OPEN',
+                    entryprice: parseFloat(entryavgprice).toFixed(2),
+                    entrydate,
+                    openquantity: opencontracts,
+                    closedquantity: closedcontracts,
+                    exitaverageprice: parseFloat(exitavgprice).toFixed(2),
+                    status,
                     notes: 'Created from Zerodha order',
                     tags: 'zerodha',
                     ltp: zerodhaOrder.price,
                     lotsize: lotSize,
                     strikeprize: strikeprize,
-                    lastmodifieddate: lastModifiedDate
+                    finalexitprice,
+                    capitalused,
+                    overallreturn,
+                    lastmodifieddate: lastModifiedDate,
+                    exitdate
                 };
                 await addNewOptionTrade(tradePayload);
             } else {
@@ -328,25 +409,84 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     tags: `zerodha,${zerodhaOrder.order_id}`,
                 };
                 await addStockOrder(orderPayload);
-                // Now create the trade
-                const tradePayload = {
+                // Fetch all orders for the trade (should be just one, but keeps logic consistent)
+                const allorders = await getTradeStockOrders(newTradeId);
+                // Recalculate trade fields (same as update logic)
+                let entryorderquantity = 0;
+                let exitorderquantity = 0;
+                let entryavgprice = 0;
+                let exitavgprice = 0;
+                let tradeType = orderPayload.ordertype === 'BUY' ? 'LONG' : 'SHORT';
+                allorders.forEach(order => {
+                    if (tradeType.toUpperCase() === "LONG") {
+                        if (order.ordertype.toUpperCase() === "BUY") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "SELL") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    } else if (tradeType.toUpperCase() === "SHORT") {
+                        if (order.ordertype.toUpperCase() === "SELL") {
+                            let newentryquantity = entryorderquantity + Number(order.quantity);
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            entryavgprice = newentryavgprice
+                            entryorderquantity = newentryquantity
+                        } else if (order.ordertype.toUpperCase() === "BUY") {
+                            let newexitavgquantity = exitorderquantity + Number(order.quantity);
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            exitavgprice = newexitavgprice
+                            exitorderquantity = newexitavgquantity
+                        }
+                    }
+                });
+                const openquantity = Math.max(entryorderquantity - exitorderquantity, 0);
+                const closedquantity = exitorderquantity;
+                const status = (entryorderquantity - exitorderquantity === 0) ? "CLOSED" : "OPEN";
+                const entrydate = allorders[0]?.date;
+                const exitdate = (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1]?.date : '';
+                const finalexitprice = (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : "0";
+                let capitalused = 0;
+                let overallreturn = 0;
+                if (tradeType.toUpperCase() === "LONG") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice)).toFixed(2);
+                } else if (tradeType.toUpperCase() === "SHORT") {
+                    capitalused = (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0;
+                    overallreturn = parseFloat((exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2);
+                }
+                const lastModifiedDate = getFormattedDate(zerodhaOrder.order_timestamp);
+                tradePayload = {
                     tradeid: newTradeId,
                     asset: zerodhaOrder.tradingsymbol,
-                    tradetype: zerodhaOrder.transaction_type === 'BUY' ? 'LONG' : 'SHORT',
-                    quantity: zerodhaOrder.quantity,
-                    entryprice: zerodhaOrder.price,
-                    entrydate: getFormattedDate(zerodhaOrder.order_timestamp),
-                    openquantity: zerodhaOrder.quantity,
-                    status: 'OPEN',
+                    tradetype: tradeType,
+                    quantity: entryorderquantity,
+                    entryprice: parseFloat(entryavgprice).toFixed(2),
+                    entrydate,
+                    openquantity,
+                    closedquantity,
+                    exitaverageprice: parseFloat(exitavgprice).toFixed(2),
+                    status,
                     notes: 'Created from Zerodha order',
                     tags: 'zerodha',
                     ltp: zerodhaOrder.price,
-                    lastmodifieddate: getFormattedDate(zerodhaOrder.order_timestamp)
+                    finalexitprice,
+                    capitalused,
+                    overallreturn,
+                    lastmodifieddate: lastModifiedDate,
+                    exitdate
                 };
                 await addNewStockTrade(tradePayload);
             }
-            if (onSuccess) onSuccess();
-            onClose();
+            setNewlyCreatedTrade(tradePayload);
+            setShowAssignStrategy(true);
+            setCreating(false);
+            // Do not call onSuccess/onClose yet; wait for strategy assignment popup
+            return;
         } catch (err) {
             setError('Failed to create new trade and link order.');
         } finally {
@@ -355,100 +495,254 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: 22, pb: 1 }}>Link Zerodha Order to Trade</DialogTitle>
-            <DialogContent>
-                <Card variant="outlined" sx={{ mb: 3, bgcolor: '#f8fafc', borderRadius: 2 }}>
-                    <CardContent>
-                        <Typography variant="subtitle2" color="primary" gutterBottom>Order Summary</Typography>
-                        <Box mb={1}>
-                            <Typography variant="body2"><b>Symbol:</b> {zerodhaOrder.tradingsymbol}</Typography>
-                            <Typography variant="body2"><b>Type:</b> {zerodhaOrder.transaction_type}</Typography>
-                            <Typography variant="body2"><b>Quantity:</b> {zerodhaOrder.quantity}</Typography>
-                            <Typography variant="body2"><b>Price:</b> {zerodhaOrder.price}</Typography>
-                            <Typography variant="body2"><b>Time:</b> {getFormattedDate(zerodhaOrder.order_timestamp)}</Typography>
-                            {isOption && (
-                                <TextField
-                                    label="Lot Size"
-                                    type="number"
-                                    value={lotSize}
-                                    onChange={e => setLotSize(e.target.value.replace(/[^\d]/g, ''))}
-                                    sx={{ mt: 2, width: 150 }}
-                                    inputProps={{ min: 1 }}
-                                    size="small"
-                                    error={!!lotSizeError}
-                                    helperText={lotSizeError}
-                                />
-                            )}
+        <>
+            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 2,
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    fontWeight: 700,
+                    fontSize: 22,
+                    pb: 1,
+                    borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+                    backgroundColor: '#f8fafc'
+                }}>
+                    Link Zerodha Order to Trade
+                </DialogTitle>
+                <DialogContent sx={{ p: 3 }}>
+                    <Box sx={{ height: 20 }} />
+                    <Card variant="outlined" sx={{
+                        mb: 3,
+                        bgcolor: '#f8fafc',
+                        borderRadius: 2,
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                        border: '1px solid rgba(0, 0, 0, 0.08)'
+                    }}>
+                        <CardContent>
+                            <Typography variant="subtitle2" color="primary" gutterBottom sx={{
+                                fontWeight: 600,
+                                fontSize: 16,
+                                mb: 2
+                            }}>
+                                Order Summary
+                            </Typography>
+                            <Box sx={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: 2
+                            }}>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Symbol</Typography>
+                                    <Typography variant="body1" fontWeight={500}>{zerodhaOrder.tradingsymbol}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Type</Typography>
+                                    <Typography variant="body1" fontWeight={500} color={zerodhaOrder.transaction_type === 'BUY' ? 'success.main' : 'error.main'}>
+                                        {zerodhaOrder.transaction_type}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Quantity</Typography>
+                                    <Typography variant="body1" fontWeight={500}>{zerodhaOrder.quantity}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Price</Typography>
+                                    <Typography variant="body1" fontWeight={500}>₹{zerodhaOrder.price}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Time</Typography>
+                                    <Typography variant="body1" fontWeight={500}>{getFormattedDate(zerodhaOrder.order_timestamp)}</Typography>
+                                </Box>
+                                {isOption && (
+                                    <Box>
+                                        <Typography variant="body2" color="text.secondary">Lot Size</Typography>
+                                        <TextField
+                                            type="number"
+                                            value={lotSize}
+                                            onChange={e => setLotSize(e.target.value.replace(/[^\d]/g, ''))}
+                                            sx={{ mt: 0.5 }}
+                                            inputProps={{ min: 1 }}
+                                            size="small"
+                                            error={!!lotSizeError}
+                                            helperText={lotSizeError}
+                                            fullWidth
+                                        />
+                                    </Box>
+                                )}
+                            </Box>
+                        </CardContent>
+                    </Card>
+
+                    {loading ? (
+                        <Box display="flex" justifyContent="center" py={3}>
+                            <CircularProgress size={40} />
                         </Box>
-                    </CardContent>
-                </Card>
-                <Divider sx={{ mb: 2 }} />
-                {loading ? <Box display="flex" justifyContent="center" py={3}><CircularProgress /></Box> : (
-                    <>
-                        {openTrades.length > 0 ? (
-                            <>
-                                <Typography variant="subtitle2" color="primary" sx={{ mb: 1 }}>Select an open trade to link:</Typography>
-                                <List sx={{ bgcolor: '#f5f7fa', borderRadius: 2, mb: 2 }}>
-                                    {openTrades.map(trade => (
-                                        <ListItem
-                                            key={trade.tradeid}
-                                            sx={{
-                                                border: selectedTradeId === trade.tradeid ? '2px solid #1976d2' : '1px solid #e0e0e0',
-                                                borderRadius: 2,
-                                                mb: 1,
-                                                bgcolor: selectedTradeId === trade.tradeid ? '#e3f2fd' : 'inherit',
-                                                transition: 'all 0.2s',
-                                                cursor: 'pointer'
-                                            }}
-                                            onClick={() => setSelectedTradeId(trade.tradeid)}
-                                        >
-                                            <ListItemAvatar>
-                                                <Avatar sx={{ bgcolor: '#1976d2', color: 'white', fontWeight: 700 }}>{trade.asset[0]}</Avatar>
-                                            </ListItemAvatar>
-                                            <ListItemText
-                                                primary={<Typography variant="subtitle1" fontWeight={600} component="span">{trade.asset}</Typography>}
-                                                secondary={<Typography variant="body2" color="text.secondary" component="span">Type: {trade.tradetype}, Qty: {trade.quantity}, Entry: {trade.entryprice}</Typography>}
-                                            />
-                                            <Radio
-                                                checked={selectedTradeId === trade.tradeid}
-                                                onChange={() => setSelectedTradeId(trade.tradeid)}
-                                                value={trade.tradeid}
-                                                color="primary"
-                                            />
-                                        </ListItem>
-                                    ))}
-                                </List>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={handleLink}
-                                    disabled={!selectedTradeId || linking}
-                                    sx={{ mt: 1, width: '100%', py: 1.2, fontWeight: 600, fontSize: 16 }}
-                                >
-                                    {linking ? 'Linking...' : 'Link to Selected Trade'}
-                                </Button>
-                            </>
-                        ) : (
-                            <Alert severity="info" sx={{ mb: 2 }}>No open trades found for this asset.</Alert>
-                        )}
-                        <Button
-                            variant="contained"
-                            color="secondary"
-                            onClick={handleCreateNewTrade}
-                            disabled={creating}
-                            sx={{ mt: 2, width: '100%', py: 1.2, fontWeight: 600, fontSize: 16 }}
-                        >
-                            {creating ? 'Creating...' : 'Create New Trade'}
-                        </Button>
-                    </>
-                )}
-                {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-            </DialogContent>
-            <DialogActions sx={{ justifyContent: 'flex-end', px: 3, pb: 2 }}>
-                <Button onClick={onClose} variant="outlined" color="primary">Cancel</Button>
-            </DialogActions>
-        </Dialog>
+                    ) : (
+                        <>
+                            {openTrades.length > 0 ? (
+                                <>
+                                    <Typography variant="subtitle2" color="primary" sx={{
+                                        mb: 2,
+                                        fontWeight: 600,
+                                        fontSize: 16
+                                    }}>
+                                        Select an open trade to link:
+                                    </Typography>
+                                    <List sx={{
+                                        bgcolor: '#f5f7fa',
+                                        borderRadius: 2,
+                                        mb: 2,
+                                        p: 1
+                                    }}>
+                                        {openTrades.map(trade => (
+                                            <ListItem
+                                                key={trade.tradeid}
+                                                sx={{
+                                                    border: selectedTradeId === trade.tradeid ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                                                    borderRadius: 2,
+                                                    mb: 1,
+                                                    bgcolor: selectedTradeId === trade.tradeid ? '#e3f2fd' : 'inherit',
+                                                    transition: 'all 0.2s',
+                                                    cursor: 'pointer',
+                                                    '&:hover': {
+                                                        bgcolor: selectedTradeId === trade.tradeid ? '#e3f2fd' : '#f8fafc',
+                                                        borderColor: '#1976d2'
+                                                    }
+                                                }}
+                                                onClick={() => setSelectedTradeId(trade.tradeid)}
+                                            >
+                                                <ListItemAvatar>
+                                                    <Avatar sx={{
+                                                        bgcolor: '#1976d2',
+                                                        color: 'white',
+                                                        fontWeight: 700,
+                                                        width: 40,
+                                                        height: 40
+                                                    }}>
+                                                        {trade.asset[0]}
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <ListItemText
+                                                    primary={<Typography variant="subtitle1" fontWeight={600} component="span">{trade.asset}</Typography>}
+                                                    secondary={<Typography variant="body2" color="text.secondary" component="span">
+                                                        Type: {trade.tradetype}, Qty: {trade.quantity}, Entry: ₹{trade.entryprice}
+                                                    </Typography>}
+                                                />
+                                                <Radio
+                                                    checked={selectedTradeId === trade.tradeid}
+                                                    onChange={() => setSelectedTradeId(trade.tradeid)}
+                                                    value={trade.tradeid}
+                                                    color="primary"
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={handleLink}
+                                        disabled={!selectedTradeId || linking}
+                                        sx={{
+                                            mt: 1,
+                                            width: '100%',
+                                            py: 1.2,
+                                            fontWeight: 600,
+                                            fontSize: 16,
+                                            textTransform: 'none',
+                                            borderRadius: 2
+                                        }}
+                                    >
+                                        {linking ? 'Linking...' : 'Link to Selected Trade'}
+                                    </Button>
+                                </>
+                            ) : (
+                                <Alert severity="info" sx={{
+                                    mb: 2,
+                                    borderRadius: 2,
+                                    '& .MuiAlert-icon': {
+                                        color: 'info.main'
+                                    }
+                                }}>
+                                    No open trades found for this asset.
+                                </Alert>
+                            )}
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                onClick={handleCreateNewTrade}
+                                disabled={creating}
+                                sx={{
+                                    mt: 2,
+                                    width: '100%',
+                                    py: 1.2,
+                                    fontWeight: 600,
+                                    fontSize: 16,
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    bgcolor: 'secondary.main',
+                                    '&:hover': {
+                                        bgcolor: 'secondary.dark'
+                                    }
+                                }}
+                            >
+                                {creating ? 'Creating...' : 'Create New Trade'}
+                            </Button>
+                        </>
+                    )}
+                    {error && (
+                        <Alert severity="error" sx={{
+                            mt: 2,
+                            borderRadius: 2
+                        }}>
+                            {error}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{
+                    justifyContent: 'flex-end',
+                    px: 3,
+                    pb: 2,
+                    borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+                    backgroundColor: '#f8fafc'
+                }}>
+                    <Button
+                        onClick={onClose}
+                        variant="outlined"
+                        color="primary"
+                        sx={{
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            fontWeight: 500
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {showAssignStrategy && newlyCreatedTrade && (
+                <AssignTradesToStrategy
+                    title="Assign New Trade to Strategy"
+                    tradeDetails={[newlyCreatedTrade]}
+                    open={showAssignStrategy}
+                    onSubmit={() => {
+                        setShowAssignStrategy(false);
+                        setNewlyCreatedTrade(null);
+                        if (onSuccess) onSuccess();
+                        if (onClose) onClose();
+                    }}
+                    onClose={() => {
+                        setShowAssignStrategy(false);
+                        setNewlyCreatedTrade(null);
+                        if (onSuccess) onSuccess();
+                        if (onClose) onClose();
+                    }}
+                />
+            )}
+        </>
     );
 }
 
