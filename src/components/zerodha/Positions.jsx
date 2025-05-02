@@ -313,22 +313,20 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 }}
             >
                 <StyledTableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {position.tradingsymbol}
-                        {isClosed && (
-                            <Chip
-                                label="Closed"
-                                size="small"
-                                sx={{
-                                    height: '20px',
-                                    fontSize: '0.75rem',
-                                    bgcolor: 'grey.200',
-                                    color: 'text.secondary',
-                                    '& .MuiChip-label': { px: 1 }
-                                }}
-                            />
-                        )}
-                    </Box>
+                    {position.tradingsymbol}
+                    {isClosed && (
+                        <Chip
+                            label="Closed"
+                            size="small"
+                            sx={{
+                                height: '20px',
+                                fontSize: '0.75rem',
+                                bgcolor: 'grey.200',
+                                color: 'text.secondary',
+                                '& .MuiChip-label': { px: 1 }
+                            }}
+                        />
+                    )}
                 </StyledTableCell>
                 <StyledTableCell>
                     <Chip
