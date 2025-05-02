@@ -18,8 +18,8 @@ const isMarketHours = () => {
     const minutes = now.getMinutes();
     const currentTime = hours * 100 + minutes;
 
-    // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 3:30 PM
-    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
+    // Check if it's a weekday (Monday-Friday) and between 9:15 AM and 3:30 PM
+    return day !== 0 && day !== 6 && currentTime >= 915 && currentTime <= 1530;
 };
 
 export const useZerodha = () => {
@@ -36,6 +36,11 @@ export const ZerodhaProvider = ({ children }) => {
     const [accountInfo, setAccountInfo] = useState(null);
     const [lastChecked, setLastChecked] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [loadingStates, setLoadingStates] = useState({
+        holdings: false,
+        positions: false,
+        orders: false
+    });
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -75,45 +80,14 @@ export const ZerodhaProvider = ({ children }) => {
         }
 
         try {
-            const response = await makeApiCallWithRetry(
-                () => getAccountInfo(),
-                'Failed to check session'
-            );
-
-            const currentSessionState = Boolean(sessionActive);
-            console.log('Session check response:', {
-                success: response?.success,
-                hasData: !!response?.data,
-                currentSessionActive: currentSessionState,
-                responseData: response?.data
-            });
-
-            if (!response || !response.success) {
-                console.log('Setting session to inactive due to invalid response');
-                if (isMounted.current) {
-                    setSessionActive(false);
-                    setIsAuth(false);
-                }
-                return false;
-            }
-
-            // If we have a successful response with data, consider the session valid
-            const isValid = Boolean(response.success && response.data);
-            console.log('Session validity check:', {
-                isValid,
-                success: response.success,
-                hasData: !!response.data
-            });
+            // Instead of calling account API, just check if we have a valid token
+            const token = localStorage.getItem('zerodha_access_token');
+            const isValid = Boolean(token);
 
             if (isMounted.current) {
-                console.log('Updating session state:', {
-                    newSessionActive: isValid,
-                    previousSessionActive: currentSessionState
-                });
                 setSessionActive(isValid);
                 setLastChecked(now);
-                setAccountInfo(response.data);
-                setIsAuth(true);
+                setIsAuth(isValid);
             }
             return isValid;
         } catch (err) {
@@ -136,21 +110,56 @@ export const ZerodhaProvider = ({ children }) => {
         }
 
         try {
-            setLoading(true);
+            if (force) {
+                setLoading(true);
+            }
             setError(null);
 
             // Only fetch if we have a valid session
             if (await checkSession()) {
-                const [holdingsRes, positionsRes, ordersRes] = await Promise.all([
-                    makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings'),
-                    makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions'),
-                    makeApiCallWithRetry(() => getOrders(), 'Failed to fetch orders')
-                ]);
+                // If force is true, also fetch account info
+                if (force) {
+                    try {
+                        const accountRes = await makeApiCallWithRetry(() => getAccountInfo(), 'Failed to fetch account info');
+                        if (accountRes && accountRes.success) {
+                            setAccountInfo(accountRes.data);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching account info:', err);
+                    }
+                }
 
-                if (isMounted.current) {
-                    if (holdingsRes) setHoldings(holdingsRes.data || []);
-                    if (positionsRes) setPositions(positionsRes.data || []);
-                    if (ordersRes) setOrders(ordersRes.data || []);
+                // Set individual loading states
+                setLoadingStates(prev => ({
+                    holdings: true,
+                    positions: true,
+                    orders: false
+                }));
+
+                try {
+                    const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
+                    if (holdingsRes && isMounted.current) {
+                        setHoldings(holdingsRes.data || []);
+                    }
+                } catch (err) {
+                    console.error('Error fetching holdings:', err);
+                } finally {
+                    if (isMounted.current) {
+                        setLoadingStates(prev => ({ ...prev, holdings: false }));
+                    }
+                }
+
+                try {
+                    const positionsRes = await makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions');
+                    if (positionsRes && isMounted.current) {
+                        setPositions(positionsRes.data || []);
+                    }
+                } catch (err) {
+                    console.error('Error fetching positions:', err);
+                } finally {
+                    if (isMounted.current) {
+                        setLoadingStates(prev => ({ ...prev, positions: false }));
+                    }
                 }
             }
 
@@ -161,11 +170,30 @@ export const ZerodhaProvider = ({ children }) => {
                 setError(err.message);
             }
         } finally {
-            if (isMounted.current) {
+            if (isMounted.current && force) {
                 setLoading(false);
             }
         }
     }, [checkSession]);
+
+    // Fetch orders separately
+    const fetchOrders = useCallback(async () => {
+        if (!isMounted.current) return;
+
+        try {
+            setLoadingStates(prev => ({ ...prev, orders: true }));
+            const ordersRes = await makeApiCallWithRetry(() => getOrders(), 'Failed to fetch orders');
+            if (ordersRes && isMounted.current) {
+                setOrders(ordersRes.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching orders:', err);
+        } finally {
+            if (isMounted.current) {
+                setLoadingStates(prev => ({ ...prev, orders: false }));
+            }
+        }
+    }, []);
 
     // Initial setup effect
     useEffect(() => {
@@ -183,6 +211,16 @@ export const ZerodhaProvider = ({ children }) => {
                 console.log('Initial session check result:', isSessionValid);
 
                 if (isSessionValid && isMounted.current) {
+                    // Fetch account info only during initial load
+                    try {
+                        const accountRes = await makeApiCallWithRetry(() => getAccountInfo(), 'Failed to fetch account info');
+                        if (accountRes && accountRes.success) {
+                            setAccountInfo(accountRes.data);
+                        }
+                    } catch (err) {
+                        console.error('Error fetching account info:', err);
+                    }
+
                     await fetchData(true);
                     setIsAutoSync(isMarketHours());
                     isInitialLoadDone.current = true;
@@ -200,7 +238,7 @@ export const ZerodhaProvider = ({ children }) => {
         };
     }, []);
 
-    // Auto-sync effect
+    // Auto-sync effect - only fetch holdings and positions
     useEffect(() => {
         if (!isAutoSync || !isMarketHours()) return;
 
@@ -212,6 +250,25 @@ export const ZerodhaProvider = ({ children }) => {
         const intervalId = setInterval(syncData, AUTO_SYNC_INTERVAL);
         return () => clearInterval(intervalId);
     }, [isAutoSync, fetchData]);
+
+    // Market hours check effect
+    useEffect(() => {
+        if (!sessionActive) return;
+
+        const checkMarketHours = () => {
+            const shouldAutoSync = isMarketHours();
+            if (shouldAutoSync !== isAutoSync) {
+                setIsAutoSync(shouldAutoSync);
+            }
+        };
+
+        // Check immediately
+        checkMarketHours();
+
+        // Check every minute
+        const intervalId = setInterval(checkMarketHours, 60000);
+        return () => clearInterval(intervalId);
+    }, [sessionActive, isAutoSync]);
 
     const handleLogout = useCallback(async () => {
         try {
@@ -242,9 +299,11 @@ export const ZerodhaProvider = ({ children }) => {
         sessionActive: Boolean(sessionActive),
         accountInfo,
         loading,
+        loadingStates,
         error,
         checkSession,
         fetchData,
+        fetchOrders,
         handleLogout,
         isAutoSync,
         setIsAutoSync,

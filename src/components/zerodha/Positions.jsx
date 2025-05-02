@@ -24,7 +24,9 @@ import {
     Grow,
     FormControl,
     InputLabel,
-    Select
+    Select,
+    LinearProgress,
+    Skeleton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
@@ -581,7 +583,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 };
 
 const Positions = () => {
-    const { positions, loading, error } = useZerodha();
+    const { positions, loadingStates } = useZerodha();
+    const isLoading = loadingStates.positions;
 
     // Keep track of whether dialog was manually closed
     const wasManuallyClosed = React.useRef(false);
@@ -850,62 +853,26 @@ const Positions = () => {
         return groups;
     }, [dayPositions, netPositions]);
 
-    if (loading) {
+    if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-                <CircularProgress />
+            <Box>
+                <Box sx={{ width: '100%', mb: 2 }}>
+                    <LinearProgress />
+                </Box>
+                {[1, 2, 3].map((i) => (
+                    <Box key={i} sx={{ mb: 1 }}>
+                        <Skeleton variant="rectangular" height={40} />
+                    </Box>
+                ))}
             </Box>
         );
     }
 
-    if (error) {
+    if (!positions || !positions.net || positions.net.length === 0) {
         return (
-            <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-            </Alert>
-        );
-    }
-
-    // Add debug logging for positions data
-    console.log('Positions component render:', {
-        hasPositions: !!positions,
-        dayLength: positions?.day?.length,
-        netLength: positions?.net?.length,
-        loading,
-        error
-    });
-
-    if (!positions || (!positions.day?.length && !positions.net?.length)) {
-        return (
-            <Box
-                sx={{
-                    textAlign: 'center',
-                    py: 8,
-                    bgcolor: 'background.paper',
-                    borderRadius: 1,
-                    border: '1px dashed',
-                    borderColor: 'divider'
-                }}
-            >
-                <Typography
-                    variant="h6"
-                    sx={{
-                        color: 'text.secondary',
-                        fontWeight: 500,
-                        mb: 1
-                    }}
-                >
-                    No Positions
-                </Typography>
-                <Typography
-                    variant="body2"
-                    sx={{
-                        color: 'text.secondary'
-                    }}
-                >
-                    You don't have any open or closed positions for today.
-                </Typography>
-            </Box>
+            <Typography variant="body1" color="text.secondary" align="center" py={4}>
+                No positions found
+            </Typography>
         );
     }
 

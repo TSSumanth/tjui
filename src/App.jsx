@@ -5,6 +5,7 @@ import Header from './components/Header/Header';
 import Home from './pages/Home';
 import ZerodhaAccount from './pages/ZerodhaAccount';
 import Portfolio from './pages/Portfolio';
+import ZerodhaOrders from './pages/ZerodhaOrders';
 import MarketAnalysis from './pages/MarketAnalysis';
 import Trades from './pages/Trades';
 import Report from './pages/ProfitLossReport';
@@ -27,6 +28,7 @@ function App() {
                     <Route path="/zerodha/login" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/account" element={<ZerodhaAccount />} />
                     <Route path="/zerodha/portfolio" element={<Portfolio />} />
+                    <Route path="/zerodha/orders" element={<ZerodhaOrders />} />
                     <Route path="/zerodha/trading-instruments" element={<TradingInstrumentsPage />} />
                     <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
                     <Route path="/marketanalysis" element={<MarketAnalysis />} />

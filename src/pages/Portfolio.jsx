@@ -3,7 +3,6 @@ import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switc
 import { useZerodha } from '../context/ZerodhaContext';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
-import Orders from '../components/zerodha/Orders';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -449,13 +448,11 @@ const Portfolio = () => {
                         >
                             <Tab label="Holdings" id="portfolio-tab-0" aria-controls="portfolio-tabpanel-0" />
                             <Tab label="Positions" id="portfolio-tab-1" aria-controls="portfolio-tabpanel-1" />
-                            <Tab label="Orders" id="portfolio-tab-2" aria-controls="portfolio-tabpanel-2" />
                         </Tabs>
                     </Box>
                     <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: '300px' }}>
                         {activeTab === 0 && <Holdings />}
                         {activeTab === 1 && <Positions />}
-                        {activeTab === 2 && <Orders />}
                     </Box>
                 </Paper>
             </Container>

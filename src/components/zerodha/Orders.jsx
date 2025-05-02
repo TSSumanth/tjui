@@ -20,12 +20,15 @@ import {
     DialogContent,
     DialogActions,
     TextField,
-    Button
+    Button,
+    LinearProgress,
+    Skeleton
 } from '@mui/material';
 import { MoreVert } from '@mui/icons-material';
-// import { useZerodha } from '../../context/ZerodhaContext';
+import { useZerodha } from '../../context/ZerodhaContext';
 import moment from 'moment';
 import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../services/zerodha/api';
+import { formatCurrency } from '../../utils/formatters';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -155,30 +158,35 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
 }
 
 function Orders() {
-    // const { orders, loading, error } = useZerodha();
-    const [orders, setOrders] = useState([]); // Use state for refresh
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const { orders, loadingStates } = useZerodha();
+    const isLoading = loadingStates.orders;
     const [modifyDialogOpen, setModifyDialogOpen] = useState(false);
     const [modifyOrder, setModifyOrder] = useState(null);
     const [modifyLoading, setModifyLoading] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
 
-    // Fetch orders on mount/refresh
-    const fetchOrders = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await getOrders();
-            setOrders(Array.isArray(response.data) ? response.data : []);
-        } catch (err) {
-            setError(err.message || 'Failed to fetch orders');
-            setOrders([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-    React.useEffect(() => { fetchOrders(); }, []);
+    if (isLoading) {
+        return (
+            <Box>
+                <Box sx={{ width: '100%', mb: 2 }}>
+                    <LinearProgress />
+                </Box>
+                {[1, 2, 3].map((i) => (
+                    <Box key={i} sx={{ mb: 1 }}>
+                        <Skeleton variant="rectangular" height={40} />
+                    </Box>
+                ))}
+            </Box>
+        );
+    }
+
+    if (!orders || orders.length === 0) {
+        return (
+            <Typography variant="body1" color="text.secondary" align="center" py={4}>
+                No orders found
+            </Typography>
+        );
+    }
 
     // Cancel order handler
     const handleCancelOrder = async (order) => {
@@ -186,7 +194,6 @@ function Orders() {
         setCancelLoading(true);
         try {
             await cancelZerodhaOrder(order.order_id);
-            await fetchOrders();
         } catch (err) {
             alert(err.message || 'Failed to cancel order');
         } finally {
@@ -205,7 +212,6 @@ function Orders() {
             await modifyZerodhaOrder(modifyOrder.order_id, fields);
             setModifyDialogOpen(false);
             setModifyOrder(null);
-            await fetchOrders();
         } catch (err) {
             alert(err.message || 'Failed to modify order');
         } finally {
@@ -227,21 +233,9 @@ function Orders() {
             <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Orders
             </Typography>
-            {loading ? (
-                <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-                    <CircularProgress />
-                </Box>
-            ) : error ? (
-                <Box p={2}>
-                    <Alert severity="error">{error}</Alert>
-                </Box>
-            ) : (
-                <>
-                    <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
-                    <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} />
-                    <OrdersTable orders={cancelledOrders} title="Cancelled Orders" showActions={false} />
-                </>
-            )}
+            <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
+            <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} />
+            <OrdersTable orders={cancelledOrders} title="Cancelled Orders" showActions={false} />
             <ModifyOrderDialog
                 open={modifyDialogOpen}
                 order={modifyOrder}

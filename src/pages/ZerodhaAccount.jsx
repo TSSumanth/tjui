@@ -33,11 +33,20 @@ const ZerodhaAccount = () => {
     const [loading, setLoading] = useState(false);
     const theme = useTheme();
 
+    const handleRefresh = async () => {
+        try {
+            setLoading(true);
+            await fetchData(true);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (sessionActive) {
-            fetchData(true);
+            handleRefresh();
         }
-    }, [sessionActive, fetchData]);
+    }, [sessionActive]);
 
     const handleConnect = async () => {
         try {
@@ -170,9 +179,10 @@ const ZerodhaAccount = () => {
                             <Button
                                 variant="outlined"
                                 startIcon={<RefreshIcon />}
-                                onClick={() => fetchData(true)}
+                                onClick={handleRefresh}
+                                disabled={loading}
                             >
-                                Refresh
+                                {loading ? 'Refreshing...' : 'Refresh'}
                             </Button>
                             <Button
                                 variant="contained"

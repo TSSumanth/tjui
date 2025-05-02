@@ -35,7 +35,7 @@ const SessionStatus = () => {
         if (isAuth) {
             checkSession();
         }
-    }, [isAuth, checkSession]);
+    }, [isAuth]);
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);

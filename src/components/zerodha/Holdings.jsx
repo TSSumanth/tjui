@@ -1,247 +1,104 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
-    Box,
-    Typography,
-    Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
-    CircularProgress,
-    Alert
+    Paper,
+    Typography,
+    Box,
+    LinearProgress,
+    Skeleton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
-import PropTypes from 'prop-types';
+import { formatCurrency } from '../../utils/formatters';
 
 const Holdings = () => {
-    const { holdings, loading, error } = useZerodha();
+    const { holdings, loadingStates } = useZerodha();
+    const isLoading = loadingStates.holdings;
 
-
-    const formatCurrency = (value) => {
-        if (typeof value !== 'number' || isNaN(value)) {
-            return '₹0.00';
-        }
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(value);
-    };
-
-    const formatPercentage = (value) => {
-        if (typeof value !== 'number' || isNaN(value)) {
-            return '0.00%';
-        }
-        return `${value.toFixed(2)}%`;
-    };
-
-    const calculateDayPnL = useMemo(() => (holding) => {
-        try {
-            const lastPrice = Number(holding.last_price) || 0;
-            const closePrice = Number(holding.close_price) || lastPrice;
-            const quantity = Number(holding.quantity) || 0;
-            const dayPnL = (lastPrice - closePrice) * quantity;
-
-            return dayPnL;
-        } catch (error) {
-            console.error('Error calculating day P&L:', error);
-            return 0;
-        }
-    }, []);
-
-    // Calculate total P&L and day P&L
-    useMemo(() => {
-        holdings.reduce((acc, holding) => {
-            const lastPrice = Number(holding.last_price) || 0;
-            const avgPrice = Number(holding.average_price) || 0;
-            const quantity = Number(holding.quantity) || 0;
-            const closePrice = Number(holding.close_price) || lastPrice;
-
-            const pnl = (lastPrice - avgPrice) * quantity;
-            const dayChange = (lastPrice - closePrice) * quantity;
-
-            return {
-                totalPnL: acc.totalPnL + pnl,
-                dayPnL: acc.dayPnL + dayChange
-            };
-        }, { totalPnL: 0, dayPnL: 0 });
-    }, [holdings]);
-
-    if (loading) {
+    if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-                <CircularProgress />
+            <Box>
+                <Box sx={{ width: '100%', mb: 2 }}>
+                    <LinearProgress />
+                </Box>
+                {[1, 2, 3].map((i) => (
+                    <Box key={i} sx={{ mb: 1 }}>
+                        <Skeleton variant="rectangular" height={40} />
+                    </Box>
+                ))}
             </Box>
         );
     }
 
-    if (error) {
+    if (!holdings || holdings.length === 0) {
         return (
-            <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-            </Alert>
-        );
-    }
-
-    if (!holdings?.length) {
-        return (
-            <Box sx={{ textAlign: 'center', py: 3 }}>
-                <Typography variant="h5" component="h2" gutterBottom>
-                    Stock Holdings
-                </Typography>
-                <Typography variant="body1" color="textSecondary" align="center">
-                    No data available. Click Get Holdings to load data.
-                </Typography>
-            </Box>
+            <Typography variant="body1" color="text.secondary" align="center" py={4}>
+                No holdings found
+            </Typography>
         );
     }
 
     return (
-        <Box>
-            <Box sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 3,
-                pb: 2,
-                borderBottom: '1px solid #e0e0e0'
-            }}>
-                <Typography variant="h5" component="h2" sx={{ fontWeight: 500 }}>
-                    Stock Holdings
-                </Typography>
-            </Box>
-            <TableContainer component={Paper} elevation={0}>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Symbol</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Quantity</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Avg. Cost</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>LTP</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Current Value</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day's P&L</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Total P&L</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>Day Change %</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {holdings.map((holding) => {
-                            const dayPnL = calculateDayPnL(holding);
-                            const currentValue = Number(holding.quantity) * Number(holding.last_price);
-                            const dayChangePercentage = Number(holding.day_change_percentage);
+        <TableContainer component={Paper} elevation={0}>
+            <Table>
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Symbol</TableCell>
+                        <TableCell align="right">Quantity</TableCell>
+                        <TableCell align="right">Avg. Cost</TableCell>
+                        <TableCell align="right">LTP</TableCell>
+                        <TableCell align="right">Current Value</TableCell>
+                        <TableCell align="right">P&L</TableCell>
+                        <TableCell align="right">Day Change</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {holdings.map((holding) => {
+                        const quantity = Number(holding.quantity) || 0;
+                        const avgPrice = Number(holding.average_price) || 0;
+                        const lastPrice = Number(holding.last_price) || 0;
+                        const closePrice = Number(holding.close_price) || lastPrice;
+                        const currentValue = quantity * lastPrice;
+                        const investedValue = quantity * avgPrice;
+                        const pnl = currentValue - investedValue;
+                        const pnlPercentage = (pnl / investedValue) * 100;
+                        const dayChange = (lastPrice - closePrice) * quantity;
+                        const dayChangePercentage = ((lastPrice - closePrice) / closePrice) * 100;
 
-                            return (
-                                <TableRow
-                                    key={holding.tradingsymbol}
-                                    sx={{
-                                        backgroundColor: 'white',
-                                        '&:hover': {
-                                            backgroundColor: '#f5f5f5'
-                                        },
-                                        '&:last-child td': {
-                                            borderBottom: 0
-                                        }
-                                    }}
-                                >
-                                    <TableCell
-                                        component="th"
-                                        scope="row"
-                                        sx={{ fontSize: '0.875rem' }}
+                        return (
+                            <TableRow key={holding.tradingsymbol}>
+                                <TableCell component="th" scope="row">
+                                    {holding.tradingsymbol}
+                                </TableCell>
+                                <TableCell align="right">{quantity}</TableCell>
+                                <TableCell align="right">₹{formatCurrency(avgPrice)}</TableCell>
+                                <TableCell align="right">₹{formatCurrency(lastPrice)}</TableCell>
+                                <TableCell align="right">₹{formatCurrency(currentValue)}</TableCell>
+                                <TableCell align="right">
+                                    <Typography
+                                        color={pnl >= 0 ? 'success.main' : 'error.main'}
                                     >
-                                        {holding.tradingsymbol}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
+                                        ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
+                                    </Typography>
+                                </TableCell>
+                                <TableCell align="right">
+                                    <Typography
+                                        color={dayChange >= 0 ? 'success.main' : 'error.main'}
                                     >
-                                        {holding.quantity}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatCurrency(Number(holding.average_price))}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatCurrency(Number(holding.last_price))}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatCurrency(currentValue)}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold',
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatCurrency(dayPnL)}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: Number(holding.pnl) >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold',
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatCurrency(Number(holding.pnl))}
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            color: dayChangePercentage >= 0 ? 'success.main' : 'error.main',
-                                            fontWeight: 'bold',
-                                            fontSize: '0.875rem',
-                                            fontFamily: 'monospace'
-                                        }}
-                                    >
-                                        {formatPercentage(dayChangePercentage)}
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-        </Box>
+                                        ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
+                </TableBody>
+            </Table>
+        </TableContainer>
     );
-};
-
-Holdings.propTypes = {
-    holdings: PropTypes.arrayOf(PropTypes.shape({
-        tradingsymbol: PropTypes.string.isRequired,
-        quantity: PropTypes.number.isRequired,
-        average_price: PropTypes.number.isRequired,
-        last_price: PropTypes.number.isRequired,
-        pnl: PropTypes.number,
-        day_change_percentage: PropTypes.number,
-        previous_close: PropTypes.number
-    }))
 };
 
 export default Holdings; 

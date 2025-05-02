@@ -7,13 +7,14 @@ import {
     Button,
     Typography,
     IconButton,
-    Tooltip
+    Tooltip,
 } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import { useZerodha } from '../../context/ZerodhaContext';
 
 const ZerodhaSubHeader = () => {
@@ -45,9 +46,9 @@ const ZerodhaSubHeader = () => {
         <AppBar
             position="static"
             color="default"
-            elevation={1}
+            elevation={0}
             sx={{
-                bgcolor: '#1a237e',
+                backgroundColor: "#1a237e",
                 borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                 width: '100%',
                 display: 'block',
@@ -61,11 +62,12 @@ const ZerodhaSubHeader = () => {
                 sx={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    minHeight: '40px',
-                    padding: '0 24px',
+                    minHeight: '48px',
+                    padding: '0 32px',
                     width: '100%',
                     maxWidth: '100%',
-                    margin: 0
+                    margin: 0,
+                    gap: 4
                 }}
             >
                 {/* Left section - Navigation */}
@@ -74,11 +76,22 @@ const ZerodhaSubHeader = () => {
                         component={Link}
                         to="/zerodha/account"
                         startIcon={<AccountBalanceIcon />}
+                        variant={isActive('/zerodha/account') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
                         sx={{
-                            color: isActive('/zerodha/account') ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                            fontWeight: isActive('/zerodha/account') ? 600 : 400,
-                            '& .MuiSvgIcon-root': {
-                                color: isActive('/zerodha/account') ? 'white' : 'rgba(255, 255, 255, 0.7)'
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
                             }
                         }}
                     >
@@ -88,11 +101,22 @@ const ZerodhaSubHeader = () => {
                         component={Link}
                         to="/zerodha/portfolio"
                         startIcon={<AccountBalanceWalletIcon />}
+                        variant={isActive('/zerodha/portfolio') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
                         sx={{
-                            color: isActive('/zerodha/portfolio') ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                            fontWeight: isActive('/zerodha/portfolio') ? 600 : 400,
-                            '& .MuiSvgIcon-root': {
-                                color: isActive('/zerodha/portfolio') ? 'white' : 'rgba(255, 255, 255, 0.7)'
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
                             }
                         }}
                     >
@@ -100,13 +124,49 @@ const ZerodhaSubHeader = () => {
                     </Button>
                     <Button
                         component={Link}
+                        to="/zerodha/orders"
+                        startIcon={<ListAltIcon />}
+                        variant={isActive('/zerodha/orders') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
+                            }
+                        }}
+                    >
+                        Orders
+                    </Button>
+                    <Button
+                        component={Link}
                         to="/zerodha/trading-instruments"
                         startIcon={<ShowChartIcon />}
+                        variant={isActive('/zerodha/trading-instruments') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
                         sx={{
-                            color: isActive('/zerodha/trading-instruments') ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                            fontWeight: isActive('/zerodha/trading-instruments') ? 600 : 400,
-                            '& .MuiSvgIcon-root': {
-                                color: isActive('/zerodha/trading-instruments') ? 'white' : 'rgba(255, 255, 255, 0.7)'
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
                             }
                         }}
                     >
@@ -116,11 +176,22 @@ const ZerodhaSubHeader = () => {
                         component={Link}
                         to="/zerodha/algo-strategies"
                         startIcon={<PsychologyIcon />}
+                        variant={isActive('/zerodha/algo-strategies') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
                         sx={{
-                            color: isActive('/zerodha/algo-strategies') ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                            fontWeight: isActive('/zerodha/algo-strategies') ? 600 : 400,
-                            '& .MuiSvgIcon-root': {
-                                color: isActive('/zerodha/algo-strategies') ? 'white' : 'rgba(255, 255, 255, 0.7)'
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
                             }
                         }}
                     >
@@ -136,18 +207,17 @@ const ZerodhaSubHeader = () => {
                     <Tooltip title="Disconnect from Zerodha">
                         <IconButton
                             onClick={handleDisconnect}
-                            color="inherit"
                             size="small"
                             sx={{
-                                color: '#ff4444',
-                                backgroundColor: 'rgba(255, 68, 68, 0.1)',
-                                borderRadius: '8px',
-                                padding: '6px',
-                                transition: 'all 0.2s ease',
+                                color: 'white',
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderRadius: '50%',
+                                p: 1.2,
+                                transition: 'all 0.2s',
                                 '&:hover': {
-                                    backgroundColor: 'rgba(255, 68, 68, 0.2)',
-                                    color: '#ff0000',
-                                    transform: 'translateY(-1px)'
+                                    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                                    color: '#90caf9',
+                                    transform: 'translateY(-2px)'
                                 }
                             }}
                         >
