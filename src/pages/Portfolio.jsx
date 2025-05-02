@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress } from '@mui/material';
+import { Box, Typography, Container, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
@@ -37,7 +37,6 @@ const getPositionType = (tradingsymbol) => {
 const Portfolio = () => {
     const theme = useTheme();
     const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession } = useZerodha();
-    const [activeTab, setActiveTab] = useState(0);
     const [localLoading, setLocalLoading] = useState(true);
 
     // Scroll to top when component mounts
@@ -125,14 +124,6 @@ const Portfolio = () => {
         totalDayPnL: holdingsDayPnL + positionsDayPnL
     }), [holdingsPnL, positionsTotalPnL, holdingsDayPnL, positionsDayPnL]);
 
-    const handleTabChange = (event, newValue) => {
-        setActiveTab(newValue);
-    };
-
-    const handleAutoSyncChange = (event) => {
-        setIsAutoSync(event.target.checked);
-    };
-
     // Show loading state while initializing
     if (localLoading || loading) {
         return (
@@ -205,7 +196,7 @@ const Portfolio = () => {
                         control={
                             <Switch
                                 checked={isAutoSync}
-                                onChange={handleAutoSyncChange}
+                                onChange={(event) => setIsAutoSync(event.target.checked)}
                                 color="primary"
                                 size="small"
                             />
@@ -426,35 +417,25 @@ const Portfolio = () => {
                     </Grid>
                 </Grid>
 
-                {/* Tabs Section */}
-                <Paper sx={{
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[2],
-                    overflow: 'hidden',
-                    mb: 4
-                }}>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                        <Tabs
-                            value={activeTab}
-                            onChange={handleTabChange}
-                            aria-label="portfolio tabs"
-                            sx={{
-                                '& .MuiTab-root': {
-                                    textTransform: 'none',
-                                    fontWeight: 500,
-                                    minHeight: 48
-                                }
-                            }}
-                        >
-                            <Tab label="Holdings" id="portfolio-tab-0" aria-controls="portfolio-tabpanel-0" />
-                            <Tab label="Positions" id="portfolio-tab-1" aria-controls="portfolio-tabpanel-1" />
-                        </Tabs>
-                    </Box>
-                    <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: '300px' }}>
-                        {activeTab === 0 && <Holdings />}
-                        {activeTab === 1 && <Positions />}
-                    </Box>
-                </Paper>
+                {/* Holdings Section */}
+                <Box mb={4}>
+                    <Paper sx={{ p: 3, borderRadius: 2 }}>
+                        <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 3 }}>
+                            Holdings
+                        </Typography>
+                        <Holdings />
+                    </Paper>
+                </Box>
+
+                {/* Positions Section */}
+                <Box mb={4}>
+                    <Paper sx={{ p: 3, borderRadius: 2 }}>
+                        <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 3 }}>
+                            Positions
+                        </Typography>
+                        <Positions />
+                    </Paper>
+                </Box>
             </Container>
         </Box>
     );

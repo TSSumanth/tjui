@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import { Box, Typography, Container, Tabs, Tab, Grid, Card, CardContent, Stack, Chip, Button, CircularProgress } from '@mui/material';
+import React from 'react';
+import { Box, Typography, Container, Grid, Card, CardContent, Stack, Chip, Button, CircularProgress } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
-import Orders from '../components/zerodha/Orders';
 import useScrollToTop from '../hooks/useScrollToTop';
 
 const formatCurrency = (value) => {
@@ -20,7 +19,6 @@ const formatCurrency = (value) => {
 
 const PortfolioDetailsPage = () => {
     const { holdings, positions, fetchData, loading, error, isAutoSync } = useZerodha();
-    const [activeTab, setActiveTab] = useState(0);
     useScrollToTop();
 
     // Calculate P&L components
@@ -54,10 +52,6 @@ const PortfolioDetailsPage = () => {
             totalDayPnL: holdingsDayPnL + positionsDayPnL
         };
     }, [holdings, positions]);
-
-    const handleTabChange = (event, newValue) => {
-        setActiveTab(newValue);
-    };
 
     return (
         <div>
@@ -189,48 +183,20 @@ const PortfolioDetailsPage = () => {
                     </Grid>
                 </Box>
 
-                {/* Tabs Section */}
-                <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                        <Tabs value={activeTab} onChange={handleTabChange} aria-label="portfolio tabs">
-                            <Tab label="Holdings" id="portfolio-tab-0" aria-controls="portfolio-tabpanel-0" />
-                            <Tab label="Positions" id="portfolio-tab-1" aria-controls="portfolio-tabpanel-1" />
-                            <Tab label="Orders" id="portfolio-tab-2" aria-controls="portfolio-tabpanel-2" />
-                        </Tabs>
-                    </Box>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 0}
-                        id="portfolio-tabpanel-0"
-                        aria-labelledby="portfolio-tab-0"
-                        style={{ display: activeTab === 0 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Holdings />
-                        </Box>
-                    </div>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 1}
-                        id="portfolio-tabpanel-1"
-                        aria-labelledby="portfolio-tab-1"
-                        style={{ display: activeTab === 1 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Positions />
-                        </Box>
-                    </div>
-                    <div
-                        role="tabpanel"
-                        hidden={activeTab !== 2}
-                        id="portfolio-tabpanel-2"
-                        aria-labelledby="portfolio-tab-2"
-                        style={{ display: activeTab === 2 ? 'block' : 'none' }}
-                    >
-                        <Box sx={{ p: 3, minHeight: '300px' }}>
-                            <Orders />
-                        </Box>
-                    </div>
+                {/* Holdings Section */}
+                <Box mb={4}>
+                    <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 2 }}>
+                        Holdings
+                    </Typography>
+                    <Holdings />
+                </Box>
+
+                {/* Positions Section */}
+                <Box mb={4}>
+                    <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 2 }}>
+                        Positions
+                    </Typography>
+                    <Positions />
                 </Box>
             </Container>
         </div>
