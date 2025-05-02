@@ -13,7 +13,7 @@ import {
     Select,
 } from "@mui/material";
 import DateTimePicker from "../Generic/DateTimeComponent";
-import { parseISO } from 'date-fns';
+import moment from 'moment';
 
 const normalizeOrderType = (type) => {
     return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
@@ -23,7 +23,7 @@ function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
     const [orderDetails, setOrderDetails] = useState(updateOrderdetails ? {
         ...updateOrderdetails,
         ordertype: normalizeOrderType(updateOrderdetails.ordertype),
-        date: updateOrderdetails.date ? (typeof updateOrderdetails.date === 'string' ? parseISO(updateOrderdetails.date) : updateOrderdetails.date) : new Date()
+        date: updateOrderdetails.date ? moment(updateOrderdetails.date).toDate() : new Date()
     } : {
         ordertype: "Buy",
         quantity: "",
@@ -50,7 +50,11 @@ function OrderForm({ title, onSubmit, onCancel, updateOrderdetails }) {
 
     const handleOnSubmit = (e) => {
         e.preventDefault();
-        onSubmit(orderDetails);
+        const formattedOrderDetails = {
+            ...orderDetails,
+            date: moment(orderDetails.date).format('YYYY-MM-DD HH:mm:ss')
+        };
+        onSubmit(formattedOrderDetails);
     };
 
     return (

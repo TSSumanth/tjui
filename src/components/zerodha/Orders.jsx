@@ -29,6 +29,7 @@ import { useZerodha } from '../../context/ZerodhaContext';
 import moment from 'moment';
 import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../services/zerodha/api';
 import { formatCurrency } from '../../utils/formatters';
+import LinkToTradePopup from './LinkToTradePopup';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -77,7 +78,7 @@ function ModifyOrderDialog({ open, order, onClose, onSubmit, loading }) {
     );
 }
 
-function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
+function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToTrade }) {
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -170,7 +171,8 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
                                                 <MenuItem key="cancel" onClick={() => { handleMenuClose(); onCancel(order); }}>Cancel</MenuItem>
                                             ]}
                                             {order.status === 'COMPLETE' && [
-                                                <MenuItem key="view" onClick={handleMenuClose}>View Details</MenuItem>
+                                                <MenuItem key="view" onClick={handleMenuClose}>View Details</MenuItem>,
+                                                <MenuItem key="linktotrade" onClick={() => { handleMenuClose(); onLinkToTrade(order); }}>Link to Trade</MenuItem>
                                             ]}
                                         </Menu>
                                     </TableCell>
@@ -191,6 +193,8 @@ function Orders() {
     const [modifyOrder, setModifyOrder] = useState(null);
     const [modifyLoading, setModifyLoading] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
+    const [linkToTradeOpen, setLinkToTradeOpen] = useState(false);
+    const [linkToTradeOrder, setLinkToTradeOrder] = useState(null);
 
     if (isLoading) {
         return (
@@ -252,6 +256,19 @@ function Orders() {
         setModifyOrder(null);
     };
 
+    // Link to trade handler
+    const handleLinkToTrade = (order) => {
+        setLinkToTradeOrder(order);
+        setLinkToTradeOpen(true);
+    };
+    const handleLinkToTradeClose = () => {
+        setLinkToTradeOpen(false);
+        setLinkToTradeOrder(null);
+    };
+    const handleLinkToTradeSuccess = async () => {
+        await fetchOrders();
+    };
+
     // Split orders by status
     const openOrders = orders.filter(o => o.status === 'OPEN' || o.status === 'AMO REQ RECEIVED');
     const triggerPendingOrders = orders.filter(o => o.status === 'TRIGGER PENDING');
@@ -265,7 +282,7 @@ function Orders() {
             </Typography>
             <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={triggerPendingOrders} title="Stop Loss Orders (Trigger Pending)" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
-            <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} />
+            <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} onLinkToTrade={handleLinkToTrade} />
             <OrdersTable orders={cancelledOrders} title="Cancelled Orders" showActions={false} />
             <ModifyOrderDialog
                 open={modifyDialogOpen}
@@ -273,6 +290,12 @@ function Orders() {
                 onClose={handleModifyClose}
                 onSubmit={handleModifySubmit}
                 loading={modifyLoading}
+            />
+            <LinkToTradePopup
+                open={linkToTradeOpen}
+                onClose={handleLinkToTradeClose}
+                zerodhaOrder={linkToTradeOrder}
+                onSuccess={handleLinkToTradeSuccess}
             />
         </Box>
     );

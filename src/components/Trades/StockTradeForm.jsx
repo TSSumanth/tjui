@@ -176,7 +176,7 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             finalexitprice: (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : 0,
             capitalused: (entryorderquantity - exitorderquantity !== 0) ? parseFloat((entryorderquantity * entryavgprice) - (exitorderquantity * exitavgprice)).toFixed(2) : 0,
             overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice) - (exitorderquantity * entryavgprice) : (exitorderquantity * entryavgprice) - (exitorderquantity * exitavgprice))).toFixed(2),
-            exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
+            exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : "",
             lastmodifieddate: getCurrentDateTime()
         }));
     }, [allorders, tradeDetails.tradetype]);
@@ -280,8 +280,8 @@ function StockTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false,
             if (strategyid !== undefined) {
                 let response2 = await getStrategies({ id: strategyid })
                 if (response2 && response2[0] && Array.isArray(response2[0].option_trades)) {
-                response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
-                await updateStrategy(response2[0])
+                    response2[0].option_trades = response2[0].option_trades.filter(trade => trade !== tradeDetails.tradeid);
+                    await updateStrategy(response2[0])
                 }
             }
         } else {

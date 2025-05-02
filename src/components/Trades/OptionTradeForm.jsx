@@ -171,7 +171,7 @@ function OptionTradeForm({ title, onSubmit, onCancel, onDelete, isUpdate = false
             finalexitprice: (entryorderquantity - exitorderquantity === 0) ? parseFloat(exitavgprice).toFixed(2) : 0,
             capitalused: (entryorderquantity - exitorderquantity !== 0) ? parseFloat(((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)) - ((exitorderquantity * exitavgprice) * Number(tradeDetails.lotsize))).toFixed(2) : 0,
             overallreturn: parseFloat((tradeDetails.tradetype.toUpperCase() === "LONG" ? (exitorderquantity * exitavgprice * prevDetails.lotsize) - (exitorderquantity * entryavgprice * prevDetails.lotsize) : (exitorderquantity * entryavgprice * prevDetails.lotsize) - (exitorderquantity * exitavgprice * prevDetails.lotsize))).toFixed(2),
-            exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : 0,
+            exitdate: (entryorderquantity - exitorderquantity === 0) ? allorders[allorders.length - 1].date : '',
             lastmodifieddate: getCurrentDateTime(),
             premiumamount: parseFloat((entryorderquantity * entryavgprice) * Number(tradeDetails.lotsize)).toFixed(2)
         }));
