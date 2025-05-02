@@ -162,7 +162,10 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
                                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                                         >
-                                            {(order.status === 'OPEN' || order.status === 'AMO REQ RECEIVED' || order.status === 'TRIGGER PENDING') && [
+                                            {order.status === 'TRIGGER PENDING' && [
+                                                <MenuItem key="cancel" onClick={() => { handleMenuClose(); onCancel(order); }}>Cancel</MenuItem>
+                                            ]}
+                                            {(order.status === 'OPEN' || order.status === 'AMO REQ RECEIVED') && [
                                                 <MenuItem key="modify" onClick={() => { handleMenuClose(); onModify(order); }}>Modify</MenuItem>,
                                                 <MenuItem key="cancel" onClick={() => { handleMenuClose(); onCancel(order); }}>Cancel</MenuItem>
                                             ]}
@@ -182,7 +185,7 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify }) {
 }
 
 function Orders() {
-    const { orders, loadingStates } = useZerodha();
+    const { orders, loadingStates, fetchOrders } = useZerodha();
     const isLoading = loadingStates.orders;
     const [modifyDialogOpen, setModifyDialogOpen] = useState(false);
     const [modifyOrder, setModifyOrder] = useState(null);
@@ -218,6 +221,7 @@ function Orders() {
         setCancelLoading(true);
         try {
             await cancelZerodhaOrder(order.order_id);
+            await fetchOrders();
         } catch (err) {
             alert(err.message || 'Failed to cancel order');
         } finally {
@@ -236,6 +240,7 @@ function Orders() {
             await modifyZerodhaOrder(modifyOrder.order_id, fields);
             setModifyDialogOpen(false);
             setModifyOrder(null);
+            await fetchOrders();
         } catch (err) {
             alert(err.message || 'Failed to modify order');
         } finally {
