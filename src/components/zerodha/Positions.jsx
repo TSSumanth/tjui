@@ -8,23 +8,11 @@ import {
     TableRow,
     Paper,
     Typography,
-    CircularProgress,
-    Alert,
     Box,
     Chip,
     IconButton,
-    Snackbar,
-    Alert as MuiAlert,
-    Button,
-    TextField,
     Menu,
     MenuItem,
-    Popper,
-    ClickAwayListener,
-    Grow,
-    FormControl,
-    InputLabel,
-    Select,
     LinearProgress,
     Skeleton
 } from '@mui/material';
@@ -179,6 +167,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
+    const { ltpMap } = useZerodha();
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -466,7 +455,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     flexWrap: 'nowrap'
                 }}>
                     {/* Left section - Asset Name */}
-                    <Box sx={{ minWidth: '150px', flexShrink: 0 }}>
+                    <Box sx={{ minWidth: '150px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Typography
                             variant="h6"
                             sx={{
@@ -476,6 +465,24 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                         >
                             {underlying}
                         </Typography>
+                        {ltpMap && ltpMap[underlying] !== undefined && (
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: 'primary.main',
+                                    fontFamily: 'monospace',
+                                    fontWeight: 600,
+                                    px: 1.5,
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    border: '1px solid',
+                                    borderColor: 'primary.main',
+                                    ml: 1
+                                }}
+                            >
+                                LTP: {formatCurrency(ltpMap[underlying])}
+                            </Typography>
+                        )}
                     </Box>
 
                     {/* Middle section - Breakeven and Premium Info */}
@@ -502,22 +509,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 {calculateBreakeven(positions).breakevenPoints.length > 0
                                     ? `Breakeven: ↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
                                     : 'Unable to show BE'}
-                            </Box>
-                            <Box sx={{
-                                color: 'text.secondary',
-                                fontFamily: 'monospace',
-                                whiteSpace: 'nowrap',
-                                transition: isUpdating ? 'color 0.3s ease' : 'none'
-                            }}>
-                                Net Premium: {formatCurrency(calculateBreakeven(positions).netPremium)}
-                            </Box>
-                            <Box sx={{
-                                color: 'text.secondary',
-                                fontFamily: 'monospace',
-                                whiteSpace: 'nowrap',
-                                transition: isUpdating ? 'color 0.3s ease' : 'none'
-                            }}>
-                                Current: {formatCurrency(calculateBreakeven(positions).currentPrice)}
                             </Box>
                         </Box>
                     )}

@@ -46,6 +46,7 @@ export const ZerodhaProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
     const [isAutoSync, setIsAutoSync] = useState(false);
     const [error, setError] = useState(null);
+    const [ltpMap, setLtpMap] = useState({});
 
     const isInitialLoadDone = useRef(false);
     const lastFetchTime = useRef(0);
@@ -306,6 +307,37 @@ export const ZerodhaProvider = ({ children }) => {
         return () => clearInterval(intervalId);
     }, [sessionActive, isAutoSync]);
 
+    // Update ltpMap whenever holdings or positions change
+    useEffect(() => {
+        const newLtpMap = {};
+        (holdings || []).forEach(h => {
+            if (h.tradingsymbol && h.last_price !== undefined) {
+                newLtpMap[h.tradingsymbol] = h.last_price;
+            }
+        });
+        // If positions is an array
+        if (Array.isArray(positions)) {
+            positions.forEach(p => {
+                if (p.tradingsymbol && p.last_price !== undefined) {
+                    newLtpMap[p.tradingsymbol] = p.last_price;
+                }
+            });
+        }
+        // If positions is an object with arrays (e.g., { net: [], day: [] })
+        else if (positions && typeof positions === 'object') {
+            Object.values(positions).forEach(arr => {
+                if (Array.isArray(arr)) {
+                    arr.forEach(p => {
+                        if (p.tradingsymbol && p.last_price !== undefined) {
+                            newLtpMap[p.tradingsymbol] = p.last_price;
+                        }
+                    });
+                }
+            });
+        }
+        setLtpMap(newLtpMap);
+    }, [holdings, positions]);
+
     const handleLogout = useCallback(async () => {
         try {
             await logout();
@@ -347,7 +379,8 @@ export const ZerodhaProvider = ({ children }) => {
         positions,
         orders,
         fetchHoldings,
-        fetchPositions
+        fetchPositions,
+        ltpMap
     };
 
     return (
