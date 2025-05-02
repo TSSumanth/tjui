@@ -14,13 +14,17 @@ import {
     Menu,
     MenuItem,
     LinearProgress,
-    Skeleton
+    Skeleton,
+    Card,
+    Grid
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, createClosePositionOrder } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
+import dayjs from 'dayjs';
+import moment from 'moment-business-days';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -144,6 +148,40 @@ const calculateBreakeven = (positions) => {
         perLotPremium: totalPremium,
         currentPrice: positions[0]?.last_price
     };
+};
+
+const calculateIntrinsicValue = (option, ltpMap) => {
+    const details = extractOptionDetails(option.tradingsymbol);
+    if (!details) return 0;
+    const stockLTP = ltpMap[details.symbol];
+    if (!stockLTP) return 0;
+    if (details.type === 'CE') {
+        return Math.max(stockLTP - details.strike, 0);
+    } else if (details.type === 'PE') {
+        return Math.max(details.strike - stockLTP, 0);
+    }
+    return 0;
+};
+
+const calculateTimeValue = (option, ltpMap) => {
+    const intrinsic = calculateIntrinsicValue(option, ltpMap);
+    const optionLTP = Number(option.last_price) || 0;
+    return Math.max(optionLTP - intrinsic, 0);
+};
+
+const calculateDaysToExpiry = (option) => {
+    const details = extractOptionDetails(option.tradingsymbol);
+    if (!details || !details.expiry) return '';
+    // details.expiry example: 25JUN
+    // Parse as DDMMM with current year
+    const year = new Date().getFullYear();
+    let expiryDate = moment(details.expiry + year, 'DDMMMYYYY');
+    // If expiry already passed this year, use next year
+    if (expiryDate.isBefore(moment(), 'day')) {
+        expiryDate = expiryDate.add(1, 'year');
+    }
+    const today = moment().startOf('day');
+    return today.businessDiff(expiryDate);
 };
 
 const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
@@ -290,6 +328,11 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         // Total P&L remains as is
         const totalPnL = Number(position.pnl) || 0;
 
+        const isOption = positionType === 'Option';
+        const intrinsicValue = isOption ? calculateIntrinsicValue(position, ltpMap) : '';
+        const timeValue = isOption ? calculateTimeValue(position, ltpMap) : '';
+        const daysToExpiry = isOption ? calculateDaysToExpiry(position) : '';
+
         return (
             <TableRow
                 key={position.tradingsymbol + (isClosed ? '-closed' : '')}
@@ -370,6 +413,15 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     }}
                 >
                     {formatPercentage(calculateChangePercentage(position))}
+                </StyledTableCell>
+                <StyledTableCell align="right">
+                    {isOption ? formatCurrency(intrinsicValue) : ''}
+                </StyledTableCell>
+                <StyledTableCell align="right">
+                    {isOption ? formatCurrency(timeValue) : ''}
+                </StyledTableCell>
+                <StyledTableCell align="right">
+                    {isOption ? daysToExpiry : ''}
                 </StyledTableCell>
                 <StyledTableCell align="right">
                     {isClosed ? (
@@ -579,6 +631,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 <StyledTableCell align="right">Day's P&L</StyledTableCell>
                                 <StyledTableCell align="right">Total P&L</StyledTableCell>
                                 <StyledTableCell align="right">Change %</StyledTableCell>
+                                <StyledTableCell align="right">Intrinsic Value</StyledTableCell>
+                                <StyledTableCell align="right">Time Value</StyledTableCell>
+                                <StyledTableCell align="right">Days to Expiry</StyledTableCell>
                                 <StyledTableCell align="right">Action</StyledTableCell>
                             </TableRow>
                         </TableHead>
@@ -748,17 +803,21 @@ const Positions = () => {
 
     return (
         <Box>
-            {Object.entries(groupedPositions).map(([underlying, positions]) => (
-                <PositionTable
-                    key={underlying}
-                    positions={positions}
-                    underlying={underlying}
-                    onOpenOrderDialog={handleOpenOrderDialog}
-                    loadingPositions={{}}
-                    prevPositions={prevPositions}
-                />
-            ))}
-
+            <Grid container spacing={3}>
+                {Object.entries(groupedPositions).map(([underlying, positions]) => (
+                    <Grid item xs={12} key={underlying}>
+                        <Card elevation={2} sx={{ p: 2 }}>
+                            <PositionTable
+                                positions={positions}
+                                underlying={underlying}
+                                onOpenOrderDialog={handleOpenOrderDialog}
+                                loadingPositions={{}}
+                                prevPositions={prevPositions}
+                            />
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
             {selectedPosition && (
                 <OrderPopup
                     open={Boolean(orderDialogAnchorEl)}
