@@ -8,15 +8,17 @@ import { formatCurrency } from '../utils/formatters';
 
 const modalStyle = {
     position: 'fixed',
-    top: 80,
-    right: 32,
-    width: 600,
-    bgcolor: 'background.paper',
-    borderRadius: 4,
-    boxShadow: '0 8px 32px rgba(40,60,90,0.18)',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 800,
+    bgcolor: '#232946',
+    borderRadius: 12,
+    boxShadow: '0 8px 32px rgba(20,30,60,0.38)',
     p: 0,
     outline: 'none',
-    zIndex: 1300
+    zIndex: 1300,
+    color: '#fff'
 };
 
 const PortfolioDashboardWidget = () => {
@@ -44,23 +46,98 @@ const PortfolioDashboardWidget = () => {
             </Tooltip>
             <Modal open={open} onClose={handleClose}>
                 <Box sx={modalStyle}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, borderBottom: '1px solid #e3e3e3' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccountBalanceWalletIcon color="primary" />
-                            <Typography variant="h6" fontWeight={600} color="text.primary">
-                                Portfolio Dashboard
-                            </Typography>
-                        </Box>
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        px: 3,
+                        py: 2,
+                        background: '#232946',
+                        borderTopLeftRadius: 12,
+                        borderTopRightRadius: 12,
+                        borderBottom: '2.5px solid #232946'
+                    }}>
+                        <AccountBalanceWalletIcon color="primary" sx={{ mr: 1 }} />
+                        <Typography variant="h6" fontWeight={600} color="#fff" sx={{ flex: 1 }}>
+                            Portfolio Dashboard
+                        </Typography>
                         <IconButton onClick={handleClose} size="small"><CloseIcon /></IconButton>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 520, borderRadius: 0, boxShadow: 'none' }}>
+                    <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 600, borderRadius: 0, boxShadow: 'none', background: 'transparent' }}>
                         <Table stickyHeader size="small">
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 600, background: '#f5f7fa', py: 1.5 }}>Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, background: '#f5f7fa', py: 1.5 }}>Account ID</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 600, background: '#f5f7fa', py: 1.5 }}>Balance</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 600, background: '#f5f7fa', py: 1.5 }}>Total Value</TableCell>
+                                    <TableCell
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Name
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Account ID
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Balance
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Equity Value
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Positions Value
+                                    </TableCell>
+                                    <TableCell
+                                        align="right"
+                                        sx={{
+                                            fontWeight: 700,
+                                            background: '#232946',
+                                            color: '#fff',
+                                            py: 1.5,
+                                            borderBottom: '2px solid #2c3142'
+                                        }}
+                                    >
+                                        Total Value
+                                    </TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -71,14 +148,17 @@ const PortfolioDashboardWidget = () => {
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {accounts.map(acc => {
+                                {accounts.map((acc, index) => {
                                     const isCurrent = accountInfo && acc.account_id === accountInfo.clientId;
                                     return (
                                         <TableRow
                                             key={acc.id}
-                                            sx={isCurrent
-                                                ? { borderLeft: '4px solid #1976d2', background: '#f8fafc' }
-                                                : {}}
+                                            sx={{
+                                                background: isCurrent ? '#20243a' : '#181c2a',
+                                                borderLeft: isCurrent ? '4px solid #90caf9' : 'none',
+                                                '&:hover': { background: '#232946', cursor: 'pointer' },
+                                                borderBottom: '1.5px solid #232946'
+                                            }}
                                         >
                                             <TableCell sx={{ py: 1.5 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -96,8 +176,18 @@ const PortfolioDashboardWidget = () => {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'success.main'}>
+                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : '#fff'}>
                                                     ₹{formatCurrency(acc.equity_account_balance)}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ py: 1.5 }}>
+                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'info.main'}>
+                                                    ₹{formatCurrency(acc.equity_holdings_value)}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ py: 1.5 }}>
+                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'warning.main'}>
+                                                    ₹{formatCurrency(acc.equity_positions_value)}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right" sx={{ py: 1.5 }}>

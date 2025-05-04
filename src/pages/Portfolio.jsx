@@ -10,6 +10,7 @@ import useScrollToTop from '../hooks/useScrollToTop';
 import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
+import { getPortfolioValue, createPortfolioValue, updatePortfolioValue } from '../services/portfolioValue';
 
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -36,7 +37,7 @@ const getPositionType = (tradingsymbol) => {
 
 const Portfolio = () => {
     const theme = useTheme();
-    const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession } = useZerodha();
+    const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession, accountInfo } = useZerodha();
     const [localLoading, setLocalLoading] = useState(true);
 
     // Scroll to top when component mounts
@@ -152,6 +153,51 @@ const Portfolio = () => {
             return sum + (quantity * lastPrice);
         }, 0);
     }, [holdings]);
+
+    useEffect(() => {
+        if (
+            accountInfo &&
+            accountInfo.clientId &&
+            accountInfo.name &&
+            accountInfo.margins?.equity?.available !== undefined &&
+            totalEquityHoldingsValue !== undefined &&
+            positionsTotalValue !== undefined
+        ) {
+            const equity_account_balance = Number(accountInfo.margins.equity.available) || 0;
+            const equity_holdings_value = Number(totalEquityHoldingsValue) || 0;
+            const equity_positions_value = Number(positionsTotalValue) || 0;
+            const total_account_value = equity_account_balance + equity_holdings_value + equity_positions_value;
+
+            const syncPortfolioValue = async () => {
+                try {
+                    const res = await getPortfolioValue({ account_id: accountInfo.clientId });
+                    if (res.success && res.data) {
+                        await updatePortfolioValue({
+                            id: res.data.id,
+                            account_id: accountInfo.clientId,
+                            account_member_name: accountInfo.name,
+                            equity_account_balance,
+                            equity_holdings_value,
+                            equity_positions_value,
+                            total_account_value
+                        });
+                    } else {
+                        await createPortfolioValue({
+                            account_member_name: accountInfo.name,
+                            account_id: accountInfo.clientId,
+                            equity_account_balance,
+                            equity_holdings_value,
+                            equity_positions_value,
+                            total_account_value
+                        });
+                    }
+                } catch (err) {
+                    // Optionally handle error
+                }
+            };
+            syncPortfolioValue();
+        }
+    }, [accountInfo, totalEquityHoldingsValue, positionsTotalValue]);
 
     // Show loading state while initializing
     if (localLoading || loading) {
