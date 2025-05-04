@@ -17,6 +17,32 @@ export const addStockOrder = async (e) => {
     }
 };
 
+export const getOrders = async (filter = {}) => {
+    try {
+        const { type, ...rest } = filter;
+        if (type === 'stock') {
+            const res = await axios.get(API_URL + '/stock', { params: rest });
+            return res.status === 200 ? res.data : [];
+        } else if (type === 'option') {
+            const res = await axios.get(API_URL + '/option', { params: rest });
+            return res.status === 200 ? res.data : [];
+        } else {
+            // fallback: query both
+            const [stockRes, optionRes] = await Promise.all([
+                axios.get(API_URL + '/stock', { params: rest }),
+                axios.get(API_URL + '/option', { params: rest })
+            ]);
+            const stockOrders = stockRes.status === 200 ? stockRes.data : [];
+            const optionOrders = optionRes.status === 200 ? optionRes.data : [];
+            return [...stockOrders, ...optionOrders];
+        }
+    } catch (e) {
+        console.error('Unable to fetch orders:', e);
+        return [];
+    }
+};
+
+
 export const getTradeStockOrders = async (tradeid) => {
     if (!tradeid)
         return [];

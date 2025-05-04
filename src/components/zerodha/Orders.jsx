@@ -30,6 +30,7 @@ import moment from 'moment';
 import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../services/zerodha/api';
 import { formatCurrency } from '../../utils/formatters';
 import LinkToTradePopup from './LinkToTradePopup';
+import { getOrders as getAppOrders } from '../../services/orders';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -81,6 +82,30 @@ function ModifyOrderDialog({ open, order, onClose, onSubmit, loading }) {
 function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToTrade }) {
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [linkedOrderIds, setLinkedOrderIds] = useState(new Set());
+
+    React.useEffect(() => {
+        let isMounted = true;
+        async function checkLinkedOrders() {
+            const linkedIds = new Set();
+            // Only check for completed orders
+            const completedOrders = orders.filter(o => o.status === 'COMPLETE');
+            await Promise.all(completedOrders.map(async (zOrder) => {
+                let appOrders = [];
+                if (isOptionOrFuture(zOrder)) {
+                    appOrders = await getAppOrders({ tags: zOrder.order_id, type: 'option' });
+                } else {
+                    appOrders = await getAppOrders({ tags: zOrder.order_id, type: 'stock' });
+                }
+                if (appOrders && appOrders.length > 0) {
+                    linkedIds.add(zOrder.order_id);
+                }
+            }));
+            if (isMounted) setLinkedOrderIds(linkedIds);
+        }
+        checkLinkedOrders();
+        return () => { isMounted = false; };
+    }, [orders]);
 
     const handleMenuClick = (event, order) => {
         setMenuAnchorEl(event.currentTarget);
@@ -129,7 +154,12 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
                     <TableBody>
                         {orders.map((order) => (
                             <TableRow key={order.order_id}>
-                                <TableCell>{order.order_id}</TableCell>
+                                <TableCell>
+                                    {order.order_id}
+                                    {order.status === 'COMPLETE' && linkedOrderIds.has(order.order_id) && (
+                                        <Chip label="Linked" color="success" size="small" sx={{ ml: 1 }} />
+                                    )}
+                                </TableCell>
                                 <TableCell>
                                     <Chip
                                         label={order.status}
@@ -184,6 +214,22 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
             </TableContainer>
         </Box>
     );
+}
+
+// Utility to determine if a Zerodha order is an option/future
+function isOptionOrFuture(order) {
+    // Check if it's from NFO exchange
+    if (order.exchange === 'NFO') return true;
+    const symbol = order.tradingsymbol || '';
+    // Check for CE/PE at the end of the symbol
+    const hasOptionSuffix = /(CE|PE)$/.test(symbol);
+    if (!hasOptionSuffix) return false;
+    // Check if it has a valid expiry format (e.g., 24MAY, 24JUN, etc.)
+    const hasExpiry = /[0-9]{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/.test(symbol);
+    if (!hasExpiry) return false;
+    // Check if it has a strike price (numbers before CE/PE)
+    const hasStrike = /[0-9]+(CE|PE|FUT)$/.test(symbol);
+    return hasStrike;
 }
 
 function Orders() {

@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
 import { getStockTrades, addNewStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade, updateStockTrade } from '../../services/trades';
-import { addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders } from '../../services/orders';
+import { addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders, updateStockOrder, getOrders } from '../../services/orders';
 import moment from 'moment';
 import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
 
@@ -132,6 +132,8 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     lotsize: lotSize
                 };
                 await addOptionOrder(orderPayload);
+                // Tag the original Zerodha order as linked
+                await tagZerodhaOrderAsLinked(zerodhaOrder.order_id);
                 // Fetch all orders for the trade
                 const allorders = await getTradeOptionOrders(selectedTradeId);
                 // Get the selected trade's tradetype from openTrades
@@ -215,6 +217,8 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     tags: `zerodha,${zerodhaOrder.order_id}`,
                 };
                 await addStockOrder(orderPayload);
+                // Tag the original Zerodha order as linked
+                await tagZerodhaOrderAsLinked(zerodhaOrder.order_id);
                 // Fetch all orders for the trade
                 const allorders = await getTradeStockOrders(selectedTradeId);
                 // Get the selected trade's tradetype from openTrades
@@ -321,6 +325,8 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     lotsize: lotSize
                 };
                 await addOptionOrder(orderPayload);
+                // Tag the original Zerodha order as linked
+                await tagZerodhaOrderAsLinked(zerodhaOrder.order_id);
                 // Fetch all orders for the trade (should be just one, but keeps logic consistent)
                 const allorders = await getTradeOptionOrders(newTradeId);
                 // Recalculate trade fields (same as update logic)
@@ -409,6 +415,8 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                     tags: `zerodha,${zerodhaOrder.order_id}`,
                 };
                 await addStockOrder(orderPayload);
+                // Tag the original Zerodha order as linked
+                await tagZerodhaOrderAsLinked(zerodhaOrder.order_id);
                 // Fetch all orders for the trade (should be just one, but keeps logic consistent)
                 const allorders = await getTradeStockOrders(newTradeId);
                 // Recalculate trade fields (same as update logic)
@@ -493,6 +501,30 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
             setCreating(false);
         }
     };
+
+    async function tagZerodhaOrderAsLinked(orderId) {
+        try {
+            // Fetch orders with the zerodha order id as a tag
+            const orders = await getOrders({ tags: orderId });
+            if (orders && orders.length > 0) {
+                const order = orders[0];
+                // Add 'linked' to the tags if not already present
+                let tagsArr = order.tags ? order.tags.split(',') : [];
+                if (!tagsArr.includes('linked')) {
+                    tagsArr.push('linked');
+                    const updatedTags = tagsArr.join(',');
+                    if (order.lotsize !== undefined) {
+                        await updateOptionOrder({ ...order, tags: updatedTags });
+                    } else {
+                        await updateStockOrder({ ...order, tags: updatedTags });
+                    }
+                }
+            }
+        } catch (err) {
+            // Optionally handle error
+            console.error('Failed to tag Zerodha order as linked:', err);
+        }
+    }
 
     return (
         <>
