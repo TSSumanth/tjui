@@ -62,6 +62,9 @@ const PortfolioDashboardWidget = () => {
                         <Typography variant="h6" fontWeight={600} color="#fff" sx={{ flex: 1 }}>
                             Portfolio Dashboard
                         </Typography>
+                        <Typography variant="body2" color="#90caf9" sx={{ ml: 2, fontWeight: 400 }}>
+                            Open the Portfolio page to get the latest Account Value
+                        </Typography>
                         <IconButton onClick={handleClose} size="small"><CloseIcon /></IconButton>
                     </Box>
                     <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 600, borderRadius: 0, boxShadow: 'none', background: 'transparent' }}>
