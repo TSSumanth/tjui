@@ -200,7 +200,8 @@ const Holdings = () => {
                                             color={pnl >= 0 ? 'success.main' : 'error.main'}
                                             sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
                                         >
-                                            ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
+                                            ₹{formatCurrency(pnl)}
+                                            {isFinite(pnlPercentage) && pnlPercentage !== 0 ? ` (${pnlPercentage.toFixed(2)}%)` : ''}
                                         </Typography>
                                     </TableCell>
                                     <TableCell align="right">
