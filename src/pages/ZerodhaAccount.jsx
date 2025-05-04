@@ -25,11 +25,13 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import { formatCurrency } from '../utils/formatters';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
+import { getPortfolioValue, createPortfolioValue, updatePortfolioValue } from '../services/portfolioValue';
 
 const ZerodhaAccount = () => {
     const { isAuth, sessionActive, accountInfo, fetchData } = useZerodha();
     const [loading, setLoading] = useState(false);
     const theme = useTheme();
+    const [portfolioValueRecord, setPortfolioValueRecord] = useState(null);
 
     const handleRefresh = async () => {
         try {
@@ -45,6 +47,53 @@ const ZerodhaAccount = () => {
             handleRefresh();
         }
     }, [sessionActive]);
+
+    useEffect(() => {
+        if (
+            accountInfo &&
+            accountInfo.clientId &&
+            accountInfo.name &&
+            accountInfo.margins?.equity?.available !== undefined
+        ) {
+            const fetchOrCreateOrUpdatePortfolioValue = async () => {
+                try {
+                    // Try to get the record by accountId (clientId)
+                    const res = await getPortfolioValue({ account_id: accountInfo.clientId });
+                    if (res.success && res.data) {
+                        // If found, update the equity_account_balance
+                        const updateRes = await updatePortfolioValue({
+                            id: res.data.id,
+                            account_id: accountInfo.clientId,
+                            equity_account_balance: accountInfo.margins.equity.available
+                        });
+                        if (updateRes.success) {
+                            setPortfolioValueRecord({
+                                ...res.data,
+                                equity_account_balance: accountInfo.margins.equity.available
+                            });
+                        }
+                    } else {
+                        // If not found, create a new record
+                        const createRes = await createPortfolioValue({
+                            account_member_name: accountInfo.name,
+                            account_id: accountInfo.clientId,
+                            equity_account_balance: accountInfo.margins.equity.available
+                        });
+                        if (createRes.success) {
+                            // Fetch the newly created record
+                            const newRes = await getPortfolioValue({ id: createRes.id, account_id: accountInfo.clientId });
+                            if (newRes.success && newRes.data) {
+                                setPortfolioValueRecord(newRes.data);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    // Optionally handle error
+                }
+            };
+            fetchOrCreateOrUpdatePortfolioValue();
+        }
+    }, [accountInfo]);
 
     const handleConnect = async () => {
         try {

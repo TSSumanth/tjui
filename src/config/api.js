@@ -9,5 +9,6 @@ export const API_URLS = {
     ORDERS: `${BASE_URL}/orders`,
     LIVE_DATA: `${BASE_URL}/livedata`,
     ACTION_ITEMS: `${BASE_URL}/actionitems`,
-    TAG_MANAGEMENT: `${BASE_URL}/tags`
+    TAG_MANAGEMENT: `${BASE_URL}/tags`,
+    PORTFOLIO_VALUE: `${BASE_URL}/portfolio-value`
 }; 

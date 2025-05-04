@@ -24,6 +24,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import { useZerodha } from '../../context/ZerodhaContext';
+import PortfolioDashboardWidget from '../PortfolioDashboardWidget';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
@@ -152,6 +153,7 @@ const Header = () => {
                                 <NotificationsIcon />
                             </Badge>
                         </IconButton>
+                        <PortfolioDashboardWidget />
                     </Box>
                 </Toolbar>
             </AppBar>
