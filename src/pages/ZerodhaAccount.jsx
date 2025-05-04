@@ -6,8 +6,6 @@ import {
     Button,
     Paper,
     Grid,
-    Divider,
-    CircularProgress,
     Stack,
     Table,
     TableBody,
@@ -101,7 +99,7 @@ const ZerodhaAccount = () => {
 
     const subHeader = <ZerodhaSubHeader />;
 
-    if (!isAuth) {
+    if (!isAuth || !sessionActive) {
         return (
             <>
                 {subHeader}
@@ -132,26 +130,6 @@ const ZerodhaAccount = () => {
                             >
                                 {loading ? 'Connecting...' : 'Connect to Zerodha'}
                             </Button>
-                        </Box>
-                    </Container>
-                </Box>
-            </>
-        );
-    }
-
-    if (!sessionActive) {
-        return (
-            <>
-                {subHeader}
-                <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                    <Container maxWidth="lg">
-                        <Box sx={{
-                            mt: 8,
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                        }}>
-                            <CircularProgress />
                         </Box>
                     </Container>
                 </Box>
@@ -265,6 +243,14 @@ const ZerodhaAccount = () => {
                                                 label: 'Option Premium',
                                                 value: accountInfo.margins.equity.optionPremium,
                                                 color: 'secondary'
+                                            },
+                                            {
+                                                label: 'Total Account Value',
+                                                value: accountInfo.margins.equity.available +
+                                                    accountInfo.margins.equity.utilised +
+                                                    accountInfo.margins.equity.exposure +
+                                                    accountInfo.margins.equity.optionPremium,
+                                                color: 'primary'
                                             }
                                         ].map((item, index) => (
                                             <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>

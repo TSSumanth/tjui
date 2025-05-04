@@ -144,117 +144,119 @@ const Holdings = () => {
     }
 
     return (
-        <TableContainer component={Paper} elevation={0}>
-            <Table>
-                <TableHead>
-                    <TableRow>
-                        <TableCell>Symbol</TableCell>
-                        <TableCell align="right">Quantity</TableCell>
-                        <TableCell align="right">Avg. Cost</TableCell>
-                        <TableCell align="right">LTP</TableCell>
-                        <TableCell align="right">Current Value</TableCell>
-                        <TableCell align="right">P&L</TableCell>
-                        <TableCell align="right">Day Change</TableCell>
-                        <TableCell align="right">Action</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {holdings.map((holding) => {
-                        const quantity = Number(holding.quantity) || 0;
-                        const avgPrice = Number(holding.average_price) || 0;
-                        const lastPrice = Number(holding.last_price) || 0;
-                        const closePrice = Number(holding.close_price) || lastPrice;
-                        const currentValue = quantity * lastPrice;
-                        const investedValue = quantity * avgPrice;
-                        const pnl = currentValue - investedValue;
-                        const pnlPercentage = (pnl / investedValue) * 100;
-                        const dayChange = (lastPrice - closePrice) * quantity;
-                        const dayChangePercentage = ((lastPrice - closePrice) / closePrice) * 100;
+        <Box>
+            <TableContainer component={Paper} elevation={0}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Symbol</TableCell>
+                            <TableCell align="right">Quantity</TableCell>
+                            <TableCell align="right">Avg. Cost</TableCell>
+                            <TableCell align="right">LTP</TableCell>
+                            <TableCell align="right">Current Value</TableCell>
+                            <TableCell align="right">P&L</TableCell>
+                            <TableCell align="right">Day Change</TableCell>
+                            <TableCell align="right">Action</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {holdings.map((holding) => {
+                            const quantity = Number(holding.quantity) || 0;
+                            const avgPrice = Number(holding.average_price) || 0;
+                            const lastPrice = Number(holding.last_price) || 0;
+                            const closePrice = Number(holding.close_price) || lastPrice;
+                            const currentValue = quantity * lastPrice;
+                            const investedValue = quantity * avgPrice;
+                            const pnl = currentValue - investedValue;
+                            const pnlPercentage = (pnl / investedValue) * 100;
+                            const dayChange = (lastPrice - closePrice) * quantity;
+                            const dayChangePercentage = ((lastPrice - closePrice) / closePrice) * 100;
 
-                        return (
-                            <TableRow key={holding.tradingsymbol}>
-                                <TableCell component="th" scope="row">
-                                    {holding.tradingsymbol}
-                                </TableCell>
-                                <TableCell align="right">{quantity}</TableCell>
-                                <TableCell align="right">₹{formatCurrency(avgPrice)}</TableCell>
-                                <TableCell align="right"
-                                    sx={{
-                                        fontFamily: 'monospace',
-                                        transition: isUpdating ? 'color 0.3s ease' : 'none'
-                                    }}
-                                >
-                                    ₹{formatCurrency(lastPrice)}
-                                </TableCell>
-                                <TableCell align="right"
-                                    sx={{
-                                        fontFamily: 'monospace',
-                                        transition: isUpdating ? 'color 0.3s ease' : 'none'
-                                    }}
-                                >
-                                    ₹{formatCurrency(currentValue)}
-                                </TableCell>
-                                <TableCell align="right">
-                                    <Typography
-                                        color={pnl >= 0 ? 'success.main' : 'error.main'}
-                                        sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
+                            return (
+                                <TableRow key={holding.tradingsymbol}>
+                                    <TableCell component="th" scope="row">
+                                        {holding.tradingsymbol}
+                                    </TableCell>
+                                    <TableCell align="right">{quantity}</TableCell>
+                                    <TableCell align="right">₹{formatCurrency(avgPrice)}</TableCell>
+                                    <TableCell align="right"
+                                        sx={{
+                                            fontFamily: 'monospace',
+                                            transition: isUpdating ? 'color 0.3s ease' : 'none'
+                                        }}
                                     >
-                                        ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right">
-                                    <Typography
-                                        color={dayChange >= 0 ? 'success.main' : 'error.main'}
-                                        sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
+                                        ₹{formatCurrency(lastPrice)}
+                                    </TableCell>
+                                    <TableCell align="right"
+                                        sx={{
+                                            fontFamily: 'monospace',
+                                            transition: isUpdating ? 'color 0.3s ease' : 'none'
+                                        }}
                                     >
-                                        ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
-                                    </Typography>
-                                </TableCell>
-                                <TableCell align="right">
-                                    <IconButton
-                                        size="small"
-                                        onClick={e => handleMenuClick(e, holding)}
-                                        aria-label={`Actions for ${holding.tradingsymbol}`}
-                                        aria-haspopup="true"
-                                        aria-controls={Boolean(menuAnchorEl) && selectedHolding?.tradingsymbol === holding.tradingsymbol ? `holding-menu-${holding.tradingsymbol}` : undefined}
-                                    >
-                                        <MoreVert fontSize="small" />
-                                    </IconButton>
-                                    <Menu
-                                        id={`holding-menu-${holding.tradingsymbol}`}
-                                        anchorEl={menuAnchorEl}
-                                        open={Boolean(menuAnchorEl) && selectedHolding?.tradingsymbol === holding.tradingsymbol}
-                                        onClose={handleMenuClose}
-                                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                                        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                    >
-                                        <MenuItem onClick={handleExitHolding}>Exit Holdings</MenuItem>
-                                        <MenuItem onClick={handleAddMore}>Add More</MenuItem>
-                                    </Menu>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })}
-                </TableBody>
-            </Table>
-            {selectedOrderHolding && (
-                <OrderPopup
-                    open={Boolean(orderDialogAnchorEl)}
-                    onClose={handleCloseOrderDialog}
-                    position={selectedOrderHolding}
-                    quantity={quantity}
-                    price={price}
-                    underlying={selectedOrderHolding.tradingsymbol}
-                    isAdding={isAddingMore}
-                    isStopLoss={false}
-                    onQuantityChange={handleQuantityChange}
-                    onPriceChange={handlePriceChange}
-                    onSubmit={handleSubmit}
-                    loading={loading}
-                    transactionType={isAddingMore ? 'BUY' : 'SELL'}
-                />
-            )}
-        </TableContainer>
+                                        ₹{formatCurrency(currentValue)}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Typography
+                                            color={pnl >= 0 ? 'success.main' : 'error.main'}
+                                            sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
+                                        >
+                                            ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Typography
+                                            color={dayChange >= 0 ? 'success.main' : 'error.main'}
+                                            sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
+                                        >
+                                            ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <IconButton
+                                            size="small"
+                                            onClick={e => handleMenuClick(e, holding)}
+                                            aria-label={`Actions for ${holding.tradingsymbol}`}
+                                            aria-haspopup="true"
+                                            aria-controls={Boolean(menuAnchorEl) && selectedHolding?.tradingsymbol === holding.tradingsymbol ? `holding-menu-${holding.tradingsymbol}` : undefined}
+                                        >
+                                            <MoreVert fontSize="small" />
+                                        </IconButton>
+                                        <Menu
+                                            id={`holding-menu-${holding.tradingsymbol}`}
+                                            anchorEl={menuAnchorEl}
+                                            open={Boolean(menuAnchorEl) && selectedHolding?.tradingsymbol === holding.tradingsymbol}
+                                            onClose={handleMenuClose}
+                                            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                        >
+                                            <MenuItem onClick={handleExitHolding}>Exit Holdings</MenuItem>
+                                            <MenuItem onClick={handleAddMore}>Add More</MenuItem>
+                                        </Menu>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+                {selectedOrderHolding && (
+                    <OrderPopup
+                        open={Boolean(orderDialogAnchorEl)}
+                        onClose={handleCloseOrderDialog}
+                        position={selectedOrderHolding}
+                        quantity={quantity}
+                        price={price}
+                        underlying={selectedOrderHolding.tradingsymbol}
+                        isAdding={isAddingMore}
+                        isStopLoss={false}
+                        onQuantityChange={handleQuantityChange}
+                        onPriceChange={handlePriceChange}
+                        onSubmit={handleSubmit}
+                        loading={loading}
+                        transactionType={isAddingMore ? 'BUY' : 'SELL'}
+                    />
+                )}
+            </TableContainer>
+        </Box>
     );
 };
 

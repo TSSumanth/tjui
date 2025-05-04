@@ -16,12 +16,13 @@ import {
     LinearProgress,
     Skeleton,
     Card,
-    Grid
+    Grid,
+    Divider
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
-import { formatCurrency } from '../../utils/formatters';
-import { placeOrder, createClosePositionOrder } from '../../services/zerodha/api';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { placeOrder, createClosePositionOrder, getInstruments } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
 import dayjs from 'dayjs';
 import moment from 'moment-business-days';
@@ -199,7 +200,7 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
     </TableCell>
 );
 
-const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions }) => {
+const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions, instrumentDetails }) => {
     // Initialize expanded state to true by default
     const [expanded, setExpanded] = useState(true);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
@@ -296,6 +297,10 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const isNegativeQuantity = quantity < 0;
         const positionType = getPositionType(position.tradingsymbol);
         const isClosed = quantity === 0 || position.is_closed;
+        // Get lot size from instrumentDetails if available
+        const details = instrumentDetails && instrumentDetails[position.tradingsymbol];
+        const lotSize = details && details.lot_size ? Number(details.lot_size) : null;
+        const lots = lotSize ? Math.round(Math.abs(Number(position.quantity)) / lotSize) : null;
 
         // For closed positions, show total P&L in Day's P&L column
         let dayPnL;
@@ -382,6 +387,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     {quantity}
                 </StyledTableCell>
                 <StyledTableCell align="right">
+                    {lots !== null ? lots : '-'}
+                </StyledTableCell>
+                <StyledTableCell align="right">
                     {formatCurrency(position.average_price)}
                 </StyledTableCell>
                 <StyledTableCell align="right">
@@ -404,15 +412,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     }}
                 >
                     {formatCurrency(totalPnL)}
-                </StyledTableCell>
-                <StyledTableCell
-                    align="right"
-                    sx={{
-                        color: totalPnL >= 0 ? 'success.main' : 'error.main',
-                        transition: isUpdating ? 'color 0.3s ease' : 'none'
-                    }}
-                >
-                    {formatPercentage(calculateChangePercentage(position))}
                 </StyledTableCell>
                 <StyledTableCell align="right">
                     {isOption ? formatCurrency(intrinsicValue) : ''}
@@ -626,11 +625,11 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 <StyledTableCell>Symbol</StyledTableCell>
                                 <StyledTableCell>Position Type</StyledTableCell>
                                 <StyledTableCell align="right">Quantity</StyledTableCell>
+                                <StyledTableCell align="right">Lots</StyledTableCell>
                                 <StyledTableCell align="right">Avg. Price</StyledTableCell>
                                 <StyledTableCell align="right">LTP</StyledTableCell>
                                 <StyledTableCell align="right">Day's P&L</StyledTableCell>
                                 <StyledTableCell align="right">Total P&L</StyledTableCell>
-                                <StyledTableCell align="right">Change %</StyledTableCell>
                                 <StyledTableCell align="right">Intrinsic Value</StyledTableCell>
                                 <StyledTableCell align="right">Time Value</StyledTableCell>
                                 <StyledTableCell align="right">Days to Expiry</StyledTableCell>
@@ -659,6 +658,7 @@ const Positions = () => {
     const [quantity, setQuantity] = React.useState('');
     const [price, setPrice] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [instrumentDetails, setInstrumentDetails] = React.useState({});
 
     // Track initial load
     React.useEffect(() => {
@@ -673,6 +673,45 @@ const Positions = () => {
             setPrevPositions(positions);
         }
     }, [positions]);
+
+    // Fetch instrument details for all unique symbols
+    React.useEffect(() => {
+        const allPositions = [
+            ...(positions.net || []),
+            ...(positions.day || [])
+        ];
+        async function fetchInstrumentDetails() {
+            const symbols = Array.from(new Set(
+                allPositions.map(pos => pos.tradingsymbol)
+            ));
+            const detailsMap = { ...instrumentDetails };
+            await Promise.all(symbols.map(async (symbol) => {
+                if (!detailsMap[symbol]) {
+                    try {
+                        const resp = await getInstruments({ search: symbol });
+                        if (resp && resp.success && resp.data && resp.data.length > 0) {
+                            detailsMap[symbol] = resp.data[0];
+                        }
+                    } catch (e) {
+                        // catch intentionally left blank
+                    }
+                }
+            }));
+            setInstrumentDetails(detailsMap);
+        }
+        if (allPositions.length > 0) {
+            fetchInstrumentDetails();
+        }
+    }, [positions]);
+
+    // Helper to get days to expiry using instrument details
+    const getDaysToExpiry = (position) => {
+        const details = instrumentDetails[position.tradingsymbol];
+        if (!details || !details.expiry) return '';
+        const expiryDate = moment(details.expiry);
+        const today = moment().startOf('day');
+        return expiryDate.diff(today, 'days');
+    };
 
     const getTransactionType = (position, isAdding, isStopLoss) => {
         const isShortPosition = position.quantity < 0;
@@ -813,6 +852,7 @@ const Positions = () => {
                                 onOpenOrderDialog={handleOpenOrderDialog}
                                 loadingPositions={{}}
                                 prevPositions={prevPositions}
+                                instrumentDetails={instrumentDetails}
                             />
                         </Card>
                     </Grid>

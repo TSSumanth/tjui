@@ -124,6 +124,35 @@ const Portfolio = () => {
         totalDayPnL: holdingsDayPnL + positionsDayPnL
     }), [holdingsPnL, positionsTotalPnL, holdingsDayPnL, positionsDayPnL]);
 
+    // Calculate F&O Positions Total Value
+    const positionsTotalValue = React.useMemo(() => {
+        if (!positions || !positions.net) return 0;
+        const allPositions = [...(positions.net || []), ...(positions.day || [])];
+        let longValue = 0;
+        let shortPnL = 0;
+        allPositions.forEach((position) => {
+            const posType = getPositionType(position.tradingsymbol);
+            if ((posType === 'Future' || posType === 'Option') && position.quantity !== 0) {
+                if (position.quantity > 0) {
+                    longValue += Number(position.quantity) * Number(position.last_price || 0);
+                } else if (position.quantity < 0) {
+                    shortPnL += Number(position.pnl) || 0;
+                }
+            }
+        });
+        return longValue + shortPnL;
+    }, [positions]);
+
+    // Calculate Total Equity Holdings Value
+    const totalEquityHoldingsValue = React.useMemo(() => {
+        if (!holdings) return 0;
+        return holdings.reduce((sum, holding) => {
+            const quantity = Number(holding.quantity) || 0;
+            const lastPrice = Number(holding.last_price) || 0;
+            return sum + (quantity * lastPrice);
+        }, 0);
+    }, [holdings]);
+
     // Show loading state while initializing
     if (localLoading || loading) {
         return (
@@ -265,6 +294,18 @@ const Portfolio = () => {
                                 <Stack direction="row" spacing={2}>
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="caption" color="text.secondary">
+                                            Total Value
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: 'primary.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(totalEquityHoldingsValue)}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
                                             Today's Change
                                         </Typography>
                                         <Typography variant="body1" sx={{
@@ -325,6 +366,21 @@ const Portfolio = () => {
                                     {activePositionsCount} Positions
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                            Total Value
+                                            <Tooltip title="Total = Long positions' value + Short positions' P&L.">
+                                                <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
+                                            </Tooltip>
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: 'primary.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(positionsTotalValue)}
+                                        </Typography>
+                                    </Box>
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="caption" color="text.secondary">
                                             Today's Change
@@ -387,6 +443,21 @@ const Portfolio = () => {
                                     Portfolio Summary
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                            Total Portfolio Value
+                                            <Tooltip title="Total Portfolio Value = Equity Holdings Value + F&O Positions Value">
+                                                <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
+                                            </Tooltip>
+                                        </Typography>
+                                        <Typography variant="body1" sx={{
+                                            color: 'primary.main',
+                                            fontWeight: 500,
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {formatCurrency(totalEquityHoldingsValue + positionsTotalValue)}
+                                        </Typography>
+                                    </Box>
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="caption" color="text.secondary">
                                             Today's Change
