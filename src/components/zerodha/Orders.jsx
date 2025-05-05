@@ -24,13 +24,16 @@ import {
     LinearProgress,
     Skeleton
 } from '@mui/material';
-import { MoreVert } from '@mui/icons-material';
+import { MoreVert, Link } from '@mui/icons-material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import moment from 'moment';
 import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../services/zerodha/api';
 import { formatCurrency } from '../../utils/formatters';
 import LinkToTradePopup from './LinkToTradePopup';
 import { getOrders as getAppOrders } from '../../services/orders';
+import OcoOrderDialog from './OcoOrderDialog';
+import { isOcoOrder, getPairedOrderId, startOcoMonitoring } from '../../services/zerodha/oco';
+import OcoPairsTable from './OcoPairsTable';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -83,11 +86,13 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [linkedOrderIds, setLinkedOrderIds] = useState(new Set());
+    const [ocoOrderIds, setOcoOrderIds] = useState(new Set());
 
     React.useEffect(() => {
         let isMounted = true;
         async function checkLinkedOrders() {
             const linkedIds = new Set();
+            const ocoIds = new Set();
             // Only check for completed orders
             const completedOrders = orders.filter(o => o.status === 'COMPLETE');
             await Promise.all(completedOrders.map(async (zOrder) => {
@@ -100,8 +105,15 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
                 if (appOrders && appOrders.length > 0) {
                     linkedIds.add(zOrder.order_id);
                 }
+                if (isOcoOrder(zOrder.order_id)) {
+                    ocoIds.add(zOrder.order_id);
+                    ocoIds.add(getPairedOrderId(zOrder.order_id));
+                }
             }));
-            if (isMounted) setLinkedOrderIds(linkedIds);
+            if (isMounted) {
+                setLinkedOrderIds(linkedIds);
+                setOcoOrderIds(ocoIds);
+            }
         }
         checkLinkedOrders();
         return () => { isMounted = false; };
@@ -158,6 +170,9 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
                                     {order.order_id}
                                     {order.status === 'COMPLETE' && linkedOrderIds.has(order.order_id) && (
                                         <Chip label="Linked" color="success" size="small" sx={{ ml: 1 }} />
+                                    )}
+                                    {ocoOrderIds.has(order.order_id) && (
+                                        <Chip label="OCO" color="info" size="small" sx={{ ml: 1 }} />
                                     )}
                                 </TableCell>
                                 <TableCell>
@@ -241,6 +256,18 @@ function Orders() {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [linkToTradeOpen, setLinkToTradeOpen] = useState(false);
     const [linkToTradeOrder, setLinkToTradeOrder] = useState(null);
+    const [showOcoDialog, setShowOcoDialog] = useState(false);
+    const [ocoPairsRefresh, setOcoPairsRefresh] = useState(0);
+
+    React.useEffect(() => {
+        let cleanup;
+        (async () => {
+            cleanup = await startOcoMonitoring();
+        })();
+        return () => {
+            if (cleanup) cleanup();
+        };
+    }, []);
 
     if (isLoading) {
         return (
@@ -323,9 +350,17 @@ function Orders() {
 
     return (
         <Box p={4}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Orders
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">Orders</Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<Link />}
+                    onClick={() => setShowOcoDialog(true)}
+                >
+                    Create OCO Order
+                </Button>
+            </Box>
+            <OcoPairsTable onChange={() => setOcoPairsRefresh(x => x + 1)} key={ocoPairsRefresh} />
             <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={triggerPendingOrders} title="Stop Loss Orders (Trigger Pending)" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} onLinkToTrade={handleLinkToTrade} />
@@ -342,6 +377,11 @@ function Orders() {
                 onClose={handleLinkToTradeClose}
                 zerodhaOrder={linkToTradeOrder}
                 onSuccess={handleLinkToTradeSuccess}
+            />
+            <OcoOrderDialog
+                open={showOcoDialog}
+                onClose={() => setShowOcoDialog(false)}
+                orders={orders.filter(o => o.status === 'OPEN' || o.status === 'TRIGGER PENDING')}
             />
         </Box>
     );
