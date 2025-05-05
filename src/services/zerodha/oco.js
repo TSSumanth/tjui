@@ -1,8 +1,7 @@
 import api from './api';
-import { getOrders, cancelZerodhaOrder, getOrderById } from './api';
+import { cancelZerodhaOrder, getOrderById } from './api';
 import { addActionItem } from '../actionitems';
 
-const API_BASE = '/api/order-pairs';
 
 // Store OCO pairs in memory
 let ocoPairs = new Map();

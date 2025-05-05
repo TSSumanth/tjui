@@ -1,9 +1,11 @@
 import React from 'react';
 import { Container, Typography, Box } from '@mui/material';
 import OcoPairsTable from '../components/zerodha/OcoPairsTable';
-
+import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 export default function PairedOrdersPage() {
     return (
+        <>
+            <ZerodhaSubHeader />
         <Container maxWidth="xl">
             <Box sx={{ my: 4 }}>
                 <Typography variant="h4" component="h1" gutterBottom>
@@ -15,5 +17,6 @@ export default function PairedOrdersPage() {
                 <OcoPairsTable />
             </Box>
         </Container>
+        </>
     );
 } 
