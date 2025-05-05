@@ -51,7 +51,15 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
         setLoading(true);
         setError('');
         try {
-            await createOrderPair({ order1_id: selectedOrders[0].order_id, order2_id: selectedOrders[1].order_id, type: 'OCO' });
+            await createOrderPair({
+                order1_id: selectedOrders[0].order_id,
+                order2_id: selectedOrders[1].order_id,
+                type: 'OCO',
+                order1_symbol: selectedOrders[0].tradingsymbol,
+                order2_symbol: selectedOrders[1].tradingsymbol,
+                order1_type: selectedOrders[0].transaction_type,
+                order2_type: selectedOrders[1].transaction_type
+            });
             setShowSuccess(true);
             setSelectedOrders([]);
             setTimeout(() => {

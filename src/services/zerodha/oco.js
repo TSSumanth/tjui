@@ -95,8 +95,8 @@ export const getAllOcoPairs = () => {
     return pairs;
 };
 
-export const createOrderPair = async ({ order1_id, order2_id, type = 'OCO' }) => {
-    const resp = await api.post('/api/order-pairs', { order1_id, order2_id, type });
+export const createOrderPair = async ({ order1_id, order2_id, type = 'OCO', order1_symbol, order2_symbol, order1_type, order2_type }) => {
+    const resp = await api.post('/api/order-pairs', { order1_id, order2_id, type, order1_symbol, order2_symbol, order1_type, order2_type });
     return resp.data;
 };
 

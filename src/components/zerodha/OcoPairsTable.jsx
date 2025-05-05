@@ -56,8 +56,10 @@ export default function OcoPairsTable({ onChange }) {
                     <TableHead>
                         <TableRow>
                             <TableCell>Order 1</TableCell>
+                            <TableCell>Type</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Order 2</TableCell>
+                            <TableCell>Type</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Last Updated</TableCell>
                             <TableCell>Action</TableCell>
@@ -69,9 +71,11 @@ export default function OcoPairsTable({ onChange }) {
                             const o2 = getOrder(pair.order2_id);
                             return (
                                 <TableRow key={pair.id}>
-                                    <TableCell>{o1.tradingsymbol} <br /> <small>{pair.order1_id}</small></TableCell>
+                                    <TableCell>{pair.order1_symbol || o1.tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
+                                    <TableCell>{pair.order1_type || o1.ordertype || ''}</TableCell>
                                     <TableCell><Chip label={o1.status} color={getStatusColor(o1.status)} size="small" /></TableCell>
-                                    <TableCell>{o2.tradingsymbol} <br /> <small>{pair.order2_id}</small></TableCell>
+                                    <TableCell>{pair.order2_symbol || o2.tradingsymbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
+                                    <TableCell>{pair.order2_type || o2.ordertype || ''}</TableCell>
                                     <TableCell><Chip label={o2.status} color={getStatusColor(o2.status)} size="small" /></TableCell>
                                     <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                     <TableCell>
