@@ -28,31 +28,60 @@ export default function OcoPairsTable({ onChange }) {
             const pairsData = await getOrderPairs();
             setPairs(pairsData);
 
-            // Fetch status for each order in OCO pairs
-            const statusMap = {};
+            // Fetch status for each order in OCO pairs (active pairs: always, completed pairs: only if not already in statusMap)
+            const statusMap = { ...orderStatusMap };
             await Promise.all(pairsData.map(async (pair) => {
-                if (pair.order1_id) {
-                    try {
-                        const resp1 = await getOrderById(pair.order1_id);
-                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
-                            const status = resp1.data[resp1.data.length - 1].status;
-                            statusMap[pair.order1_id] = status;
-                            console.log(`Order ${pair.order1_id} status: ${status}`);
+                // For active pairs, always fetch
+                if (pair.status !== 'completed') {
+                    if (pair.order1_id) {
+                        try {
+                            const resp1 = await getOrderById(pair.order1_id);
+                            if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                                const status = resp1.data[resp1.data.length - 1].status;
+                                statusMap[pair.order1_id] = status;
+                                console.log(`Order ${pair.order1_id} status: ${status}`);
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching status for order ${pair.order1_id}:`, err);
                         }
-                    } catch (err) {
-                        console.error(`Error fetching status for order ${pair.order1_id}:`, err);
                     }
-                }
-                if (pair.order2_id) {
-                    try {
-                        const resp2 = await getOrderById(pair.order2_id);
-                        if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                            const status = resp2.data[resp2.data.length - 1].status;
-                            statusMap[pair.order2_id] = status;
-                            console.log(`Order ${pair.order2_id} status: ${status}`);
+                    if (pair.order2_id) {
+                        try {
+                            const resp2 = await getOrderById(pair.order2_id);
+                            if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                                const status = resp2.data[resp2.data.length - 1].status;
+                                statusMap[pair.order2_id] = status;
+                                console.log(`Order ${pair.order2_id} status: ${status}`);
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching status for order ${pair.order2_id}:`, err);
                         }
-                    } catch (err) {
-                        console.error(`Error fetching status for order ${pair.order2_id}:`, err);
+                    }
+                } else {
+                    // For completed pairs, fetch only if not already in statusMap
+                    if (pair.order1_id && !statusMap[pair.order1_id]) {
+                        try {
+                            const resp1 = await getOrderById(pair.order1_id);
+                            if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                                const status = resp1.data[resp1.data.length - 1].status;
+                                statusMap[pair.order1_id] = status;
+                                console.log(`Order ${pair.order1_id} status (completed): ${status}`);
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching status for order ${pair.order1_id}:`, err);
+                        }
+                    }
+                    if (pair.order2_id && !statusMap[pair.order2_id]) {
+                        try {
+                            const resp2 = await getOrderById(pair.order2_id);
+                            if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                                const status = resp2.data[resp2.data.length - 1].status;
+                                statusMap[pair.order2_id] = status;
+                                console.log(`Order ${pair.order2_id} status (completed): ${status}`);
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching status for order ${pair.order2_id}:`, err);
+                        }
                     }
                 }
             }));
