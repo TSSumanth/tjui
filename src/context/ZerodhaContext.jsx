@@ -98,7 +98,7 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error checking session:', err);
             if (isMounted.current) {
-                setSessionActive(false);
+            setSessionActive(false);
                 setIsAuth(false);
             }
             return false;
@@ -116,7 +116,7 @@ export const ZerodhaProvider = ({ children }) => {
 
         try {
             if (force) {
-                setLoading(true);
+            setLoading(true);
             }
             setError(null);
 
@@ -172,11 +172,11 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error fetching data:', err);
             if (isMounted.current) {
-                setError(err.message);
+            setError(err.message);
             }
         } finally {
             if (isMounted.current && force) {
-                setLoading(false);
+            setLoading(false);
             }
         }
     }, [checkSession]);
@@ -194,7 +194,7 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error fetching orders:', err);
             if (isMounted.current) {
-                setError(err.message);
+            setError(err.message);
             }
         } finally {
             if (isMounted.current) {
