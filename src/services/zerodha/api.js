@@ -157,4 +157,9 @@ export const modifyZerodhaOrder = async (orderId, data) => {
     return response.data;
 };
 
+export const getOrderById = async (orderId) => {
+    const response = await api.get(`/api/zerodha/order/${orderId}`);
+    return response.data;
+};
+
 export default api; 

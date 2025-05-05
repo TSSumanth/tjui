@@ -189,6 +189,9 @@ export const ZerodhaProvider = ({ children }) => {
             }
         } catch (err) {
             console.error('Error fetching orders:', err);
+            if (isMounted.current) {
+                setError(err.message);
+            }
         } finally {
             if (isMounted.current) {
                 setLoadingStates(prev => ({ ...prev, orders: false }));
@@ -337,6 +340,21 @@ export const ZerodhaProvider = ({ children }) => {
         }
         setLtpMap(newLtpMap);
     }, [holdings, positions]);
+
+    // Remove any automatic polling for orders
+    useEffect(() => {
+        // Only fetch orders on initial mount if we have a valid session
+        if (isInitialLoadDone.current) return;
+
+        const initialFetch = async () => {
+            if (await checkSession()) {
+                await fetchOrders();
+                isInitialLoadDone.current = true;
+            }
+        };
+
+        initialFetch();
+    }, [checkSession, fetchOrders]);
 
     const handleLogout = useCallback(async () => {
         try {

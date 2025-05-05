@@ -542,7 +542,7 @@ const Portfolio = () => {
                         </Typography>
                         <Holdings />
                     </Paper>
-                </Box>
+                    </Box>
 
                 {/* Positions Section */}
                 <Box mb={4}>
@@ -552,7 +552,7 @@ const Portfolio = () => {
                         </Typography>
                         <Positions />
                     </Paper>
-                </Box>
+                    </Box>
             </Container>
         </Box>
     );

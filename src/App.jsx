@@ -16,6 +16,7 @@ import ActionItemsPage from './pages/ActionItems';
 import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
 import Dashboard from './pages/DashBoardManagement';
 import TagManagement from './pages/TagManagement';
+import PairedOrdersPage from './pages/PairedOrdersPage';
 
 function App() {
     return (
@@ -39,6 +40,7 @@ function App() {
                     <Route path="/mystrategies" element={<StrategyPage />} />
                     <Route path="/updatestrategy/:id" element={<UpdateStrategyPage />} />
                     <Route path="/actionitems" element={<ActionItemsPage />} />
+                    <Route path="/zerodha/paired-orders" element={<PairedOrdersPage />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
             </BrowserRouter>

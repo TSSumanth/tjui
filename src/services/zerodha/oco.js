@@ -1,5 +1,5 @@
 import api from './api';
-import { getOrders, cancelZerodhaOrder } from './api';
+import { getOrders, cancelZerodhaOrder, getOrderById } from './api';
 import { addActionItem } from '../actionitems';
 
 const API_BASE = '/api/order-pairs';
@@ -36,37 +36,47 @@ export const getPairedOrderId = (orderId) => {
 export const startOcoMonitoring = async () => {
     const checkOrders = async () => {
         try {
-            // Get all orders
-            const orders = await getOrders();
-
-            // Check each OCO pair
+            // For each OCO pair, fetch status for both orders
             for (const [order1Id, order2Id] of ocoPairs.entries()) {
-                const order1 = orders.find(o => o.order_id === order1Id);
-                const order2 = orders.find(o => o.order_id === order2Id);
-
-                if (!order1 || !order2) continue;
-
-                // If both orders are complete, create action item
-                if (order1.status === 'COMPLETE' && order2.status === 'COMPLETE') {
-                    const description = `One Cancels Other Order execution failed, both orders are executed. Please Close one order. Order Details: ${order1.tradingsymbol} - ${order1.order_id}, ${order2.tradingsymbol} - ${order2.order_id}`;
-                    await addActionItem({
-                        description,
-                        status: 'TODO',
-                        created_by: 'Automatic',
-                        asset: '',
-                        stock_trade_id: '',
-                        option_trade_id: ''
-                    });
-                    removeOcoPair(order1Id);
+                let order1Status = null;
+                let order2Status = null;
+                try {
+                    const resp1 = await getOrderById(order1Id);
+                    if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                        order1Status = resp1.data[resp1.data.length - 1].status;
+                    }
+                } catch (err) {
+                    console.error(`Error fetching status for order ${order1Id}:`, err);
                 }
-                // If one order is complete, cancel the other
-                else if (order1.status === 'COMPLETE' && order2.status === 'OPEN') {
-                    await cancelZerodhaOrder(order2Id);
-                    removeOcoPair(order1Id);
+                try {
+                    const resp2 = await getOrderById(order2Id);
+                    if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                        order2Status = resp2.data[resp2.data.length - 1].status;
+                    }
+                } catch (err) {
+                    console.error(`Error fetching status for order ${order2Id}:`, err);
                 }
-                else if (order2.status === 'COMPLETE' && order1.status === 'OPEN') {
-                    await cancelZerodhaOrder(order1Id);
-                    removeOcoPair(order2Id);
+
+                // OCO logic
+                if (order1Status && order2Status) {
+                    if (order1Status === 'COMPLETE' && order2Status === 'COMPLETE') {
+                        const description = `One Cancels Other Order execution failed, both orders are executed. Please Close one order. Order Details: ${order1Id}, ${order2Id}`;
+                        await addActionItem({
+                            description,
+                            status: 'TODO',
+                            created_by: 'Automatic',
+                            asset: '',
+                            stock_trade_id: '',
+                            option_trade_id: ''
+                        });
+                        removeOcoPair(order1Id);
+                    } else if (order1Status === 'COMPLETE' && order2Status === 'OPEN') {
+                        await cancelZerodhaOrder(order2Id);
+                        removeOcoPair(order1Id);
+                    } else if (order2Status === 'COMPLETE' && order1Status === 'OPEN') {
+                        await cancelZerodhaOrder(order1Id);
+                        removeOcoPair(order2Id);
+                    }
                 }
             }
         } catch (error) {

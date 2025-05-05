@@ -139,7 +139,7 @@ const Holdings = () => {
         return (
             <Typography variant="body1" color="text.secondary" align="center" py={4}>
                 No holdings found
-            </Typography>
+                </Typography>
         );
     }
 
@@ -199,7 +199,7 @@ const Holdings = () => {
                                         <Typography
                                             color={pnl >= 0 ? 'success.main' : 'error.main'}
                                             sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
-                                        >
+                                    >
                                             ₹{formatCurrency(pnl)}
                                             {isFinite(pnlPercentage) && pnlPercentage !== 0 ? ` (${pnlPercentage.toFixed(2)}%)` : ''}
                                         </Typography>
@@ -208,7 +208,7 @@ const Holdings = () => {
                                         <Typography
                                             color={dayChange >= 0 ? 'success.main' : 'error.main'}
                                             sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
-                                        >
+                                    >
                                             ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
                                         </Typography>
                                     </TableCell>
@@ -229,7 +229,7 @@ const Holdings = () => {
                                             onClose={handleMenuClose}
                                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                        >
+                                    >
                                             <MenuItem onClick={handleExitHolding}>Exit Holdings</MenuItem>
                                             <MenuItem onClick={handleAddMore}>Add More</MenuItem>
                                         </Menu>

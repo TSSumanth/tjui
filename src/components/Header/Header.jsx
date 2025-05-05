@@ -41,7 +41,7 @@ const Header = () => {
     const handleZerodhaClick = () => {
         if (sessionActive) {
             navigate('/zerodha/account');
-        } else {
+                            } else {
             navigate('/zerodha/login');
         }
     };
@@ -257,72 +257,72 @@ const ButtonGroup = () => {
             }
         }}>
             {Object.entries(menuItems).map(([menuName, { icon, items }]) => (
-                <React.Fragment key={menuName}>
-                    <Button
-                        onClick={(e) => handleClick(e, menuName)}
-                        startIcon={icon}
-                        endIcon={<KeyboardArrowDownIcon />}
+                        <React.Fragment key={menuName}>
+                            <Button
+                                onClick={(e) => handleClick(e, menuName)}
+                                startIcon={icon}
+                                endIcon={<KeyboardArrowDownIcon />}
                         data-active={activeMenu === menuName}
-                    >
-                        {menuName}
-                    </Button>
-                    <Menu
-                        anchorEl={anchorEl}
-                        open={activeMenu === menuName}
-                        onClose={handleClose}
-                        anchorOrigin={{
-                            vertical: 'bottom',
-                            horizontal: 'left',
-                        }}
-                        transformOrigin={{
-                            vertical: 'top',
-                            horizontal: 'left',
-                        }}
-                        PaperProps={{
-                            sx: {
-                                mt: 1,
-                                minWidth: "200px",
-                                boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
+                            >
+                                {menuName}
+                            </Button>
+                            <Menu
+                                anchorEl={anchorEl}
+                                open={activeMenu === menuName}
+                                onClose={handleClose}
+                                anchorOrigin={{
+                                    vertical: 'bottom',
+                                    horizontal: 'left',
+                                }}
+                                transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'left',
+                                }}
+                                PaperProps={{
+                                    sx: {
+                                        mt: 1,
+                                        minWidth: "200px",
+                                        boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
                                 borderRadius: 2,
                                 overflow: 'hidden',
-                                "& .MuiMenuItem-root": {
+                                        "& .MuiMenuItem-root": {
                                     padding: "10px 20px",
                                     fontSize: '1rem',
                                     fontWeight: 400,
                                     '&:hover': {
-                                        backgroundColor: "#e3f2fd"
+                                                backgroundColor: "#e3f2fd"
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                        }}
-                    >
-                        {Object.entries(items).map(([label, { path, icon, onClick }]) => (
-                            <MenuItem
-                                key={path}
-                                component={onClick ? 'button' : Link}
-                                to={onClick ? undefined : path}
-                                onClick={onClick || handleClose}
-                                selected={isActive(path)}
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                    color: isActive(path) ? "#1976d2" : "inherit",
-                                    fontWeight: isActive(path) ? 600 : 400,
-                                    width: "100%",
-                                    border: "none",
-                                    background: "none",
-                                    cursor: "pointer"
                                 }}
                             >
-                                {icon}
-                                {label}
-                            </MenuItem>
+                        {Object.entries(items).map(([label, { path, icon, onClick }]) => (
+                                        <MenuItem
+                                            key={path}
+                                            component={onClick ? 'button' : Link}
+                                            to={onClick ? undefined : path}
+                                            onClick={onClick || handleClose}
+                                            selected={isActive(path)}
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                color: isActive(path) ? "#1976d2" : "inherit",
+                                                fontWeight: isActive(path) ? 600 : 400,
+                                                width: "100%",
+                                                border: "none",
+                                                background: "none",
+                                                cursor: "pointer"
+                                            }}
+                                        >
+                                            {icon}
+                                            {label}
+                                        </MenuItem>
                         ))}
-                    </Menu>
-                </React.Fragment>
+                            </Menu>
+                        </React.Fragment>
             ))}
-        </Box>
+            </Box>
     );
 };
 

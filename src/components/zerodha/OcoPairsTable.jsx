@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Chip, Typography } from '@mui/material';
-import { getOrderPairs, deleteOrderPair } from '../../services/zerodha/oco';
-import { getOrders } from '../../services/zerodha/api';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Chip, Typography, Divider } from '@mui/material';
+import { getOrderPairs, deleteOrderPair, updateOrderPairStatus } from '../../services/zerodha/oco';
+import { getOrderById, cancelZerodhaOrder } from '../../services/zerodha/api';
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -9,34 +9,101 @@ function formatDate(dateStr) {
     return d.toLocaleString(); // You can use toISOString() or a library for more control
 }
 
+function isToday(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
 export default function OcoPairsTable({ onChange }) {
     const [pairs, setPairs] = useState([]);
-    const [orders, setOrders] = useState([]);
+    const [orderStatusMap, setOrderStatusMap] = useState({});
     const [loading, setLoading] = useState(false);
 
-    const fetchPairs = async () => {
+    // Poll OCO pairs and their order statuses
+    const fetchPairsAndStatuses = async () => {
         setLoading(true);
-        setPairs(await getOrderPairs());
-        const ordersResult = await getOrders();
-        setOrders(Array.isArray(ordersResult) ? ordersResult : []);
-        setLoading(false);
+        try {
+            const pairsData = await getOrderPairs();
+            setPairs(pairsData);
+
+            // Fetch status for each order in OCO pairs
+            const statusMap = {};
+            await Promise.all(pairsData.map(async (pair) => {
+                if (pair.order1_id) {
+                    try {
+                        const resp1 = await getOrderById(pair.order1_id);
+                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                            const status = resp1.data[resp1.data.length - 1].status;
+                            statusMap[pair.order1_id] = status;
+                            console.log(`Order ${pair.order1_id} status: ${status}`);
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching status for order ${pair.order1_id}:`, err);
+                    }
+                }
+                if (pair.order2_id) {
+                    try {
+                        const resp2 = await getOrderById(pair.order2_id);
+                        if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                            const status = resp2.data[resp2.data.length - 1].status;
+                            statusMap[pair.order2_id] = status;
+                            console.log(`Order ${pair.order2_id} status: ${status}`);
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching status for order ${pair.order2_id}:`, err);
+                    }
+                }
+            }));
+            setOrderStatusMap(statusMap);
+
+            // OCO logic: if one order is COMPLETE and the other is OPEN, cancel the open one and mark the pair as completed
+            await Promise.all(pairsData.map(async (pair) => {
+                if (pair.status !== 'completed') {
+                    const status1 = statusMap[pair.order1_id];
+                    const status2 = statusMap[pair.order2_id];
+
+                    console.log(`Checking pair ${pair.id}: Order1(${pair.order1_id})=${status1}, Order2(${pair.order2_id})=${status2}`);
+
+                    if (status1 === 'COMPLETE' && status2 === 'OPEN') {
+                        console.log(`Cancelling order ${pair.order2_id} and marking pair ${pair.id} as completed`);
+                        await cancelZerodhaOrder(pair.order2_id);
+                        await updateOrderPairStatus(pair.id, 'completed');
+                    } else if (status2 === 'COMPLETE' && status1 === 'OPEN') {
+                        console.log(`Cancelling order ${pair.order1_id} and marking pair ${pair.id} as completed`);
+                        await cancelZerodhaOrder(pair.order1_id);
+                        await updateOrderPairStatus(pair.id, 'completed');
+                    } else if (status1 === 'COMPLETE' && status2 === 'COMPLETE') {
+                        console.log(`Both orders completed for pair ${pair.id}, marking as completed`);
+                        await updateOrderPairStatus(pair.id, 'completed');
+                    } else if (status1 === 'CANCELLED' && status2 === 'CANCELLED') {
+                        console.log(`Both orders cancelled for pair ${pair.id}, marking as completed`);
+                        await updateOrderPairStatus(pair.id, 'completed');
+                    }
+                }
+            }));
+        } catch (error) {
+            console.error('Error in fetchPairsAndStatuses:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
-        fetchPairs();
-        const interval = setInterval(fetchPairs, 10000);
+        fetchPairsAndStatuses();
+        const interval = setInterval(fetchPairsAndStatuses, 15000); // Poll every 15s
         return () => clearInterval(interval);
     }, []);
 
     const handleCancel = async (id) => {
         await deleteOrderPair(id);
-        fetchPairs();
+        fetchPairsAndStatuses();
         if (onChange) onChange();
     };
 
     if (!pairs.length) return null;
 
-    const getOrder = (id) => Array.isArray(orders) ? orders.find(o => o.order_id === id) || {} : {};
     const getStatusColor = (status) => {
         switch (status) {
             case 'COMPLETE': return 'success';
@@ -45,6 +112,10 @@ export default function OcoPairsTable({ onChange }) {
             default: return 'warning';
         }
     };
+
+    // Split pairs into active and completed (today only)
+    const activePairs = pairs.filter(pair => pair.status !== 'completed');
+    const completedTodayPairs = pairs.filter(pair => pair.status === 'completed' && isToday(pair.created_at));
 
     return (
         <Paper sx={{ mb: 3, p: 2 }}>
@@ -66,17 +137,17 @@ export default function OcoPairsTable({ onChange }) {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {pairs.map((pair) => {
-                            const o1 = getOrder(pair.order1_id);
-                            const o2 = getOrder(pair.order2_id);
+                        {activePairs.map((pair) => {
+                            const status1 = orderStatusMap[pair.order1_id] || '';
+                            const status2 = orderStatusMap[pair.order2_id] || '';
                             return (
                                 <TableRow key={pair.id}>
-                                    <TableCell>{pair.order1_symbol || o1.tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
-                                    <TableCell>{pair.order1_type || o1.ordertype || ''}</TableCell>
-                                    <TableCell><Chip label={o1.status} color={getStatusColor(o1.status)} size="small" /></TableCell>
-                                    <TableCell>{pair.order2_symbol || o2.tradingsymbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
-                                    <TableCell>{pair.order2_type || o2.ordertype || ''}</TableCell>
-                                    <TableCell><Chip label={o2.status} color={getStatusColor(o2.status)} size="small" /></TableCell>
+                                    <TableCell>{pair.order1_symbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
+                                    <TableCell>{pair.order1_type || ''}</TableCell>
+                                    <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                    <TableCell>{pair.order2_symbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
+                                    <TableCell>{pair.order2_type || ''}</TableCell>
+                                    <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                     <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                     <TableCell>
                                         <Button variant="outlined" color="error" size="small" onClick={() => handleCancel(pair.id)}>
@@ -89,6 +160,46 @@ export default function OcoPairsTable({ onChange }) {
                     </TableBody>
                 </Table>
             </TableContainer>
+            {completedTodayPairs.length > 0 && (
+                <>
+                    <Divider sx={{ my: 3 }} />
+                    <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                        Completed OCO Pairs (Today)
+                    </Typography>
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Order 1</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Order 2</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Last Updated</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {completedTodayPairs.map((pair) => {
+                                    const status1 = orderStatusMap[pair.order1_id] || '';
+                                    const status2 = orderStatusMap[pair.order2_id] || '';
+                                    return (
+                                        <TableRow key={pair.id}>
+                                            <TableCell>{pair.order1_symbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
+                                            <TableCell>{pair.order1_type || ''}</TableCell>
+                                            <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                            <TableCell>{pair.order2_symbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
+                                            <TableCell>{pair.order2_type || ''}</TableCell>
+                                            <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                            <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </>
+            )}
         </Paper>
     );
 } 

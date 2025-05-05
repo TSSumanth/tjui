@@ -11,7 +11,6 @@ import {
     Box,
     Chip,
     CircularProgress,
-    Alert,
     IconButton,
     Menu,
     MenuItem,
@@ -32,8 +31,7 @@ import { formatCurrency } from '../../utils/formatters';
 import LinkToTradePopup from './LinkToTradePopup';
 import { getOrders as getAppOrders } from '../../services/orders';
 import OcoOrderDialog from './OcoOrderDialog';
-import { isOcoOrder, getPairedOrderId, startOcoMonitoring } from '../../services/zerodha/oco';
-import OcoPairsTable from './OcoPairsTable';
+import { isOcoOrder, getPairedOrderId } from '../../services/zerodha/oco';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -117,7 +115,7 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
         }
         checkLinkedOrders();
         return () => { isMounted = false; };
-    }, [orders]);
+    }, []);
 
     const handleMenuClick = (event, order) => {
         setMenuAnchorEl(event.currentTarget);
@@ -257,17 +255,6 @@ function Orders() {
     const [linkToTradeOpen, setLinkToTradeOpen] = useState(false);
     const [linkToTradeOrder, setLinkToTradeOrder] = useState(null);
     const [showOcoDialog, setShowOcoDialog] = useState(false);
-    const [ocoPairsRefresh, setOcoPairsRefresh] = useState(0);
-
-    React.useEffect(() => {
-        let cleanup;
-        (async () => {
-            cleanup = await startOcoMonitoring();
-        })();
-        return () => {
-            if (cleanup) cleanup();
-        };
-    }, []);
 
     if (isLoading) {
         return (
@@ -356,11 +343,15 @@ function Orders() {
                     variant="contained"
                     startIcon={<Link />}
                     onClick={() => setShowOcoDialog(true)}
+                    sx={{
+                        textTransform: 'none',
+                        borderRadius: 1.5,
+                        px: 2
+                    }}
                 >
                     Create OCO Order
                 </Button>
             </Box>
-            <OcoPairsTable onChange={() => setOcoPairsRefresh(x => x + 1)} key={ocoPairsRefresh} />
             <OrdersTable orders={openOrders} title="Open Orders" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={triggerPendingOrders} title="Stop Loss Orders (Trigger Pending)" showActions onCancel={handleCancelOrder} onModify={handleModifyOrder} />
             <OrdersTable orders={completedOrders} title="Completed Orders" showActions onCancel={() => { }} onModify={() => { }} onLinkToTrade={handleLinkToTrade} />

@@ -17,6 +17,7 @@ import LinkOffIcon from '@mui/icons-material/LinkOff';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import { useZerodha } from '../../context/ZerodhaContext';
 
+
 const ZerodhaSubHeader = () => {
     const location = useLocation();
     const { sessionActive, handleLogout } = useZerodha();
@@ -139,6 +140,31 @@ const ZerodhaSubHeader = () => {
                         }}
                     >
                         Orders
+                    </Button>
+                    <Button
+                        component={Link}
+                        to="/zerodha/paired-orders"
+                        startIcon={<ListAltIcon />}
+                        variant={isActive('/zerodha/paired-orders') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
+                            }
+                        }}
+                    >
+                        Paired Orders
                     </Button>
                     <Button
                         component={Link}

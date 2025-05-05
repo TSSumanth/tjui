@@ -188,15 +188,15 @@ const PortfolioDetailsPage = () => {
                     <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 2 }}>
                         Holdings
                     </Typography>
-                    <Holdings />
-                </Box>
+                            <Holdings />
+                        </Box>
 
                 {/* Positions Section */}
                 <Box mb={4}>
                     <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 2 }}>
                         Positions
                     </Typography>
-                    <Positions />
+                            <Positions />
                 </Box>
             </Container>
         </div>
