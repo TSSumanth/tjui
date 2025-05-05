@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Chip, Typography, Divider } from '@mui/material';
-import { getOrderPairs, deleteOrderPair, updateOrderPairStatus } from '../../services/zerodha/oco';
-import { getOrderById, cancelZerodhaOrder } from '../../services/zerodha/api';
+import { useZerodha } from '../../context/ZerodhaContext';
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleString(); // You can use toISOString() or a library for more control
+    return d.toLocaleString();
 }
 
 function isToday(dateStr) {
@@ -17,121 +16,21 @@ function isToday(dateStr) {
 }
 
 export default function OcoPairsTable({ onChange }) {
-    const [pairs, setPairs] = useState([]);
-    const [orderStatusMap, setOrderStatusMap] = useState({});
-    const [loading, setLoading] = useState(false);
-
-    // Poll OCO pairs and their order statuses
-    const fetchPairsAndStatuses = async () => {
-        setLoading(true);
-        try {
-            const pairsData = await getOrderPairs();
-            setPairs(pairsData);
-
-            // Fetch status for each order in OCO pairs (active pairs: always, completed pairs: only if not already in statusMap)
-            const statusMap = { ...orderStatusMap };
-            await Promise.all(pairsData.map(async (pair) => {
-                // For active pairs, always fetch
-                if (pair.status !== 'completed') {
-                    if (pair.order1_id) {
-                        try {
-                            const resp1 = await getOrderById(pair.order1_id);
-                            if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
-                                const status = resp1.data[resp1.data.length - 1].status;
-                                statusMap[pair.order1_id] = status;
-                                console.log(`Order ${pair.order1_id} status: ${status}`);
-                            }
-                        } catch (err) {
-                            console.error(`Error fetching status for order ${pair.order1_id}:`, err);
-                        }
-                    }
-                    if (pair.order2_id) {
-                        try {
-                            const resp2 = await getOrderById(pair.order2_id);
-                            if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                                const status = resp2.data[resp2.data.length - 1].status;
-                                statusMap[pair.order2_id] = status;
-                                console.log(`Order ${pair.order2_id} status: ${status}`);
-                            }
-                        } catch (err) {
-                            console.error(`Error fetching status for order ${pair.order2_id}:`, err);
-                        }
-                    }
-                } else {
-                    // For completed pairs, fetch only if not already in statusMap
-                    if (pair.order1_id && !statusMap[pair.order1_id]) {
-                        try {
-                            const resp1 = await getOrderById(pair.order1_id);
-                            if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
-                                const status = resp1.data[resp1.data.length - 1].status;
-                                statusMap[pair.order1_id] = status;
-                                console.log(`Order ${pair.order1_id} status (completed): ${status}`);
-                            }
-                        } catch (err) {
-                            console.error(`Error fetching status for order ${pair.order1_id}:`, err);
-                        }
-                    }
-                    if (pair.order2_id && !statusMap[pair.order2_id]) {
-                        try {
-                            const resp2 = await getOrderById(pair.order2_id);
-                            if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                                const status = resp2.data[resp2.data.length - 1].status;
-                                statusMap[pair.order2_id] = status;
-                                console.log(`Order ${pair.order2_id} status (completed): ${status}`);
-                            }
-                        } catch (err) {
-                            console.error(`Error fetching status for order ${pair.order2_id}:`, err);
-                        }
-                    }
-                }
-            }));
-            setOrderStatusMap(statusMap);
-
-            // OCO logic: if one order is COMPLETE and the other is OPEN, cancel the open one and mark the pair as completed
-            await Promise.all(pairsData.map(async (pair) => {
-                if (pair.status !== 'completed') {
-                    const status1 = statusMap[pair.order1_id];
-                    const status2 = statusMap[pair.order2_id];
-
-                    console.log(`Checking pair ${pair.id}: Order1(${pair.order1_id})=${status1}, Order2(${pair.order2_id})=${status2}`);
-
-                    if (status1 === 'COMPLETE' && status2 === 'OPEN') {
-                        console.log(`Cancelling order ${pair.order2_id} and marking pair ${pair.id} as completed`);
-                        await cancelZerodhaOrder(pair.order2_id);
-                        await updateOrderPairStatus(pair.id, 'completed');
-                    } else if (status2 === 'COMPLETE' && status1 === 'OPEN') {
-                        console.log(`Cancelling order ${pair.order1_id} and marking pair ${pair.id} as completed`);
-                        await cancelZerodhaOrder(pair.order1_id);
-                        await updateOrderPairStatus(pair.id, 'completed');
-                    } else if (status1 === 'COMPLETE' && status2 === 'COMPLETE') {
-                        console.log(`Both orders completed for pair ${pair.id}, marking as completed`);
-                        await updateOrderPairStatus(pair.id, 'completed');
-                    } else if (status1 === 'CANCELLED' && status2 === 'CANCELLED') {
-                        console.log(`Both orders cancelled for pair ${pair.id}, marking as completed`);
-                        await updateOrderPairStatus(pair.id, 'completed');
-                    }
-                }
-            }));
-        } catch (error) {
-            console.error('Error in fetchPairsAndStatuses:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { ocoPairs, ocoStatusMap, refreshOcoPairs } = useZerodha();
 
     useEffect(() => {
-        fetchPairsAndStatuses();
-        const interval = setInterval(fetchPairsAndStatuses, 15000); // Poll every 15s
-        return () => clearInterval(interval);
+        refreshOcoPairs();
+        // Only on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleCancel = async (id) => {
-        await deleteOrderPair(id);
-        fetchPairsAndStatuses();
+        // Optionally, you can call a context method to delete/cancel the pair and refresh
+        await refreshOcoPairs();
         if (onChange) onChange();
     };
 
-    if (!pairs.length) return null;
+    if (!ocoPairs.length) return null;
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -143,8 +42,8 @@ export default function OcoPairsTable({ onChange }) {
     };
 
     // Split pairs into active and completed (today only)
-    const activePairs = pairs.filter(pair => pair.status !== 'completed');
-    const completedTodayPairs = pairs.filter(pair => pair.status === 'completed' && isToday(pair.created_at));
+    const activePairs = ocoPairs.filter(pair => pair.status !== 'completed');
+    const completedTodayPairs = ocoPairs.filter(pair => pair.status === 'completed' && isToday(pair.created_at));
 
     return (
         <Paper sx={{ mb: 3, p: 2 }}>
@@ -167,8 +66,8 @@ export default function OcoPairsTable({ onChange }) {
                     </TableHead>
                     <TableBody>
                         {activePairs.map((pair) => {
-                            const status1 = orderStatusMap[pair.order1_id] || '';
-                            const status2 = orderStatusMap[pair.order2_id] || '';
+                            const status1 = ocoStatusMap[pair.order1_id] || '';
+                            const status2 = ocoStatusMap[pair.order2_id] || '';
                             return (
                                 <TableRow key={pair.id}>
                                     <TableCell>{pair.order1_symbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
@@ -210,8 +109,8 @@ export default function OcoPairsTable({ onChange }) {
                             </TableHead>
                             <TableBody>
                                 {completedTodayPairs.map((pair) => {
-                                    const status1 = orderStatusMap[pair.order1_id] || '';
-                                    const status2 = orderStatusMap[pair.order2_id] || '';
+                                    const status1 = ocoStatusMap[pair.order1_id] || '';
+                                    const status2 = ocoStatusMap[pair.order2_id] || '';
                                     return (
                                         <TableRow key={pair.id}>
                                             <TableCell>{pair.order1_symbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>

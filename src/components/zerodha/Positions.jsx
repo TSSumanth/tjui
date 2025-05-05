@@ -16,15 +16,13 @@ import {
     LinearProgress,
     Skeleton,
     Card,
-    Grid,
-    Divider
+    Grid
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { placeOrder, createClosePositionOrder, getInstruments } from '../../services/zerodha/api';
+import { formatCurrency } from '../../utils/formatters';
+import { placeOrder, getInstruments } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
-import dayjs from 'dayjs';
 import moment from 'moment-business-days';
 
 // Utility functions

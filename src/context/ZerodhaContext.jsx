@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
+import { getOrderPairs, updateOrderPairStatus, deleteOrderPair } from '../services/zerodha/oco';
+import { getOrderById, cancelZerodhaOrder } from '../services/zerodha/api';
 
 const ZerodhaContext = createContext();
 const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
@@ -10,7 +12,7 @@ const SESSION_CHECK_INTERVAL = 2000; // 2 seconds
 const FETCH_INTERVAL = 10000; // 10 seconds
 const AUTO_SYNC_INTERVAL = 10000; // 10 seconds
 
-// Function to check if current time is within market hours
+// Function to check if current time is within market hours (extended 30 mins after close)
 const isMarketHours = () => {
     const now = new Date();
     const day = now.getDay();
@@ -18,8 +20,8 @@ const isMarketHours = () => {
     const minutes = now.getMinutes();
     const currentTime = hours * 100 + minutes;
 
-    // Check if it's a weekday (Monday-Friday) and between 9:15 AM and 3:30 PM
-    return day !== 0 && day !== 6 && currentTime >= 915 && currentTime <= 1530;
+    // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 4:00 PM
+    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1600;
 };
 
 export const useZerodha = () => {
@@ -47,6 +49,8 @@ export const ZerodhaProvider = ({ children }) => {
     const [isAutoSync, setIsAutoSync] = useState(false);
     const [error, setError] = useState(null);
     const [ltpMap, setLtpMap] = useState({});
+    const [ocoPairs, setOcoPairs] = useState([]);
+    const [ocoStatusMap, setOcoStatusMap] = useState({});
 
     const isInitialLoadDone = useRef(false);
     const lastFetchTime = useRef(0);
@@ -356,6 +360,130 @@ export const ZerodhaProvider = ({ children }) => {
         initialFetch();
     }, [checkSession, fetchOrders]);
 
+    // Global OCO monitoring effect
+    useEffect(() => {
+        let intervalId;
+        let isUnmounted = false;
+        const fetchOcoPairsAndStatuses = async (activeOnly = true) => {
+            try {
+                const pairsData = await getOrderPairs();
+                if (isUnmounted) return;
+                setOcoPairs(pairsData);
+                // Only process active pairs for polling
+                const pairsToProcess = activeOnly ? pairsData.filter(pair => pair.status !== 'completed') : pairsData;
+                // Start with the existing status map to preserve completed pairs' statuses
+                const statusMap = { ...ocoStatusMap };
+                await Promise.all(pairsToProcess.map(async (pair) => {
+                    if (pair.status !== 'completed') {
+                        if (pair.order1_id) {
+                            try {
+                                const resp1 = await getOrderById(pair.order1_id);
+                                if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                                    const status = resp1.data[resp1.data.length - 1].status;
+                                    statusMap[pair.order1_id] = status;
+                                }
+                            } catch { /* intentionally empty */ }
+                        }
+                        if (pair.order2_id) {
+                            try {
+                                const resp2 = await getOrderById(pair.order2_id);
+                                if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                                    const status = resp2.data[resp2.data.length - 1].status;
+                                    statusMap[pair.order2_id] = status;
+                                }
+                            } catch { /* intentionally empty */ }
+                        }
+                    }
+                }));
+                if (isUnmounted) return;
+                setOcoStatusMap(statusMap);
+                // OCO logic: auto-cancel and mark as completed
+                await Promise.all(pairsToProcess.map(async (pair) => {
+                    if (pair.status !== 'completed') {
+                        const status1 = statusMap[pair.order1_id];
+                        const status2 = statusMap[pair.order2_id];
+                        const normStatus1 = (status1 || '').toUpperCase();
+                        const normStatus2 = (status2 || '').toUpperCase();
+                        console.log(`OCO pair ${pair.id} statuses:`, normStatus1, normStatus2);
+                        if (normStatus1 === 'COMPLETE' && normStatus2 === 'OPEN') {
+                            await cancelZerodhaOrder(pair.order2_id);
+                            await updateOrderPairStatus(pair.id, 'completed');
+                        } else if (normStatus2 === 'COMPLETE' && normStatus1 === 'OPEN') {
+                            await cancelZerodhaOrder(pair.order1_id);
+                            await updateOrderPairStatus(pair.id, 'completed');
+                        } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
+                            await updateOrderPairStatus(pair.id, 'completed');
+                        } else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {
+                            await updateOrderPairStatus(pair.id, 'completed');
+                        }
+                    }
+                }));
+            } catch { /* intentionally empty */ }
+        };
+        if (sessionActive && isMarketHours()) {
+            fetchOcoPairsAndStatuses(true);
+            intervalId = setInterval(() => fetchOcoPairsAndStatuses(true), 15000);
+        }
+        return () => {
+            isUnmounted = true;
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [sessionActive, isMarketHours()]);
+
+    // Manual refresh for OCO pairs (fetch all pairs, including completed)
+    const refreshOcoPairs = useCallback(async () => {
+        // Don't clear the status map to preserve completed pair statuses
+        const pairsData = await getOrderPairs();
+        setOcoPairs(pairsData);
+        const statusMap = { ...ocoStatusMap }; // Start with existing statuses
+
+        // Process all pairs to get their current status
+        await Promise.all(pairsData.map(async (pair) => {
+            // For completed pairs, only fetch status if not already in map
+            if (pair.status === 'completed') {
+                if (pair.order1_id && !statusMap[pair.order1_id]) {
+                    try {
+                        const resp1 = await getOrderById(pair.order1_id);
+                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                            const status = resp1.data[resp1.data.length - 1].status;
+                            statusMap[pair.order1_id] = status;
+                        }
+                    } catch { /* intentionally empty */ }
+                }
+                if (pair.order2_id && !statusMap[pair.order2_id]) {
+                    try {
+                        const resp2 = await getOrderById(pair.order2_id);
+                        if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                            const status = resp2.data[resp2.data.length - 1].status;
+                            statusMap[pair.order2_id] = status;
+                        }
+                    } catch { /* intentionally empty */ }
+                }
+            } else {
+                // For active pairs, always fetch latest status
+                if (pair.order1_id) {
+                    try {
+                        const resp1 = await getOrderById(pair.order1_id);
+                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                            const status = resp1.data[resp1.data.length - 1].status;
+                            statusMap[pair.order1_id] = status;
+                        }
+                    } catch { /* intentionally empty */ }
+                }
+                if (pair.order2_id) {
+                    try {
+                        const resp2 = await getOrderById(pair.order2_id);
+                        if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                            const status = resp2.data[resp2.data.length - 1].status;
+                            statusMap[pair.order2_id] = status;
+                        }
+                    } catch { /* intentionally empty */ }
+                }
+            }
+        }));
+        setOcoStatusMap(statusMap);
+    }, [ocoStatusMap]);
+
     const handleLogout = useCallback(async () => {
         try {
             await logout();
@@ -398,7 +526,10 @@ export const ZerodhaProvider = ({ children }) => {
         orders,
         fetchHoldings,
         fetchPositions,
-        ltpMap
+        ltpMap,
+        ocoPairs,
+        ocoStatusMap,
+        refreshOcoPairs
     };
 
     return (
