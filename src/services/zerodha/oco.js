@@ -104,8 +104,48 @@ export const getAllOcoPairs = () => {
     return pairs;
 };
 
-export const createOrderPair = async ({ order1_id, order2_id, type = 'OCO', order1_symbol, order2_symbol, order1_type, order2_type }) => {
-    const resp = await api.post('/api/order-pairs', { order1_id, order2_id, type, order1_symbol, order2_symbol, order1_type, order2_type });
+export const createOrderPair = async ({
+    order1_id,
+    order2_id,
+    type = 'OCO',
+    order1_details,
+    order1_tradingsymbol,
+    order1_transaction_type,
+    order1_quantity,
+    order1_price,
+    order1_product,
+    order1_order_type,
+    order1_validity,
+    order2_details,
+    order2_tradingsymbol,
+    order2_transaction_type,
+    order2_quantity,
+    order2_price,
+    order2_product,
+    order2_order_type,
+    order2_validity
+}) => {
+    const resp = await api.post('/api/order-pairs', {
+        order1_id,
+        order2_id,
+        type,
+        order1_details,
+        order1_tradingsymbol,
+        order1_transaction_type,
+        order1_quantity,
+        order1_price,
+        order1_product,
+        order1_order_type,
+        order1_validity,
+        order2_details,
+        order2_tradingsymbol,
+        order2_transaction_type,
+        order2_quantity,
+        order2_price,
+        order2_product,
+        order2_order_type,
+        order2_validity
+    });
     return resp.data;
 };
 

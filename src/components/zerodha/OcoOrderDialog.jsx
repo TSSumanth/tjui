@@ -48,27 +48,57 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
 
     const handleSubmit = async () => {
         if (selectedOrders.length !== 2) return;
+
         setLoading(true);
         setError('');
+
         try {
+            const [order1, order2] = selectedOrders;
             await createOrderPair({
-                order1_id: selectedOrders[0].order_id,
-                order2_id: selectedOrders[1].order_id,
+                order1_id: order1.order_id,
+                order2_id: order2.order_id,
                 type: 'OCO',
-                order1_symbol: selectedOrders[0].tradingsymbol,
-                order2_symbol: selectedOrders[1].tradingsymbol,
-                order1_type: selectedOrders[0].transaction_type,
-                order2_type: selectedOrders[1].transaction_type
+                // Order 1 details
+                order1_details: {
+                    tradingsymbol: order1.tradingsymbol,
+                    transaction_type: order1.transaction_type,
+                    quantity: order1.quantity,
+                    price: order1.price,
+                    product: order1.product,
+                    order_type: order1.order_type,
+                    validity: order1.validity
+                },
+                order1_tradingsymbol: order1.tradingsymbol,
+                order1_transaction_type: order1.transaction_type,
+                order1_quantity: order1.quantity,
+                order1_price: order1.price,
+                order1_product: order1.product,
+                order1_order_type: order1.order_type,
+                order1_validity: order1.validity,
+                // Order 2 details
+                order2_details: {
+                    tradingsymbol: order2.tradingsymbol,
+                    transaction_type: order2.transaction_type,
+                    quantity: order2.quantity,
+                    price: order2.price,
+                    product: order2.product,
+                    order_type: order2.order_type,
+                    validity: order2.validity
+                },
+                order2_tradingsymbol: order2.tradingsymbol,
+                order2_transaction_type: order2.transaction_type,
+                order2_quantity: order2.quantity,
+                order2_price: order2.price,
+                order2_product: order2.product,
+                order2_order_type: order2.order_type,
+                order2_validity: order2.validity
             });
+
             setShowSuccess(true);
-            setSelectedOrders([]);
-            setTimeout(() => {
-                setShowSuccess(false);
-                onClose();
-            }, 1200);
-        } catch (error) {
-            setError(error?.response?.data?.error || 'Failed to create OCO pair. Please try again.');
-            console.error('Error creating OCO pair:', error);
+            onClose();
+        } catch (err) {
+            console.error('Error creating OCO pair:', err);
+            setError(err.message || 'Failed to create OCO pair');
         } finally {
             setLoading(false);
         }

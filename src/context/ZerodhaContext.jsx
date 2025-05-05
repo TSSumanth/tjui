@@ -397,24 +397,63 @@ export const ZerodhaProvider = ({ children }) => {
                 }));
                 if (isUnmounted) return;
                 setOcoStatusMap(statusMap);
-                // OCO logic: auto-cancel and mark as completed
+
+                // Process pairs based on their type (OCO or OAO)
                 await Promise.all(pairsToProcess.map(async (pair) => {
                     if (pair.status !== 'completed') {
                         const status1 = statusMap[pair.order1_id];
                         const status2 = statusMap[pair.order2_id];
                         const normStatus1 = (status1 || '').toUpperCase();
                         const normStatus2 = (status2 || '').toUpperCase();
-                        console.log(`OCO pair ${pair.id} statuses:`, normStatus1, normStatus2);
-                        if (normStatus1 === 'COMPLETE' && normStatus2 === 'OPEN') {
-                            await cancelZerodhaOrder(pair.order2_id);
-                            await updateOrderPairStatus(pair.id, 'completed');
-                        } else if (normStatus2 === 'COMPLETE' && normStatus1 === 'OPEN') {
-                            await cancelZerodhaOrder(pair.order1_id);
-                            await updateOrderPairStatus(pair.id, 'completed');
-                        } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
-                            await updateOrderPairStatus(pair.id, 'completed');
-                        } else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {
-                            await updateOrderPairStatus(pair.id, 'completed');
+                        console.log(`Pair ${pair.id} (${pair.type}) statuses:`, normStatus1, normStatus2);
+
+                        if (pair.type === 'OCO') {
+                            // OCO Logic
+                            if (normStatus1 === 'COMPLETE' && normStatus2 === 'OPEN') {
+                                await cancelZerodhaOrder(pair.order2_id);
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            } else if (normStatus2 === 'COMPLETE' && normStatus1 === 'OPEN') {
+                                await cancelZerodhaOrder(pair.order1_id);
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            } else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            }
+                        } else if (pair.type === 'OAO') {
+                            // OAO Logic
+                            if (normStatus1 === 'COMPLETE' && !pair.order2_id) {
+                                // Order 1 is complete, create Order 2
+                                try {
+                                    const response = await fetch('/api/zerodha/place-order', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify(pair.order2_details)
+                                    });
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        if (data.success && data.order_id) {
+                                            // Update the pair with order2_id
+                                            await fetch('/api/zerodha/order-pairs/' + pair.id, {
+                                                method: 'PATCH',
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    order2_id: data.order_id
+                                                })
+                                            });
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('Error creating Order 2:', error);
+                                }
+                            } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
+                                // Both orders are complete
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            }
                         }
                     }
                 }));
