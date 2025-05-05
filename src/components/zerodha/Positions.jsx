@@ -16,7 +16,8 @@ import {
     LinearProgress,
     Skeleton,
     Card,
-    Grid
+    Grid,
+    Button
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
@@ -24,6 +25,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, getInstruments } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
 import moment from 'moment-business-days';
+import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -205,6 +207,11 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const { ltpMap } = useZerodha();
+    const [manualPl, setManualPl] = React.useState('');
+    const [manualPlId, setManualPlId] = React.useState(null);
+    const [manualPlLoading, setManualPlLoading] = React.useState(false);
+    const [manualPlSaving, setManualPlSaving] = React.useState(false);
+    const [manualPlError, setManualPlError] = React.useState('');
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -243,6 +250,30 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             return () => clearTimeout(timer);
         }
     }, [positions, prevPositions]);
+
+    // Fetch manual P/L on mount or when underlying changes
+    React.useEffect(() => {
+        let isMounted = true;
+        setManualPlLoading(true);
+        setManualPlError('');
+        getManualPl({ AssetName: underlying })
+            .then((data) => {
+                if (isMounted) {
+                    setManualPl(data.manual_pl ?? 0);
+                    setManualPlId(data.id);
+                }
+            })
+            .catch(() => {
+                if (isMounted) {
+                    setManualPl(0);
+                    setManualPlId(null);
+                }
+            })
+            .finally(() => {
+                if (isMounted) setManualPlLoading(false);
+            });
+        return () => { isMounted = false; };
+    }, [underlying]);
 
     const handleMenuClick = (event, position) => {
         event.stopPropagation();
@@ -286,6 +317,28 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
         onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, true);
         handleMenuClose();
+    };
+
+    const handleManualPlChange = (e) => {
+        setManualPl(e.target.value);
+    };
+
+    const handleManualPlSave = async () => {
+        setManualPlSaving(true);
+        setManualPlError('');
+        try {
+            const value = parseFloat(manualPl) || 0;
+            if (manualPlId) {
+                await updateManualPl({ id: manualPlId, manual_pl: value });
+            } else {
+                const data = await createManualPl({ AssetName: underlying, manual_pl: value });
+                setManualPlId(data.id);
+            }
+        } catch (err) {
+            setManualPlError('Failed to save Manual P/L');
+        } finally {
+            setManualPlSaving(false);
+        }
     };
 
     const renderPositionRow = (position) => {
@@ -532,6 +585,111 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 LTP: {formatCurrency(ltpMap[underlying])}
                             </Typography>
                         )}
+                        {/* Manual P/L Section */}
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            border: '2px solid #1976d2',
+                            borderRadius: '20px',
+                            px: 3,
+                            py: 1,
+                            bgcolor: 'linear-gradient(90deg, #e3f2fd 0%, #ffffff 100%)',
+                            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.08)',
+                            transition: 'box-shadow 0.2s, border-color 0.2s',
+                            '&:hover': {
+                                boxShadow: '0 4px 16px rgba(25, 118, 210, 0.15)',
+                                borderColor: '#1565c0',
+                            }
+                        }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2', mr: 1 }}>
+                                Manual P/L:
+                            </Typography>
+                            <input
+                                type="number"
+                                value={manualPl}
+                                onChange={handleManualPlChange}
+                                placeholder="Manual P/L"
+                                style={{
+                                    width: 90,
+                                    fontFamily: 'monospace',
+                                    fontSize: 15,
+                                    padding: '6px 10px',
+                                    borderRadius: "15px",
+                                    border: '1px solid #bdbdbd',
+                                    background: '#f8fafc',
+                                    outline: 'none',
+                                    transition: 'border-color 0.2s',
+                                    boxShadow: '0 1px 2px rgba(25, 118, 210, 0.04)',
+                                    marginRight: 4
+                                }}
+                                disabled={manualPlLoading || manualPlSaving}
+                            />
+                            <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleManualPlSave}
+                                disabled={manualPlLoading || manualPlSaving}
+                                sx={{
+                                    minWidth: 48,
+                                    px: 2,
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    boxShadow: '0 2px 6px rgba(25, 118, 210, 0.10)',
+                                    background: 'linear-gradient(90deg, #1976d2 60%, #42a5f5 100%)',
+                                    color: 'white',
+                                    textTransform: 'none',
+                                    '&:hover': {
+                                        background: 'linear-gradient(90deg, #1565c0 60%, #1976d2 100%)',
+                                    }
+                                }}
+                            >
+                                {manualPlSaving ? 'Saving...' : 'Save'}
+                            </Button>
+                            {manualPlError && (
+                                <Typography variant="caption" color="error" sx={{ ml: 1 }}>{manualPlError}</Typography>
+                            )}
+                        </Box>
+                        {/* Manual P/L Section */}
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            border: '2px solid #1976d2',
+                            borderRadius: '20px',
+                            px: 3,
+                            py: 1,
+                            bgcolor: 'linear-gradient(90deg, #e3f2fd 0%, #ffffff 100%)',
+                            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.08)',
+                            transition: 'box-shadow 0.2s, border-color 0.2s',
+                            '&:hover': {
+                                boxShadow: '0 4px 16px rgba(25, 118, 210, 0.15)',
+                                borderColor: '#1565c0',
+                            }
+                        }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2', mr: 1 }}>
+                                Net P/L:
+                            </Typography>
+                            <input
+                                type="number"
+                                value={manualPl + totalPnL}
+                                placeholder="Net P/L"
+                                style={{
+                                    width: 90,
+                                    fontFamily: 'monospace',
+                                    fontSize: 15,
+                                    padding: '6px 10px',
+                                    borderRadius: "15px",
+                                    border: '1px solid #bdbdbd',
+                                    background: '#f8fafc',
+                                    outline: 'none',
+                                    transition: 'border-color 0.2s',
+                                    boxShadow: '0 1px 2px rgba(25, 118, 210, 0.04)',
+                                    marginRight: 4
+                                }}
+                                disabled="true"
+                            />
+                        </Box>
                     </Box>
 
                     {/* Middle section - Breakeven and Premium Info */}
@@ -559,6 +717,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                     ? `Breakeven: ↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
                                     : 'Unable to show BE'}
                             </Box>
+
                         </Box>
                     )}
 

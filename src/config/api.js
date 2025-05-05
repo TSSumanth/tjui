@@ -10,5 +10,6 @@ export const API_URLS = {
     LIVE_DATA: `${BASE_URL}/livedata`,
     ACTION_ITEMS: `${BASE_URL}/actionitems`,
     TAG_MANAGEMENT: `${BASE_URL}/tags`,
-    PORTFOLIO_VALUE: `${BASE_URL}/portfolio-value`
+    PORTFOLIO_VALUE: `${BASE_URL}/portfolio-value`,
+    MANUAL_PL: `${BASE_URL}/manual-pl`
 }; 
