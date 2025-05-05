@@ -167,7 +167,7 @@ function OrdersTable({ orders, title, showActions, onCancel, onModify, onLinkToT
                                 <TableCell>
                                     {order.order_id}
                                     {order.status === 'COMPLETE' && linkedOrderIds.has(order.order_id) && (
-                                        <Chip label="Linked" color="success" size="small" sx={{ ml: 1 }} />
+                                        <Chip label="Linked" color="warning" size="small" sx={{ ml: 1 }} />
                                     )}
                                     {ocoOrderIds.has(order.order_id) && (
                                         <Chip label="OCO" color="info" size="small" sx={{ ml: 1 }} />
