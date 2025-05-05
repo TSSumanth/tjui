@@ -7,6 +7,7 @@ import { getStockTrades, addNewStockTrade, addNewOptionTrade, getOptionTrades, u
 import { addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders, updateStockOrder, getOrders } from '../../services/orders';
 import moment from 'moment';
 import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
+import { getInstruments } from '../../services/zerodha/api';
 
 function isOptionOrFuture(order) {
     // Check if it's from NFO exchange
@@ -60,6 +61,7 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
     const [creating, setCreating] = useState(false);
     const [lotSize, setLotSize] = useState('');
     const [lotSizeError, setLotSizeError] = useState('');
+    const [lotSizeLoading, setLotSizeLoading] = useState(false);
     const [showAssignStrategy, setShowAssignStrategy] = useState(false);
     const [newlyCreatedTrade, setNewlyCreatedTrade] = useState(null);
 
@@ -67,6 +69,26 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
         if (open && zerodhaOrder) {
             fetchOpenTrades();
         }
+        // Fetch lot size for options/futures
+        const fetchLotSize = async () => {
+            if (open && zerodhaOrder && isOptionOrFuture(zerodhaOrder) && zerodhaOrder.tradingsymbol) {
+                setLotSizeLoading(true);
+                try {
+                    const resp = await getInstruments({ search: zerodhaOrder.tradingsymbol });
+                    if (resp && resp.success && resp.data && resp.data.length > 0) {
+                        const instrument = resp.data[0];
+                        if (instrument.lot_size && !lotSize) {
+                            setLotSize(instrument.lot_size);
+                        }
+                    }
+                } catch (e) {
+                    // Optionally handle error
+                } finally {
+                    setLotSizeLoading(false);
+                }
+            }
+        };
+        fetchLotSize();
         // eslint-disable-next-line
     }, [open, zerodhaOrder]);
 
@@ -597,11 +619,16 @@ function LinkToTradePopup({ open, onClose, zerodhaOrder, assetType = 'stock', on
                                             value={lotSize}
                                             onChange={e => setLotSize(e.target.value.replace(/[^\d]/g, ''))}
                                             sx={{ mt: 0.5 }}
-                                            inputProps={{ min: 1 }}
+                                            inputProps={{ min: 1, readOnly: !!lotSize }}
                                             size="small"
                                             error={!!lotSizeError}
-                                            helperText={lotSizeError}
+                                            helperText={lotSizeError || (lotSize ? 'Auto-filled from instrument data' : 'Enter lot size if not auto-filled')}
                                             fullWidth
+                                            InputProps={{
+                                                endAdornment: lotSizeLoading ? (
+                                                    <CircularProgress size={20} />
+                                                ) : null
+                                            }}
                                         />
                                     </Box>
                                 )}
