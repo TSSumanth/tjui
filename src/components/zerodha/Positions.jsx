@@ -19,6 +19,7 @@ import {
     Grid,
     Button
 } from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert, Close } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
@@ -636,8 +637,16 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     </Grid>
 
                     <Grid item xs={6} md={3}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid', borderRadius: "5px", borderColor: 'black', padding: "5px" }}>
-                            <EditNoteIcon color="warning" fontSize="small" />
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            border: '1px solid',
+                            borderRadius: "5px",
+                            borderColor: 'black',
+                            padding: "5px",
+                            width: '100%'
+                        }}>
                             <Typography variant="body1" sx={{ fontWeight: 500, ml: 1 }}>
                                 Manual P/L:
                             </Typography>
@@ -645,22 +654,37 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 type="number"
                                 value={manualPl}
                                 onChange={handleManualPlChange}
-                                style={{ width: 110, height: 36, fontFamily: 'monospace', fontSize: 16, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #bdbdbd', background: '#f8fafc', outline: 'none', marginRight: 8 }}
+                                style={{
+                                    flex: 1,
+                                    width: '100%',
+                                    minWidth: 0,
+                                    height: 36,
+                                    fontFamily: 'monospace',
+                                    fontSize: 16,
+                                    padding: '6px 10px',
+                                    borderRadius: 8,
+                                    border: '1.5px solid #bdbdbd',
+                                    background: '#f8fafc',
+                                    outline: 'none'
+                                }}
                                 disabled={manualPlLoading || manualPlSaving}
                             />
-                            <Button
-                                variant="contained"
-                                size="medium"
-                                onClick={handleManualPlSave}
-                                disabled={manualPlLoading || manualPlSaving}
-                                sx={{ minWidth: 56, px: 2, borderRadius: 8, fontWeight: 600, fontSize: 15 }}
-                            >
-                                {manualPlSaving ? 'Saving...' : 'Save'}
-                            </Button>
-                            {manualPlError && (
-                                <Typography variant="caption" color="error" sx={{ ml: 1 }}>{manualPlError}</Typography>
-                            )}
+                            <Tooltip title="Save Manual P/L">
+                                <span>
+                                    <IconButton
+                                        color="primary"
+                                        onClick={handleManualPlSave}
+                                        disabled={manualPlLoading || manualPlSaving}
+                                        size="large"
+                                    >
+                                        <SaveIcon />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
                         </Box>
+                        {manualPlError && (
+                            <Typography variant="caption" color="error" sx={{ ml: 1 }}>{manualPlError}</Typography>
+                        )}
                     </Grid>
                     <Grid item xs={6} md={3}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
