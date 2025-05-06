@@ -26,6 +26,17 @@ import { placeOrder, getInstruments } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
 import moment from 'moment-business-days';
 import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
+import { getStrategies } from '../../services/strategies';
+import StrategyIcon from '@mui/icons-material/AutoGraph';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import TodayIcon from '@mui/icons-material/Today';
+import SummarizeIcon from '@mui/icons-material/Summarize';
+import Tooltip from '@mui/material/Tooltip';
+import Popover from '@mui/material/Popover';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -212,6 +223,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [manualPlLoading, setManualPlLoading] = React.useState(false);
     const [manualPlSaving, setManualPlSaving] = React.useState(false);
     const [manualPlError, setManualPlError] = React.useState('');
+    const [strategyId, setStrategyId] = useState(null);
+    const [strategyLoading, setStrategyLoading] = useState(false);
+    const [manualPlAnchorEl, setManualPlAnchorEl] = useState(null);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -271,6 +285,29 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             })
             .finally(() => {
                 if (isMounted) setManualPlLoading(false);
+            });
+        return () => { isMounted = false; };
+    }, [underlying]);
+
+    React.useEffect(() => {
+        let isMounted = true;
+        setStrategyLoading(true);
+        setStrategyId(null);
+        getStrategies({ symbol: underlying, status: 'OPEN' })
+            .then((response) => {
+                if (isMounted) {
+                    if (response && response.length > 0) {
+                        setStrategyId(response[0].id);
+                    } else {
+                        setStrategyId(null);
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) setStrategyId(null);
+            })
+            .finally(() => {
+                if (isMounted) setStrategyLoading(false);
             });
         return () => { isMounted = false; };
     }, [underlying]);
@@ -340,6 +377,20 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             setManualPlSaving(false);
         }
     };
+
+    const handleViewStrategy = (e) => {
+        e.stopPropagation();
+        if (strategyId) {
+            window.open(`/updatestrategy/${strategyId}`, '_blank');
+        }
+    };
+
+    const handleManualPlIconClick = (event) => {
+        event.stopPropagation();
+        setManualPlAnchorEl(event.currentTarget);
+    };
+    const handleManualPlPopoverClose = () => setManualPlAnchorEl(null);
+    const manualPlPopoverOpen = Boolean(manualPlAnchorEl);
 
     const renderPositionRow = (position) => {
         const lastPrice = Number(position.last_price) || 0;
@@ -535,114 +586,74 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         <Box sx={{ mb: 3 }}>
             <Box
                 sx={{
-                    cursor: 'pointer',
                     bgcolor: 'background.paper',
                     borderLeft: '4px solid',
                     borderLeftColor: 'primary.main',
-                    '&:hover': {
-                        bgcolor: 'grey.50'
-                    },
-                    transition: isUpdating ? 'background-color 0.3s ease' : 'none'
+                    transition: isUpdating ? 'background-color 0.3s ease' : 'none',
+                    py: 2
                 }}
-                onClick={() => setExpanded(!expanded)}
             >
-                {/* Header content */}
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    py: 2,
-                    px: 3,
-                    gap: 2,
-                    flexWrap: 'nowrap'
-                }}>
-                    {/* Left section - Asset Name */}
-                    <Box sx={{ minWidth: '150px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography
-                            variant="h6"
-                            sx={{
-                                color: 'text.primary',
-                                fontWeight: 500
-                            }}
-                        >
-                            {underlying}
-                        </Typography>
-                        {ltpMap && ltpMap[underlying] !== undefined && (
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    color: 'primary.main',
-                                    fontFamily: 'monospace',
-                                    fontWeight: 600,
-                                    px: 1.5,
-                                    py: 0.5,
-                                    borderRadius: 2,
-                                    border: '1px solid',
-                                    borderColor: 'primary.main',
-                                    ml: 1
-                                }}
-                            >
-                                LTP: {formatCurrency(ltpMap[underlying])}
+                <Grid container spacing={2} alignItems="center" sx={{ py: 2, px: 3 }}>
+                    {/* Row 1 */}
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>{underlying}</Typography>
+                            <Box sx={{ display: 'inline-flex', alignItems: 'center', ml: 2 }}>
+                                <TrendingUpIcon color="primary" fontSize="small" />
+                                <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
+                                    LTP: {ltpMap && ltpMap[underlying] !== undefined ? formatCurrency(ltpMap[underlying]) : '-'}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <TodayIcon color={dayPnL >= 0 ? 'success' : 'error'} fontSize="small" />
+                            <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
+                                Today's Change: <span style={{ color: dayPnL >= 0 ? 'green' : 'red' }}>{formatCurrency(dayPnL)}</span>
                             </Typography>
-                        )}
-                        {/* Manual P/L Section */}
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            border: '2px solid #1976d2',
-                            borderRadius: '20px',
-                            px: 3,
-                            py: 1,
-                            bgcolor: 'linear-gradient(90deg, #e3f2fd 0%, #ffffff 100%)',
-                            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.08)',
-                            transition: 'box-shadow 0.2s, border-color 0.2s',
-                            '&:hover': {
-                                boxShadow: '0 4px 16px rgba(25, 118, 210, 0.15)',
-                                borderColor: '#1565c0',
-                            }
-                        }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2', mr: 1 }}>
+                        </Box>
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <SummarizeIcon color={totalPnL >= 0 ? 'success' : 'error'} fontSize="small" />
+                            <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
+                                Total Open Positions P/L: <span style={{ color: totalPnL >= 0 ? 'green' : 'red' }}>{formatCurrency(totalPnL)}</span>
+                            </Typography>
+                        </Box>
+                    </Grid>
+
+                    {/* Row 2 */}
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <CalculateIcon color="info" fontSize="small" />
+                            <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
+                                Breakeven: {calculateBreakeven(positions) && calculateBreakeven(positions).breakevenPoints.length > 0
+                                    ? `↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
+                                    : 'N/A'}
+                            </Typography>
+                        </Box>
+                    </Grid>
+
+                    <Grid item xs={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid', borderRadius: "5px", borderColor: 'black', padding: "5px" }}>
+                            <EditNoteIcon color="warning" fontSize="small" />
+                            <Typography variant="body1" sx={{ fontWeight: 500, ml: 1 }}>
                                 Manual P/L:
                             </Typography>
                             <input
                                 type="number"
                                 value={manualPl}
                                 onChange={handleManualPlChange}
-                                placeholder="Manual P/L"
-                                style={{
-                                    width: 90,
-                                    fontFamily: 'monospace',
-                                    fontSize: 15,
-                                    padding: '6px 10px',
-                                    borderRadius: "15px",
-                                    border: '1px solid #bdbdbd',
-                                    background: '#f8fafc',
-                                    outline: 'none',
-                                    transition: 'border-color 0.2s',
-                                    boxShadow: '0 1px 2px rgba(25, 118, 210, 0.04)',
-                                    marginRight: 4
-                                }}
+                                style={{ width: 110, height: 36, fontFamily: 'monospace', fontSize: 16, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #bdbdbd', background: '#f8fafc', outline: 'none', marginRight: 8 }}
                                 disabled={manualPlLoading || manualPlSaving}
                             />
                             <Button
                                 variant="contained"
-                                size="small"
+                                size="medium"
                                 onClick={handleManualPlSave}
                                 disabled={manualPlLoading || manualPlSaving}
-                                sx={{
-                                    minWidth: 48,
-                                    px: 2,
-                                    borderRadius: 8,
-                                    fontWeight: 600,
-                                    boxShadow: '0 2px 6px rgba(25, 118, 210, 0.10)',
-                                    background: 'linear-gradient(90deg, #1976d2 60%, #42a5f5 100%)',
-                                    color: 'white',
-                                    textTransform: 'none',
-                                    '&:hover': {
-                                        background: 'linear-gradient(90deg, #1565c0 60%, #1976d2 100%)',
-                                    }
-                                }}
+                                sx={{ minWidth: 56, px: 2, borderRadius: 8, fontWeight: 600, fontSize: 15 }}
                             >
                                 {manualPlSaving ? 'Saving...' : 'Save'}
                             </Button>
@@ -650,118 +661,33 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                                 <Typography variant="caption" color="error" sx={{ ml: 1 }}>{manualPlError}</Typography>
                             )}
                         </Box>
-                        {/* Manual P/L Section */}
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            border: '2px solid #1976d2',
-                            borderRadius: '20px',
-                            px: 3,
-                            py: 1,
-                            bgcolor: 'linear-gradient(90deg, #e3f2fd 0%, #ffffff 100%)',
-                            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.08)',
-                            transition: 'box-shadow 0.2s, border-color 0.2s',
-                            '&:hover': {
-                                boxShadow: '0 4px 16px rgba(25, 118, 210, 0.15)',
-                                borderColor: '#1565c0',
-                            }
-                        }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2', mr: 1 }}>
-                                Net P/L:
+                    </Grid>
+                    <Grid item xs={6} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <AccountBalanceIcon color="secondary" fontSize="small" />
+                            <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
+                                Net P/L: {(Number(manualPl || 0) + Number(totalPnL || 0)).toFixed(2)}
                             </Typography>
-                            <input
-                                type="number"
-                                value={manualPl + totalPnL}
-                                placeholder="Net P/L"
-                                style={{
-                                    width: 90,
-                                    fontFamily: 'monospace',
-                                    fontSize: 15,
-                                    padding: '6px 10px',
-                                    borderRadius: "15px",
-                                    border: '1px solid #bdbdbd',
-                                    background: '#f8fafc',
-                                    outline: 'none',
-                                    transition: 'border-color 0.2s',
-                                    boxShadow: '0 1px 2px rgba(25, 118, 210, 0.04)',
-                                    marginRight: 4
-                                }}
-                                disabled="true"
-                            />
                         </Box>
-                    </Box>
-
-                    {/* Middle section - Breakeven and Premium Info */}
-                    {calculateBreakeven(positions) && (
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 3,
-                            flex: 1,
-                            overflow: 'hidden'
-                        }}>
-                            <Box sx={{
-                                fontFamily: 'monospace',
-                                bgcolor: 'grey.50',
-                                px: 2,
-                                py: 1,
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                fontWeight: 500,
-                                whiteSpace: 'nowrap',
-                                transition: isUpdating ? 'background-color 0.3s ease' : 'none'
-                            }}>
-                                {calculateBreakeven(positions).breakevenPoints.length > 0
-                                    ? `Breakeven: ↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
-                                    : 'Unable to show BE'}
-                            </Box>
-
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Button
+                                variant="outlined"
+                                onClick={handleViewStrategy}
+                                disabled={!strategyId || strategyLoading}
+                                sx={{ ml: 1 }}
+                            >
+                                View Associated Strategy
+                            </Button>
                         </Box>
-                    )}
-
-                    {/* Right section - P&L Info */}
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3,
-                        justifyContent: 'flex-end',
-                        minWidth: '350px',
-                        flexShrink: 0
-                    }}>
-                        <Box
-                            sx={{
-                                fontFamily: 'monospace',
-                                color: dayPnL >= 0 ? 'success.main' : 'error.main',
-                                whiteSpace: 'nowrap',
-                                transition: isUpdating ? 'color 0.3s ease' : 'none'
-                            }}
-                        >
-                            Day: {formatCurrency(dayPnL)}
-                        </Box>
-                        <Box
-                            sx={{
-                                fontFamily: 'monospace',
-                                color: totalPnL >= 0 ? 'success.main' : 'error.main',
-                                whiteSpace: 'nowrap',
-                                transition: isUpdating ? 'color 0.3s ease' : 'none'
-                            }}
-                        >
-                            Total: {formatCurrency(totalPnL)}
-                        </Box>
-                        <IconButton
-                            size="small"
-                            sx={{
-                                color: 'action.active',
-                                '&:hover': {
-                                    bgcolor: 'grey.100'
-                                }
-                            }}
-                        >
-                            {expanded ? <ExpandLess /> : <ExpandMore />}
-                        </IconButton>
-                    </Box>
+                    </Grid>
+                </Grid>
+                {/* Move expand/collapse button to bottom right */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', pr: 4, pb: 1 }}>
+                    <IconButton size="large" sx={{ color: 'action.active' }} onClick={() => setExpanded(!expanded)}>
+                        {expanded ? <ExpandLess fontSize="large" /> : <ExpandMore fontSize="large" />}
+                    </IconButton>
                 </Box>
             </Box>
 

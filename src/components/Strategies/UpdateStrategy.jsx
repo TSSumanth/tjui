@@ -30,14 +30,11 @@ import {
     List,
     ListItem,
     ListItemIcon,
-    ListItemText,
     Stack,
 } from "@mui/material";
 import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
 import { addActionItem, getActionItems } from "../../services/actionitems";
-import StrategyForm from "./StrategyForm";
-import TradesTable from "../Trades/TradesTable";
 import { StockTradeForm } from "../Trades/StockTradeForm";
 import OptionTradeForm from "../Trades/OptionTradeForm";
 import NotesTable from "./NotesTable";
@@ -1047,6 +1044,15 @@ function UpdateStrategy({ id }) {
                                         onChange={handleNameChange}
                                         error={!!nameError}
                                         helperText={nameError}
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        label="Symbol"
+                                        value={strategy?.symbol || ""}
+                                        fullWidth
+                                        onChange={(e) => setStrategy(prev => ({ ...prev, symbol: e.target.value }))}
                                         size="small"
                                     />
                                 </Grid>
