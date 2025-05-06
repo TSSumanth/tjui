@@ -33,6 +33,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
+    const [showValidation, setShowValidation] = useState(false);
     const [order2Details, setOrder2Details] = useState({
         tradingsymbol: '',
         transaction_type: 'BUY',
@@ -70,6 +71,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
     };
 
     const handleCreateOAO = async () => {
+        setShowValidation(true);
         const validationError = validateForm();
         if (validationError) {
             setError(validationError);
@@ -81,6 +83,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
         try {
             await createOaoOrderPair({
                 order1_id: selectedOrder.order_id,
+                order2_id: "WAITINGFORORDER1",
                 order1_details: {
                     tradingsymbol: selectedOrder.tradingsymbol,
                     transaction_type: selectedOrder.transaction_type,
@@ -112,6 +115,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
                 setSuccess(false);
                 setStep(1);
                 setSelectedOrder(null);
+                setShowValidation(false);
                 setOrder2Details({
                     tradingsymbol: '',
                     transaction_type: 'BUY',
@@ -133,6 +137,18 @@ const CreateOAOOrder = ({ open, onClose }) => {
     const handleClose = () => {
         setError(null);
         setSuccess(false);
+        setShowValidation(false);
+        setStep(1);
+        setSelectedOrder(null);
+        setOrder2Details({
+            tradingsymbol: '',
+            transaction_type: 'BUY',
+            quantity: '',
+            price: '',
+            product: 'CNC',
+            order_type: 'LIMIT',
+            validity: 'DAY'
+        });
         onClose();
     };
 
@@ -190,8 +206,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     value={order2Details.tradingsymbol}
                                     onChange={handleOrder2Change}
                                     required
-                                    error={!order2Details.tradingsymbol}
-                                    helperText={!order2Details.tradingsymbol ? 'Trading symbol is required' : ''}
+                                    error={showValidation && !order2Details.tradingsymbol}
+                                    helperText={showValidation && !order2Details.tradingsymbol ? 'Trading symbol is required' : ''}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -216,8 +232,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     value={order2Details.quantity}
                                     onChange={handleOrder2Change}
                                     required
-                                    error={!order2Details.quantity || order2Details.quantity <= 0}
-                                    helperText={!order2Details.quantity || order2Details.quantity <= 0 ? 'Valid quantity is required' : ''}
+                                    error={showValidation && (!order2Details.quantity || order2Details.quantity <= 0)}
+                                    helperText={showValidation && (!order2Details.quantity || order2Details.quantity <= 0) ? 'Valid quantity is required' : ''}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -229,8 +245,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     value={order2Details.price}
                                     onChange={handleOrder2Change}
                                     required
-                                    error={!order2Details.price || order2Details.price <= 0}
-                                    helperText={!order2Details.price || order2Details.price <= 0 ? 'Valid price is required' : ''}
+                                    error={showValidation && (!order2Details.price || order2Details.price <= 0)}
+                                    helperText={showValidation && (!order2Details.price || order2Details.price <= 0) ? 'Valid price is required' : ''}
                                 />
                             </Grid>
                         </Grid>
@@ -250,7 +266,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
                         <Button
                             variant="contained"
                             onClick={handleCreateOAO}
-                            disabled={loading || !order2Details.tradingsymbol || !order2Details.quantity || !order2Details.price}
+                            disabled={loading}
                             startIcon={loading ? <CircularProgress size={20} /> : null}
                         >
                             {loading ? 'Creating...' : 'Create OAO Order'}

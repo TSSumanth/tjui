@@ -57,4 +57,9 @@ export const deleteOaoOrderPair = async (id) => {
 export const updateOaoOrderPairStatus = async (id, status) => {
     const resp = await api.patch(`${API_URLS.ORDER_PAIRS}/${id}`, { status });
     return resp.data;
+};
+
+export const updateOaoOrderPair = async (id, updateData) => {
+    const resp = await api.patch(`${API_URLS.ORDER_PAIRS}/${id}`, updateData);
+    return resp.data;
 }; 

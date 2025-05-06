@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
 import { getOrderPairs, updateOrderPairStatus, deleteOrderPair } from '../services/zerodha/oco';
-import { getOrderById, cancelZerodhaOrder } from '../services/zerodha/api';
+import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
+import { updateOaoOrderPair } from '../services/zerodha/oao';
 
 const ZerodhaContext = createContext();
 const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
@@ -98,7 +99,7 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error checking session:', err);
             if (isMounted.current) {
-            setSessionActive(false);
+                setSessionActive(false);
                 setIsAuth(false);
             }
             return false;
@@ -116,7 +117,7 @@ export const ZerodhaProvider = ({ children }) => {
 
         try {
             if (force) {
-            setLoading(true);
+                setLoading(true);
             }
             setError(null);
 
@@ -172,11 +173,11 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error fetching data:', err);
             if (isMounted.current) {
-            setError(err.message);
+                setError(err.message);
             }
         } finally {
             if (isMounted.current && force) {
-            setLoading(false);
+                setLoading(false);
             }
         }
     }, [checkSession]);
@@ -194,7 +195,7 @@ export const ZerodhaProvider = ({ children }) => {
         } catch (err) {
             console.error('Error fetching orders:', err);
             if (isMounted.current) {
-            setError(err.message);
+                setError(err.message);
             }
         } finally {
             if (isMounted.current) {
@@ -364,7 +365,7 @@ export const ZerodhaProvider = ({ children }) => {
     useEffect(() => {
         let intervalId;
         let isUnmounted = false;
-        const fetchOcoPairsAndStatuses = async (activeOnly = true) => {
+        const fetchOrderPairStatuses = async (activeOnly = true) => {
             try {
                 const pairsData = await getOrderPairs();
                 if (isUnmounted) return;
@@ -382,16 +383,17 @@ export const ZerodhaProvider = ({ children }) => {
                                     const status = resp1.data[resp1.data.length - 1].status;
                                     statusMap[pair.order1_id] = status;
                                 }
-                            } catch { /* intentionally empty */ }
+                            } catch (error) { console.log(error) }
                         }
-                        if (pair.order2_id) {
+                        // Only fetch order2 details if it's not an OAO order or if order1 is completed
+                        if (pair.order2_id && (pair.type !== 'OAO' || statusMap[pair.order1_id] === 'COMPLETE')) {
                             try {
                                 const resp2 = await getOrderById(pair.order2_id);
                                 if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
                                     const status = resp2.data[resp2.data.length - 1].status;
                                     statusMap[pair.order2_id] = status;
                                 }
-                            } catch { /* intentionally empty */ }
+                            } catch (error) { console.log(error) }
                         }
                     }
                 }));
@@ -422,30 +424,13 @@ export const ZerodhaProvider = ({ children }) => {
                             }
                         } else if (pair.type === 'OAO') {
                             // OAO Logic
-                            if (normStatus1 === 'COMPLETE' && !pair.order2_id) {
+                            if (normStatus1 === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
                                 // Order 1 is complete, create Order 2
                                 try {
-                                    const response = await fetch('/api/zerodha/place-order', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify(pair.order2_details)
-                                    });
-                                    if (response.ok) {
-                                        const data = await response.json();
-                                        if (data.success && data.order_id) {
-                                            // Update the pair with order2_id
-                                            await fetch('/api/zerodha/order-pairs/' + pair.id, {
-                                                method: 'PATCH',
-                                                headers: {
-                                                    'Content-Type': 'application/json'
-                                                },
-                                                body: JSON.stringify({
-                                                    order2_id: data.order_id
-                                                })
-                                            });
-                                        }
+                                    const data = await placeOrder(pair.order2_details);
+                                    if (data.success && data.order_id) {
+                                        // Update the pair with order2_id using the oao service
+                                        await updateOaoOrderPair(pair.id, { order2_id: data.order_id });
                                     }
                                 } catch (error) {
                                     console.error('Error creating Order 2:', error);
@@ -460,8 +445,8 @@ export const ZerodhaProvider = ({ children }) => {
             } catch { /* intentionally empty */ }
         };
         if (sessionActive && isMarketHours()) {
-            fetchOcoPairsAndStatuses(true);
-            intervalId = setInterval(() => fetchOcoPairsAndStatuses(true), 15000);
+            fetchOrderPairStatuses(true);
+            intervalId = setInterval(() => fetchOrderPairStatuses(true), 15000);
         }
         return () => {
             isUnmounted = true;
