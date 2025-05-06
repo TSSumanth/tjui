@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Typography, Box, Button } from '@mui/material';
-import OcoPairsTable from '../components/zerodha/OcoPairsTable';
+import PairedOrdersTable from '../components/zerodha/PairedOrdersTable';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import OcoOrderDialog from '../components/zerodha/OcoOrderDialog';
 import CreateOAOOrder from '../components/zerodha/CreateOAOOrder';
@@ -39,7 +39,7 @@ export default function PairedOrdersPage() {
                             Create OAO Order
                         </Button>
                     </div>
-                    <OcoPairsTable />
+                    <PairedOrdersTable />
                 </Box>
                 <OcoOrderDialog
                     open={isOCODialogOpen}

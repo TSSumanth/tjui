@@ -1,6 +1,23 @@
-import React, { useContext, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Chip, Typography, Divider } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    Button,
+    Chip,
+    Typography,
+    Divider,
+    CircularProgress,
+    Alert,
+    Snackbar
+} from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
+import { deleteOaoOrderPair } from '../../services/zerodha/oao';
+import { deleteOrderPair } from '../../services/zerodha/oco';
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -15,8 +32,10 @@ function isToday(dateStr) {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
-export default function OcoPairsTable({ onChange }) {
+export default function PairedOrdersTable({ onChange }) {
     const { ocoPairs, ocoStatusMap, refreshOcoPairs } = useZerodha();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         refreshOcoPairs();
@@ -24,10 +43,23 @@ export default function OcoPairsTable({ onChange }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleCancel = async (id) => {
-        // Optionally, you can call a context method to delete/cancel the pair and refresh
-        await refreshOcoPairs();
-        if (onChange) onChange();
+    const handleCancel = async (id, type) => {
+        setLoading(true);
+        setError(null);
+        try {
+            if (type === 'OAO') {
+                await deleteOaoOrderPair(id);
+            } else {
+                await deleteOrderPair(id);
+            }
+            await refreshOcoPairs();
+            if (onChange) onChange();
+        } catch (error) {
+            console.error('Error cancelling order pair:', error);
+            setError(error.response?.data?.message || 'Failed to cancel order pair. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (!ocoPairs.length) return null;
@@ -94,7 +126,14 @@ export default function OcoPairsTable({ onChange }) {
                                         <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                         <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                         <TableCell>
-                                            <Button variant="outlined" color="error" size="small" onClick={() => handleCancel(pair.id)}>
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                size="small"
+                                                onClick={() => handleCancel(pair.id, 'OCO')}
+                                                disabled={loading}
+                                                startIcon={loading ? <CircularProgress size={20} /> : null}
+                                            >
                                                 Cancel OCO
                                             </Button>
                                         </TableCell>
@@ -181,7 +220,14 @@ export default function OcoPairsTable({ onChange }) {
                                         <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                         <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                         <TableCell>
-                                            <Button variant="outlined" color="error" size="small" onClick={() => handleCancel(pair.id)}>
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                size="small"
+                                                onClick={() => handleCancel(pair.id, 'OAO')}
+                                                disabled={loading}
+                                                startIcon={loading ? <CircularProgress size={20} /> : null}
+                                            >
                                                 Cancel OAO
                                             </Button>
                                         </TableCell>
@@ -231,6 +277,16 @@ export default function OcoPairsTable({ onChange }) {
                     </>
                 )}
             </Paper>
+            <Snackbar
+                open={!!error}
+                autoHideDuration={6000}
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setError(null)} severity="error">
+                    {error}
+                </Alert>
+            </Snackbar>
         </>
     );
 } 

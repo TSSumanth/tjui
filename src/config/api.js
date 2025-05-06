@@ -11,5 +11,6 @@ export const API_URLS = {
     ACTION_ITEMS: `${BASE_URL}/actionitems`,
     TAG_MANAGEMENT: `${BASE_URL}/tags`,
     PORTFOLIO_VALUE: `${BASE_URL}/portfolio-value`,
-    MANUAL_PL: `${BASE_URL}/manual-pl`
+    MANUAL_PL: `${BASE_URL}/manual-pl`,
+    ORDER_PAIRS: `${BASE_URL}/order-pairs`
 }; 
