@@ -204,7 +204,7 @@ const ButtonGroup = () => {
             items: {
                 "Tag Management": { path: "/tags", icon: <LocalOfferIcon /> },
                 "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> },
-                "Events and Holidays": { path: "/events-holidays", icon: <EventIcon /> }
+                "Holidays": { path: "/holidays", icon: <EventIcon /> }
             }
         }
     };

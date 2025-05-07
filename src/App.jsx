@@ -17,7 +17,7 @@ import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
 import Dashboard from './pages/DashBoardManagement';
 import TagManagement from './pages/TagManagement';
 import PairedOrdersPage from './pages/PairedOrdersPage';
-import EventsAndHolidays from './pages/EventsAndHolidays';
+import Holidays from './pages/Holidays';
 
 function App() {
     return (
@@ -43,7 +43,7 @@ function App() {
                     <Route path="/actionitems" element={<ActionItemsPage />} />
                     <Route path="/zerodha/paired-orders" element={<PairedOrdersPage />} />
                     <Route path="/tags" element={<TagManagement />} />
-                    <Route path="/events-holidays" element={<EventsAndHolidays />} />
+                    <Route path="/holidays" element={<Holidays />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
             </BrowserRouter>
