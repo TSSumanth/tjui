@@ -6,12 +6,10 @@ import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodh
 import { updateOaoOrderPair } from '../services/zerodha/oao';
 
 const ZerodhaContext = createContext();
-const FETCH_COOLDOWN = 10000; // 10 seconds minimum between fetches
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
 const SESSION_CHECK_INTERVAL = 2000; // 2 seconds
 const FETCH_INTERVAL = 10000; // 10 seconds
-const AUTO_SYNC_INTERVAL = 10000; // 10 seconds
 
 // Function to check if current time is within market hours (extended 30 mins after close)
 const isMarketHours = () => {
@@ -437,6 +435,9 @@ export const ZerodhaProvider = ({ children }) => {
                                 }
                             } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
                                 // Both orders are complete
+                                await updateOrderPairStatus(pair.id, 'completed');
+                            } else if (normStatus1.startsWith('CANCELLED')) {
+                                // Order 1 is cancelled, mark the pair as completed
                                 await updateOrderPairStatus(pair.id, 'completed');
                             }
                         }

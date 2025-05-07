@@ -16,11 +16,8 @@ export default function PairedOrdersPage() {
             <ZerodhaSubHeader />
             <Container maxWidth="xl">
                 <Box sx={{ my: 4 }}>
-                    <Typography variant="h4" component="h1" gutterBottom>
-                        Paired Orders
-                    </Typography>
                     <Typography variant="body1" color="text.secondary" paragraph>
-                        Manage your One-Cancels-Other (OCO) and One-Attaches-Other (OAO) order pairs here.
+                        Manage your One-Cancels-Other (OCO) and One-After-Other (OAO) order pairs here.
                     </Typography>
                     <div style={{ marginBottom: '20px' }}>
                         <Button

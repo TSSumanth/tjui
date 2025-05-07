@@ -92,65 +92,92 @@ export default function PairedOrdersTable({ onChange }) {
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                     OCO Pairs
                 </Typography>
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Order 1</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Order 2</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Last Updated</TableCell>
-                                <TableCell>Action</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {activePairs.map((pair) => {
-                                const status1 = ocoStatusMap[pair.order1_id] || '';
-                                const status2 = ocoStatusMap[pair.order2_id] || '';
-                                return (
-                                    <TableRow key={pair.id}>
-                                        <TableCell>
-                                            {pair.order1_tradingsymbol || ''} <br />
-                                            <small>{pair.order1_id}</small>
-                                        </TableCell>
-                                        <TableCell>{pair.order1_transaction_type || ''}</TableCell>
-                                        <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                        <TableCell>
-                                            {pair.order2_tradingsymbol || ''} <br />
-                                            <small>{pair.order2_id}</small>
-                                        </TableCell>
-                                        <TableCell>{pair.order2_transaction_type || ''}</TableCell>
-                                        <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
-                                        <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                        <TableCell>
-                                            <Button
-                                                variant="outlined"
-                                                color="error"
-                                                size="small"
-                                                onClick={() => handleCancel(pair.id, 'OCO')}
-                                                disabled={loading}
-                                                startIcon={loading ? <CircularProgress size={20} /> : null}
-                                            >
-                                                Cancel OCO
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                {activePairs.length === 0 ? (
+                    <Typography variant="body1" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                        No active OCO orders found. Create a new OCO order pair to get started.
+                    </Typography>
+                ) : (
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Order 1</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Order 2</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Last Updated</TableCell>
+                                    <TableCell>Action</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {activePairs.map((pair) => {
+                                    const status1 = ocoStatusMap[pair.order1_id] || '';
+                                    const status2 = ocoStatusMap[pair.order2_id] || '';
+                                    return (
+                                        <TableRow key={pair.id}>
+                                            <TableCell>
+                                                {pair.order1_tradingsymbol || ''} <br />
+                                                <small>{pair.order1_id}</small>
+                                            </TableCell>
+                                            <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                            <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                            <TableCell>
+                                                {pair.order2_tradingsymbol || ''} <br />
+                                                <small>{pair.order2_id}</small>
+                                            </TableCell>
+                                            <TableCell>{pair.order2_transaction_type || ''}</TableCell>
+                                            <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                            <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    size="small"
+                                                    onClick={() => handleCancel(pair.id, 'OCO')}
+                                                    disabled={loading}
+                                                    startIcon={loading ? <CircularProgress size={20} /> : null}
+                                                >
+                                                    Cancel OCO
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )}
                 {completedTodayPairs.length > 0 && (
                     <>
                         <Divider sx={{ my: 2 }} />
-                        <Typography variant="subtitle2" fontWeight={500} gutterBottom>
+                        <Typography
+                            variant="subtitle1"
+                            fontWeight={600}
+                            gutterBottom
+                            sx={{
+                                color: 'primary.main',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}
+                        >
                             Completed Today
                         </Typography>
                         <TableContainer>
                             <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Order 1</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Order 2</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Last Updated</TableCell>
+                                    </TableRow>
+                                </TableHead>
                                 <TableBody>
                                     {completedTodayPairs.map((pair) => {
                                         const status1 = ocoStatusMap[pair.order1_id] || '';
@@ -164,7 +191,6 @@ export default function PairedOrdersTable({ onChange }) {
                                                 <TableCell>{pair.order2_transaction_type || ''}</TableCell>
                                                 <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                                 <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                                <TableCell />
                                             </TableRow>
                                         );
                                     })}
@@ -180,71 +206,98 @@ export default function PairedOrdersTable({ onChange }) {
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                     OAO Pairs
                 </Typography>
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Order 1</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Order 2 Details</TableCell>
-                                <TableCell>Order 2 ID</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Last Updated</TableCell>
-                                <TableCell>Action</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {activeOaoPairs.map((pair) => {
-                                const status1 = ocoStatusMap[pair.order1_id] || '';
-                                const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
-                                return (
-                                    <TableRow key={pair.id}>
-                                        <TableCell>
-                                            {pair.order1_tradingsymbol || ''} <br />
-                                            <small>{pair.order1_id}</small>
-                                        </TableCell>
-                                        <TableCell>{pair.order1_transaction_type || ''}</TableCell>
-                                        <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                        <TableCell>
-                                            {pair.order2_details ? (
-                                                <>
-                                                    {pair.order2_details.tradingsymbol || ''} <br />
-                                                    {pair.order2_details.transaction_type || ''} <br />
-                                                    Qty: {pair.order2_details.quantity || ''} <br />
-                                                    Price: {pair.order2_details.price || ''}
-                                                </>
-                                            ) : ''}
-                                        </TableCell>
-                                        <TableCell>{pair.order2_id || '-'}</TableCell>
-                                        <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
-                                        <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                        <TableCell>
-                                            <Button
-                                                variant="outlined"
-                                                color="error"
-                                                size="small"
-                                                onClick={() => handleCancel(pair.id, 'OAO')}
-                                                disabled={loading}
-                                                startIcon={loading ? <CircularProgress size={20} /> : null}
-                                            >
-                                                Cancel OAO
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                {activeOaoPairs.length === 0 ? (
+                    <Typography variant="body1" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                        No active OAO orders found. Create a new OAO order pair to get started.
+                    </Typography>
+                ) : (
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Order 1</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Order 2 Details</TableCell>
+                                    <TableCell>Order 2 ID</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Last Updated</TableCell>
+                                    <TableCell>Action</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {activeOaoPairs.map((pair) => {
+                                    const status1 = ocoStatusMap[pair.order1_id] || '';
+                                    const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
+                                    return (
+                                        <TableRow key={pair.id}>
+                                            <TableCell>
+                                                {pair.order1_tradingsymbol || ''} <br />
+                                                <small>{pair.order1_id}</small>
+                                            </TableCell>
+                                            <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                            <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                            <TableCell>
+                                                {pair.order2_details ? (
+                                                    <>
+                                                        {pair.order2_details.tradingsymbol || ''} <br />
+                                                        {pair.order2_details.transaction_type || ''} <br />
+                                                        Qty: {pair.order2_details.quantity || ''} <br />
+                                                        Price: {pair.order2_details.price || ''}
+                                                    </>
+                                                ) : ''}
+                                            </TableCell>
+                                            <TableCell>{pair.order2_id || '-'}</TableCell>
+                                            <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                            <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    size="small"
+                                                    onClick={() => handleCancel(pair.id, 'OAO')}
+                                                    disabled={loading}
+                                                    startIcon={loading ? <CircularProgress size={20} /> : null}
+                                                >
+                                                    Cancel OAO
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )}
                 {completedOaoPairs.length > 0 && (
                     <>
                         <Divider sx={{ my: 2 }} />
-                        <Typography variant="subtitle2" fontWeight={500} gutterBottom>
+                        <Typography
+                            variant="subtitle1"
+                            fontWeight={600}
+                            gutterBottom
+                            sx={{
+                                color: 'primary.main',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}
+                        >
                             Completed Today
                         </Typography>
                         <TableContainer>
                             <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Order 1</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Order 2 Details</TableCell>
+                                        <TableCell>Order 2 ID</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Last Updated</TableCell>
+                                    </TableRow>
+                                </TableHead>
                                 <TableBody>
                                     {completedOaoPairs.map((pair) => {
                                         const status1 = ocoStatusMap[pair.order1_id] || '';
@@ -267,7 +320,6 @@ export default function PairedOrdersTable({ onChange }) {
                                                 <TableCell>{pair.order2_id || '-'}</TableCell>
                                                 <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                                 <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                                <TableCell />
                                             </TableRow>
                                         );
                                     })}

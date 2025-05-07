@@ -8,6 +8,8 @@ import {
     MenuItem,
     IconButton,
     Badge,
+    ListItemIcon,
+    ListItemText,
 } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -21,10 +23,15 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import EventIcon from '@mui/icons-material/Event';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import { useZerodha } from '../../context/ZerodhaContext';
 import PortfolioDashboardWidget from '../PortfolioDashboardWidget';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
@@ -41,7 +48,7 @@ const Header = () => {
     const handleZerodhaClick = () => {
         if (sessionActive) {
             navigate('/zerodha/account');
-                            } else {
+        } else {
             navigate('/zerodha/login');
         }
     };
@@ -168,6 +175,7 @@ const ButtonGroup = () => {
     const [activeMenu, setActiveMenu] = useState(null);
     const [showCreateStrategy, setShowCreateStrategy] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
 
     const menuItems = {
         "Trading": {
@@ -193,10 +201,10 @@ const ButtonGroup = () => {
             }
         },
         "Management": {
-            icon: <SettingsIcon />,
             items: {
-                "Tag Management": { path: "/tagmanagement", icon: <LocalOfferIcon /> },
-                "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> }
+                "Tag Management": { path: "/tags", icon: <LocalOfferIcon /> },
+                "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> },
+                "Events and Holidays": { path: "/events-holidays", icon: <EventIcon /> }
             }
         }
     };
@@ -215,114 +223,118 @@ const ButtonGroup = () => {
         return location.pathname === path;
     };
 
-    const handleCreateStrategySubmit = () => {
-        setShowCreateStrategy(false);
-    };
-
     return (
-        <Box sx={{
-            display: "flex",
-            gap: 2,
-            '& > button': {
-                position: 'relative',
-                background: 'none',
-                color: 'white',
-                fontWeight: 500,
-                fontSize: '1rem',
-                borderRadius: 0,
-                px: 2,
-                py: 1.5,
-                minWidth: 0,
-                letterSpacing: 0.2,
-                transition: 'color 0.2s',
-                '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    left: 0,
-                    bottom: 0,
-                    width: '100%',
-                    height: '2.5px',
-                    background: 'linear-gradient(90deg, #42a5f5 0%, #1e88e5 100%)',
-                    borderRadius: 2,
-                    transform: 'scaleX(0)',
-                    transition: 'transform 0.25s',
-                },
-                '&:hover, &[data-active="true"]': {
-                    color: '#90caf9',
+        <>
+            <Box sx={{
+                display: "flex",
+                gap: 2,
+                '& > button': {
+                    position: 'relative',
                     background: 'none',
-                },
-                '&:hover::after, &[data-active="true"]::after': {
-                    transform: 'scaleX(1)',
+                    color: 'white',
+                    fontWeight: 500,
+                    fontSize: '1rem',
+                    borderRadius: 0,
+                    px: 2,
+                    py: 1.5,
+                    minWidth: 0,
+                    letterSpacing: 0.2,
+                    transition: 'color 0.2s',
+                    '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        bottom: 0,
+                        width: '100%',
+                        height: '2.5px',
+                        background: 'linear-gradient(90deg, #42a5f5 0%, #1e88e5 100%)',
+                        borderRadius: 2,
+                        transform: 'scaleX(0)',
+                        transition: 'transform 0.25s',
+                    },
+                    '&:hover, &[data-active="true"]': {
+                        color: '#90caf9',
+                        background: 'none',
+                    },
+                    '&:hover::after, &[data-active="true"]::after': {
+                        transform: 'scaleX(1)',
+                    }
                 }
-            }
-        }}>
-            {Object.entries(menuItems).map(([menuName, { icon, items }]) => (
-                        <React.Fragment key={menuName}>
-                            <Button
-                                onClick={(e) => handleClick(e, menuName)}
-                                startIcon={icon}
-                                endIcon={<KeyboardArrowDownIcon />}
-                        data-active={activeMenu === menuName}
-                            >
-                                {menuName}
-                            </Button>
-                            <Menu
-                                anchorEl={anchorEl}
-                                open={activeMenu === menuName}
-                                onClose={handleClose}
-                                anchorOrigin={{
-                                    vertical: 'bottom',
-                                    horizontal: 'left',
-                                }}
-                                transformOrigin={{
-                                    vertical: 'top',
-                                    horizontal: 'left',
-                                }}
-                                PaperProps={{
-                                    sx: {
-                                        mt: 1,
-                                        minWidth: "200px",
-                                        boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                                        "& .MuiMenuItem-root": {
-                                    padding: "10px 20px",
-                                    fontSize: '1rem',
-                                    fontWeight: 400,
-                                    '&:hover': {
-                                                backgroundColor: "#e3f2fd"
-                                            }
+            }}>
+                {Object.entries(menuItems).map(([menuName, { icon, items }]) => (
+                    <React.Fragment key={menuName}>
+                        <Button
+                            onClick={(e) => handleClick(e, menuName)}
+                            startIcon={icon}
+                            endIcon={<KeyboardArrowDownIcon />}
+                            data-active={activeMenu === menuName}
+                        >
+                            {menuName}
+                        </Button>
+                        <Menu
+                            anchorEl={anchorEl}
+                            open={activeMenu === menuName}
+                            onClose={handleClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'left',
+                            }}
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    mt: 1,
+                                    minWidth: "200px",
+                                    boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.1)",
+                                    borderRadius: 2,
+                                    overflow: 'hidden',
+                                    "& .MuiMenuItem-root": {
+                                        padding: "10px 20px",
+                                        fontSize: '1rem',
+                                        fontWeight: 400,
+                                        '&:hover': {
+                                            backgroundColor: "#e3f2fd"
                                         }
                                     }
-                                }}
-                            >
-                        {Object.entries(items).map(([label, { path, icon, onClick }]) => (
-                                        <MenuItem
-                                            key={path}
-                                            component={onClick ? 'button' : Link}
-                                            to={onClick ? undefined : path}
-                                            onClick={onClick || handleClose}
-                                            selected={isActive(path)}
-                                            sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 1,
-                                                color: isActive(path) ? "#1976d2" : "inherit",
-                                                fontWeight: isActive(path) ? 600 : 400,
-                                                width: "100%",
-                                                border: "none",
-                                                background: "none",
-                                                cursor: "pointer"
-                                            }}
-                                        >
-                                            {icon}
-                                            {label}
-                                        </MenuItem>
-                        ))}
-                            </Menu>
-                        </React.Fragment>
-            ))}
+                                }
+                            }}
+                        >
+                            {Object.entries(items).map(([label, { path, icon, onClick }]) => (
+                                <MenuItem
+                                    key={path}
+                                    component={onClick ? 'button' : Link}
+                                    to={onClick ? undefined : path}
+                                    onClick={onClick || handleClose}
+                                    selected={isActive(path)}
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        color: isActive(path) ? "#1976d2" : "inherit",
+                                        fontWeight: isActive(path) ? 600 : 400,
+                                        width: "100%",
+                                        border: "none",
+                                        background: "none",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    {icon}
+                                    {label}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </React.Fragment>
+                ))}
             </Box>
+            {showCreateStrategy && (
+                <CreateStrategy
+                    open={showCreateStrategy}
+                    onClose={() => setShowCreateStrategy(false)}
+                />
+            )}
+        </>
     );
 };
 
