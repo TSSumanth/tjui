@@ -331,7 +331,8 @@ const ButtonGroup = () => {
             {showCreateStrategy && (
                 <CreateStrategy
                     open={showCreateStrategy}
-                    onClose={() => setShowCreateStrategy(false)}
+                    onCancel={() => setShowCreateStrategy(false)}
+                    onSubmit={() => setShowCreateStrategy(false)}
                 />
             )}
         </>
