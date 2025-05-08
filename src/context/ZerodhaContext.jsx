@@ -392,7 +392,7 @@ export const ZerodhaProvider = ({ children }) => {
                         if (pair.type === 'OAO') {
                             if (order1Status === 'CANCELLED') {
                                 // Order 1 is cancelled, mark the pair as completed
-                                await updateOrderPair(pair.id, { status: 'completed' });
+                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
                             } else if (order1Status === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
                                 // Order 1 is complete, create Order 2
                                 try {
@@ -406,19 +406,26 @@ export const ZerodhaProvider = ({ children }) => {
                                 }
                             } else if (order1Status === 'COMPLETE' && order2Status === 'COMPLETE') {
                                 // Both orders are complete
-                                await updateOrderPair(pair.id, { status: 'completed' });
+                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
                             }
                         }
 
                         if (pair.type === 'OCO') {
                             const normStatus1 = (order1Status || '').toUpperCase();
                             const normStatus2 = (order2Status || '').toUpperCase();
-                            if (normStatus1 === 'COMPLETE' && normStatus2 === 'OPEN') {
-                                await cancelZerodhaOrder(pair.order2_id);
+                            const isOrder1Open = normStatus1 === 'OPEN';
+                            const isOrder2Open = normStatus2 === 'OPEN';
+                            // If neither order is OPEN, mark as completed (handles legacy/inconsistent pairs)
+                            if (!isOrder1Open && !isOrder2Open) {
                                 await updateOrderPair(pair.id, { status: 'completed' });
+                            } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'OPEN') {
+                                await cancelZerodhaOrder(pair.order2_id);
+                                const newOrder2Details = { ...pair.order2_details, orderstatus: 'CANCELLED' };
+                                await updateOrderPair(pair.id, { status: 'completed', order2_details: newOrder2Details });
                             } else if (normStatus2 === 'COMPLETE' && normStatus1 === 'OPEN') {
                                 await cancelZerodhaOrder(pair.order1_id);
-                                await updateOrderPair(pair.id, { status: 'completed' });
+                                const newOrder1Details = { ...pair.order1_details, orderstatus: 'CANCELLED' };
+                                await updateOrderPair(pair.id, { status: 'completed', order1_details: newOrder1Details });
                             } else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
                                 await updateOrderPair(pair.id, { status: 'completed' });
                             } else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {

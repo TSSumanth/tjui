@@ -74,16 +74,16 @@ export default function PairedOrdersTable({ onChange }) {
     };
 
     // Split pairs into OCO and OAO
-    const ocoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OCO');
-    const oaoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OAO');
+    const ocoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OCO' && isToday(pair.created_at));
+    const oaoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OAO' && isToday(pair.created_at));
 
-    // OCO: Split into active and completed (today only)
-    const activePairs = ocoOnlyPairs.filter(pair => pair.status !== 'completed');
-    const completedTodayPairs = ocoOnlyPairs.filter(pair => pair.status === 'completed' && isToday(pair.created_at));
+    // OCO: Split into active and completed
+    const activePairs = ocoOnlyPairs.filter(pair => pair.status !== 'COMPLETED');
+    const completedTodayPairs = ocoOnlyPairs.filter(pair => pair.status === 'COMPLETED');
 
     // OAO: Show all (or split if needed)
-    const activeOaoPairs = oaoOnlyPairs.filter(pair => pair.status !== 'completed');
-    const completedOaoPairs = oaoOnlyPairs.filter(pair => pair.status === 'completed' && isToday(pair.created_at));
+    const activeOaoPairs = oaoOnlyPairs.filter(pair => pair.status !== 'COMPLETED');
+    const completedOaoPairs = oaoOnlyPairs.filter(pair => pair.status === 'COMPLETED');
 
     return (
         <>
