@@ -13,6 +13,9 @@ import {
     Tab,
     Tabs,
     Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
     TableContainer,
     Table,
     TableHead,
@@ -31,6 +34,7 @@ import {
     ListItem,
     ListItemIcon,
     Stack,
+    LinearProgress,
 } from "@mui/material";
 import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
@@ -52,6 +56,8 @@ import { CreateActionItem } from "../ActionItems/ActionModelPopup";
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import { useZerodha } from '../../context/ZerodhaContext';
+import SyncIcon from '@mui/icons-material/Sync';
 
 const TABLE_STYLES = {
     container: {
@@ -90,6 +96,7 @@ const TABLE_STYLES = {
 };
 
 function UpdateStrategy({ id }) {
+    const { sessionActive, holdings, positions } = useZerodha();
     const [strategy, setStrategy] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -118,6 +125,13 @@ function UpdateStrategy({ id }) {
     const [showActionItemPopup, setShowActionItemPopup] = useState(false);
     const [selectedTradeForAction, setSelectedTradeForAction] = useState(null);
     const [tradeActionItems, setTradeActionItems] = useState({});
+    const [isFetchingZerodhaLTP, setIsFetchingZerodhaLTP] = useState(false);
+    const [showZerodhaConfirmDialog, setShowZerodhaConfirmDialog] = useState(false);
+    const [syncProgress, setSyncProgress] = useState({
+        total: 0,
+        current: 0,
+        status: 'idle' // 'idle' | 'syncing' | 'complete'
+    });
     const navigate = useNavigate();
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
@@ -562,6 +576,199 @@ function UpdateStrategy({ id }) {
                 message: 'Failed to create action item',
                 severity: 'error'
             });
+        }
+    };
+
+    const handleGetLTPFromZerodha = async () => {
+        console.log('Get LTP from Zerodha clicked');
+        console.log('Zerodha Context:', {
+            sessionActive,
+            holdings: holdings?.length || 0,
+            positions: positions ? (Array.isArray(positions) ? positions.length : Object.keys(positions).length) : 0
+        });
+
+        if (!sessionActive) {
+            setSnackbar({
+                open: true,
+                message: 'No active session available for Zerodha. Please connect to Zerodha and try again.',
+                severity: 'error'
+            });
+            return;
+        }
+
+        // Show confirmation dialog instead of proceeding directly
+        setShowZerodhaConfirmDialog(true);
+    };
+
+    const handleConfirmZerodhaSync = async () => {
+        setShowZerodhaConfirmDialog(false);
+        setIsFetchingZerodhaLTP(true);
+        setSyncProgress({ total: 0, current: 0, status: 'syncing' });
+
+        try {
+            // Check if we have Zerodha data
+            console.log('Zerodha Context State:', {
+                sessionActive,
+                holdingsCount: holdings?.length || 0,
+                positionsCount: Array.isArray(positions) ? positions.length :
+                    (positions && typeof positions === 'object' ? Object.keys(positions).length : 0)
+            });
+
+            if (!sessionActive) {
+                throw new Error('No active Zerodha session');
+            }
+
+            if (!holdings && !positions) {
+                throw new Error('No Zerodha data available');
+            }
+
+            // Get all open trades
+            const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
+            const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
+            const totalTrades = openStockTrades.length + openOptionTrades.length;
+            setSyncProgress(prev => ({ ...prev, total: totalTrades }));
+
+            console.log('Open Trades:', {
+                stockTrades: openStockTrades.map(t => ({
+                    symbol: t.symbol,
+                    asset: t.asset,
+                    strikePrice: t.strikeprize,
+                    type: t.tradetype
+                })),
+                optionTrades: openOptionTrades.map(t => ({
+                    symbol: t.symbol,
+                    asset: t.asset,
+                    strikePrice: t.strikeprize,
+                    type: t.tradetype
+                }))
+            });
+
+            // Create a map of asset names to their LTP from Zerodha
+            const zerodhaLTPMap = new Map();
+
+            // Add holdings LTP
+            if (holdings && holdings.length > 0) {
+                console.log('Processing Zerodha Holdings:', holdings);
+                holdings.forEach(holding => {
+                    if (holding.tradingsymbol && holding.last_price) {
+                        zerodhaLTPMap.set(holding.tradingsymbol, holding.last_price);
+                        console.log(`Added holding LTP for ${holding.tradingsymbol}: ${holding.last_price}`);
+                    }
+                });
+            }
+
+            // Add positions LTP
+            if (Array.isArray(positions)) {
+                console.log('Processing Zerodha Positions (Array):', positions);
+                positions.forEach(position => {
+                    if (position.tradingsymbol && position.last_price) {
+                        zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
+                        console.log(`Added position LTP for ${position.tradingsymbol}: ${position.last_price}`);
+                    }
+                });
+            } else if (positions && typeof positions === 'object') {
+                console.log('Processing Zerodha Positions (Object):', positions);
+                Object.values(positions).forEach(arr => {
+                    if (Array.isArray(arr)) {
+                        arr.forEach(position => {
+                            if (position.tradingsymbol && position.last_price) {
+                                zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
+                                console.log(`Added position LTP for ${position.tradingsymbol}: ${position.last_price}`);
+                            }
+                        });
+                    }
+                });
+            }
+
+            console.log('Final LTP Map:', Object.fromEntries(zerodhaLTPMap));
+
+            // Update trades with Zerodha LTP
+            const updatedStockTrades = [];
+            const updatedOptionTrades = [];
+
+            // Update stock trades
+            for (const trade of openStockTrades) {
+                const ltp = zerodhaLTPMap.get(trade.symbol);
+                console.log(`Checking stock trade ${trade.symbol} - Found LTP: ${ltp}`);
+                if (ltp) {
+                    const updatedTrade = {
+                        ...trade,
+                        ltp: ltp.toString()
+                    };
+                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                    updatedTrade.unrealizedpl = unrealizedPL;
+                    updatedStockTrades.push(updatedTrade);
+                    console.log(`Updated stock trade ${trade.symbol} with LTP: ${ltp}`);
+                }
+                setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
+            }
+
+            // Update option trades
+            for (const trade of openOptionTrades) {
+                // For option trades, construct the full option symbol
+                // Format: SYMBOL + EXPIRY + STRIKE + TYPE
+                // Example: RELIANCE25JUN1400CE
+                const optionSymbol = `${trade.asset}${trade.strikeprize}${trade.asset.endsWith('CE') ? 'CE' : 'PE'}`;
+                console.log(`Checking option trade ${optionSymbol} - Found LTP: ${zerodhaLTPMap.get(optionSymbol)}`);
+
+                // Try to find a matching position by iterating through the LTP map
+                let matchedLTP = null;
+                for (const [symbol, ltp] of zerodhaLTPMap.entries()) {
+                    // Check if the symbol contains our option details
+                    if (symbol.includes(trade.asset) &&
+                        symbol.includes(trade.strikeprize) &&
+                        symbol.endsWith(trade.asset.endsWith('CE') ? 'CE' : 'PE')) {
+                        matchedLTP = ltp;
+                        console.log(`Found matching position: ${symbol} with LTP: ${ltp}`);
+                        break;
+                    }
+                }
+
+                if (matchedLTP) {
+                    const updatedTrade = {
+                        ...trade,
+                        ltp: matchedLTP.toString()
+                    };
+                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                    updatedTrade.unrealizedpl = unrealizedPL;
+                    updatedOptionTrades.push(updatedTrade);
+                    console.log(`Updated option trade ${optionSymbol} with LTP: ${matchedLTP}`);
+                } else {
+                    console.log(`No matching position found for ${optionSymbol}`);
+                }
+                setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
+            }
+
+            // Update trades in database
+            await Promise.all([
+                ...updatedStockTrades.map(trade => updateStockTrade(trade)),
+                ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
+            ]);
+
+            // Refresh trades and P/L summary
+            await fetchTrades();
+            calculatePLSummary();
+
+            const totalUpdated = updatedStockTrades.length + updatedOptionTrades.length;
+            const totalOpen = openStockTrades.length + openOptionTrades.length;
+
+            setSnackbar({
+                open: true,
+                message: totalUpdated > 0
+                    ? `Successfully synced LTP from Zerodha for ${totalUpdated} out of ${totalOpen} open trades`
+                    : 'No matching trades found in Zerodha positions/holdings',
+                severity: totalUpdated > 0 ? 'success' : 'info'
+            });
+        } catch (error) {
+            console.error('Error updating LTP from Zerodha:', error);
+            setSnackbar({
+                open: true,
+                message: error.message || 'Failed to update LTP from Zerodha',
+                severity: 'error'
+            });
+        } finally {
+            setIsFetchingZerodhaLTP(false);
+            setSyncProgress({ total: 0, current: 0, status: 'complete' });
         }
     };
 
@@ -1082,30 +1289,29 @@ function UpdateStrategy({ id }) {
                                 mt: 3,
                                 gap: 2
                             }}>
-                                {hasOpenTradesWithZeroLTP ? (
-                                    <Typography
-                                        variant="body2"
-                                        color="error"
-                                    >
-                                        Please update LTP for open trades before saving
-                                    </Typography>
-                                ) : (
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Click Update Strategy to save P/L details
-                                    </Typography>
-                                )}
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<SyncIcon />}
+                                    onClick={() => {
+                                        console.log('Sync button clicked');
+                                        handleGetLTPFromZerodha();
+                                    }}
+                                    disabled={isFetchingZerodhaLTP}
+                                >
+                                    {isFetchingZerodhaLTP ? 'Fetching LTP...' : 'Get LTP from Zerodha'}
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setShowLTPDialog(true)}
+                                >
+                                    Update LTP
+                                </Button>
                                 <Button
                                     variant="contained"
-                                    color="primary"
-                                    onClick={handleUpdateStrategy}
                                     startIcon={<SaveIcon />}
-                                    size="large"
-                                    disabled={hasOpenTradesWithZeroLTP}
+                                    onClick={handleUpdateStrategy}
                                 >
-                                    Update Strategy
+                                    Save Changes
                                 </Button>
                             </Box>
                         </CardContent>
@@ -1141,13 +1347,6 @@ function UpdateStrategy({ id }) {
                                     gap: 2,
                                     mb: 3
                                 }}>
-                                    <Button
-                                        variant="outlined"
-                                        onClick={() => setShowLTPDialog(true)}
-                                        size="large"
-                                    >
-                                        Update LTP
-                                    </Button>
                                     <Button
                                         variant="contained"
                                         startIcon={<AddIcon />}
@@ -1543,6 +1742,47 @@ function UpdateStrategy({ id }) {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Zerodha Sync Confirmation Dialog */}
+            <Dialog
+                open={showZerodhaConfirmDialog}
+                onClose={() => setShowZerodhaConfirmDialog(false)}
+            >
+                <DialogTitle>Confirm LTP Sync</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        This will sync the Last Traded Prices (LTP) from your Zerodha positions and holdings for all open trades in this strategy. Do you want to continue?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowZerodhaConfirmDialog(false)}>Cancel</Button>
+                    <Button onClick={handleConfirmZerodhaSync} variant="contained" color="primary">
+                        Sync LTP
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Sync Progress Dialog */}
+            <Dialog
+                open={syncProgress.status === 'syncing'}
+                onClose={() => { }} // Prevent closing while syncing
+            >
+                <DialogContent>
+                    <Box sx={{ width: '100%', minWidth: 300 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Syncing LTP from Zerodha
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Processing trade {syncProgress.current} of {syncProgress.total}
+                        </Typography>
+                        <LinearProgress
+                            variant="determinate"
+                            value={(syncProgress.current / syncProgress.total) * 100}
+                            sx={{ mt: 2 }}
+                        />
+                    </Box>
+                </DialogContent>
+            </Dialog>
         </Box>
     );
 }
