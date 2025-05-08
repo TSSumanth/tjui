@@ -109,42 +109,14 @@ export const createOrderPair = async ({
     order2_id,
     type = 'OCO',
     order1_details,
-    order1_tradingsymbol,
-    order1_transaction_type,
-    order1_quantity,
-    order1_price,
-    order1_product,
-    order1_order_type,
-    order1_validity,
-    order2_details,
-    order2_tradingsymbol,
-    order2_transaction_type,
-    order2_quantity,
-    order2_price,
-    order2_product,
-    order2_order_type,
-    order2_validity
+    order2_details
 }) => {
     const resp = await api.post('/api/order-pairs', {
         order1_id,
         order2_id,
         type,
         order1_details,
-        order1_tradingsymbol,
-        order1_transaction_type,
-        order1_quantity,
-        order1_price,
-        order1_product,
-        order1_order_type,
-        order1_validity,
-        order2_details,
-        order2_tradingsymbol,
-        order2_transaction_type,
-        order2_quantity,
-        order2_price,
-        order2_product,
-        order2_order_type,
-        order2_validity
+        order2_details
     });
     return resp.data;
 };
@@ -158,7 +130,13 @@ export const deleteOrderPair = async (id) => {
     await api.delete(`/api/order-pairs/${id}`);
 };
 
-export const updateOrderPairStatus = async (id, status) => {
-    const resp = await api.patch(`/api/order-pairs/${id}`, { status });
+export const updateOrderPair = async (id, { status, order1_details, order2_details, order2_id }) => {
+    // Allow updating status, order1_details, order2_details, and order2_id (for OAO activation)
+    const payload = {};
+    if (status !== undefined) payload.status = status;
+    if (order1_details !== undefined) payload.order1_details = order1_details;
+    if (order2_details !== undefined) payload.order2_details = order2_details;
+    if (order2_id !== undefined) payload.order2_id = order2_id;
+    const resp = await api.patch(`/api/order-pairs/${id}`, payload);
     return resp.data;
 }; 

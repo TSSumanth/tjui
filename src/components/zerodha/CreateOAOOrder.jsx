@@ -91,23 +91,13 @@ const CreateOAOOrder = ({ open, onClose }) => {
                     price: selectedOrder.price,
                     product: selectedOrder.product,
                     order_type: selectedOrder.order_type,
-                    validity: selectedOrder.validity
+                    validity: selectedOrder.validity,
+                    orderstatus: selectedOrder.status || 'OPEN'
                 },
-                order1_tradingsymbol: selectedOrder.tradingsymbol,
-                order1_transaction_type: selectedOrder.transaction_type,
-                order1_quantity: selectedOrder.quantity,
-                order1_price: selectedOrder.price,
-                order1_product: selectedOrder.product,
-                order1_order_type: selectedOrder.order_type,
-                order1_validity: selectedOrder.validity,
-                order2_details: order2Details,
-                order2_tradingsymbol: order2Details.tradingsymbol,
-                order2_transaction_type: order2Details.transaction_type,
-                order2_quantity: order2Details.quantity,
-                order2_price: order2Details.price,
-                order2_product: order2Details.product,
-                order2_order_type: order2Details.order_type,
-                order2_validity: order2Details.validity
+                order2_details: {
+                    ...order2Details,
+                    orderstatus: 'OPEN'
+                }
             });
             setSuccess(true);
             setTimeout(() => {

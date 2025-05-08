@@ -118,16 +118,16 @@ export default function PairedOrdersTable({ onChange }) {
                                     return (
                                         <TableRow key={pair.id}>
                                             <TableCell>
-                                                {pair.order1_tradingsymbol || ''} <br />
+                                                {pair.order1_details?.tradingsymbol || ''} <br />
                                                 <small>{pair.order1_id}</small>
                                             </TableCell>
-                                            <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                            <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
                                             <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
                                             <TableCell>
-                                                {pair.order2_tradingsymbol || ''} <br />
+                                                {pair.order2_details?.tradingsymbol || ''} <br />
                                                 <small>{pair.order2_id}</small>
                                             </TableCell>
-                                            <TableCell>{pair.order2_transaction_type || ''}</TableCell>
+                                            <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
                                             <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                             <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                             <TableCell>
@@ -184,11 +184,11 @@ export default function PairedOrdersTable({ onChange }) {
                                         const status2 = ocoStatusMap[pair.order2_id] || '';
                                         return (
                                             <TableRow key={pair.id}>
-                                                <TableCell>{pair.order1_tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
-                                                <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                                <TableCell>{pair.order1_details?.tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
+                                                <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
                                                 <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                                <TableCell>{pair.order2_tradingsymbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
-                                                <TableCell>{pair.order2_transaction_type || ''}</TableCell>
+                                                <TableCell>{pair.order2_details?.tradingsymbol || ''} <br /> <small>{pair.order2_id}</small></TableCell>
+                                                <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
                                                 <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
                                                 <TableCell>{formatDate(pair.updated_at)}</TableCell>
                                             </TableRow>
@@ -232,10 +232,10 @@ export default function PairedOrdersTable({ onChange }) {
                                     return (
                                         <TableRow key={pair.id}>
                                             <TableCell>
-                                                {pair.order1_tradingsymbol || ''} <br />
+                                                {pair.order1_details?.tradingsymbol || ''} <br />
                                                 <small>{pair.order1_id}</small>
                                             </TableCell>
-                                            <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                            <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
                                             <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
                                             <TableCell>
                                                 {pair.order2_details ? (
@@ -304,8 +304,8 @@ export default function PairedOrdersTable({ onChange }) {
                                         const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
                                         return (
                                             <TableRow key={pair.id}>
-                                                <TableCell>{pair.order1_tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
-                                                <TableCell>{pair.order1_transaction_type || ''}</TableCell>
+                                                <TableCell>{pair.order1_details?.tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
+                                                <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
                                                 <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
                                                 <TableCell>
                                                     {pair.order2_details ? (

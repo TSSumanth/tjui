@@ -58,7 +58,6 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                 order1_id: order1.order_id,
                 order2_id: order2.order_id,
                 type: 'OCO',
-                // Order 1 details
                 order1_details: {
                     tradingsymbol: order1.tradingsymbol,
                     transaction_type: order1.transaction_type,
@@ -66,16 +65,9 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                     price: order1.price,
                     product: order1.product,
                     order_type: order1.order_type,
-                    validity: order1.validity
+                    validity: order1.validity,
+                    orderstatus: order1.status || 'OPEN'
                 },
-                order1_tradingsymbol: order1.tradingsymbol,
-                order1_transaction_type: order1.transaction_type,
-                order1_quantity: order1.quantity,
-                order1_price: order1.price,
-                order1_product: order1.product,
-                order1_order_type: order1.order_type,
-                order1_validity: order1.validity,
-                // Order 2 details
                 order2_details: {
                     tradingsymbol: order2.tradingsymbol,
                     transaction_type: order2.transaction_type,
@@ -83,15 +75,9 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                     price: order2.price,
                     product: order2.product,
                     order_type: order2.order_type,
-                    validity: order2.validity
-                },
-                order2_tradingsymbol: order2.tradingsymbol,
-                order2_transaction_type: order2.transaction_type,
-                order2_quantity: order2.quantity,
-                order2_price: order2.price,
-                order2_product: order2.product,
-                order2_order_type: order2.order_type,
-                order2_validity: order2.validity
+                    validity: order2.validity,
+                    orderstatus: order2.status || 'OPEN'
+                }
             });
 
             setShowSuccess(true);
