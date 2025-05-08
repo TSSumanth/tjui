@@ -342,9 +342,11 @@ export const ZerodhaProvider = ({ children }) => {
                 const statusMap = { ...ocoStatusMap };
                 await Promise.all(pairsToProcess.map(async (pair) => {
                     if (pair.status !== 'completed') {
-                        // Check orderstatus in details
+                        // Only fetch from Zerodha if not done and status is OPEN
                         const order1StatusLocal = pair.order1_details?.orderstatus?.toUpperCase();
                         const order2StatusLocal = pair.order2_details?.orderstatus?.toUpperCase();
+                        const isOrder1Open = order1StatusLocal === 'OPEN';
+                        const isOrder2Open = order2StatusLocal === 'OPEN';
                         const isOrder1Done = order1StatusLocal === 'COMPLETE' || order1StatusLocal === 'CANCELLED';
                         const isOrder2Done = order2StatusLocal === 'COMPLETE' || order2StatusLocal === 'CANCELLED';
                         let order1Status = order1StatusLocal;
@@ -352,8 +354,8 @@ export const ZerodhaProvider = ({ children }) => {
                         let order1DetailsUpdated = false;
                         let order2DetailsUpdated = false;
 
-                        // Only fetch from Zerodha if not done
-                        if (!isOrder1Done && pair.order1_id) {
+                        // Only fetch order1 status if it's OPEN
+                        if (isOrder1Open && pair.order1_id) {
                             try {
                                 const resp1 = await getOrderById(pair.order1_id);
                                 if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
@@ -367,19 +369,26 @@ export const ZerodhaProvider = ({ children }) => {
                         } else {
                             statusMap[pair.order1_id] = order1StatusLocal;
                         }
-                        if (!isOrder2Done && pair.order2_id && pair.order2_id !== 'WAITINGFORORDER1' && (pair.type !== 'OAO' || order1Status === 'COMPLETE')) {
-                            try {
-                                const resp2 = await getOrderById(pair.order2_id);
-                                if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                                    order2Status = resp2.data[resp2.data.length - 1].status?.toUpperCase();
-                                    statusMap[pair.order2_id] = order2Status;
-                                    if (order2Status !== order2StatusLocal) {
-                                        order2DetailsUpdated = true;
+
+                        // Skip order2 status check if it's WAITINGFORORDER1
+                        if (pair.order2_id && pair.order2_id !== 'WAITINGFORORDER1') {
+                            // Only fetch order2 status if it's OPEN
+                            if (isOrder2Open && (pair.type !== 'OAO' || order1Status === 'COMPLETE')) {
+                                try {
+                                    const resp2 = await getOrderById(pair.order2_id);
+                                    if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
+                                        order2Status = resp2.data[resp2.data.length - 1].status?.toUpperCase();
+                                        statusMap[pair.order2_id] = order2Status;
+                                        if (order2Status !== order2StatusLocal) {
+                                            order2DetailsUpdated = true;
+                                        }
                                     }
-                                }
-                            } catch (error) { console.log(error) }
-                        } else {
-                            statusMap[pair.order2_id] = order2StatusLocal;
+                                } catch (error) { console.log(error) }
+                            } else {
+                                statusMap[pair.order2_id] = order2StatusLocal;
+                            }
+                        } else if (pair.order2_id === 'WAITINGFORORDER1') {
+                            statusMap[pair.order2_id] = 'WAITINGFORORDER1';
                         }
 
                         // If status changed, update backend
@@ -455,46 +464,39 @@ export const ZerodhaProvider = ({ children }) => {
 
         // Process all pairs to get their current status
         await Promise.all(pairsData.map(async (pair) => {
-            // For completed pairs, only fetch status if not already in map
-            if (pair.status === 'completed') {
-                if (pair.order1_id && !statusMap[pair.order1_id]) {
-                    try {
-                        const resp1 = await getOrderById(pair.order1_id);
-                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
-                            const status = resp1.data[resp1.data.length - 1].status;
-                            statusMap[pair.order1_id] = status;
-                        }
-                    } catch { /* intentionally empty */ }
-                }
-                if (pair.order2_id && !statusMap[pair.order2_id]) {
-                    try {
-                        const resp2 = await getOrderById(pair.order2_id);
-                        if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                            const status = resp2.data[resp2.data.length - 1].status;
-                            statusMap[pair.order2_id] = status;
-                        }
-                    } catch { /* intentionally empty */ }
-                }
+            const order1StatusLocal = pair.order1_details?.orderstatus?.toUpperCase();
+            const order2StatusLocal = pair.order2_details?.orderstatus?.toUpperCase();
+            const isOrder1Open = order1StatusLocal === 'OPEN';
+            const isOrder2Open = order2StatusLocal === 'OPEN';
+
+            // For order1, only fetch if it's OPEN
+            if (isOrder1Open && pair.order1_id) {
+                try {
+                    const resp1 = await getOrderById(pair.order1_id);
+                    if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
+                        const status = resp1.data[resp1.data.length - 1].status?.toUpperCase();
+                        statusMap[pair.order1_id] = status;
+                    }
+                } catch { /* intentionally empty */ }
             } else {
-                // For active pairs, always fetch latest status
-                if (pair.order1_id) {
-                    try {
-                        const resp1 = await getOrderById(pair.order1_id);
-                        if (resp1.success && Array.isArray(resp1.data) && resp1.data.length > 0) {
-                            const status = resp1.data[resp1.data.length - 1].status;
-                            statusMap[pair.order1_id] = status;
-                        }
-                    } catch { /* intentionally empty */ }
-                }
-                if (pair.order2_id) {
+                statusMap[pair.order1_id] = order1StatusLocal;
+            }
+
+            // For order2, only fetch if it's OPEN and not WAITINGFORORDER1
+            if (pair.order2_id && pair.order2_id !== 'WAITINGFORORDER1') {
+                if (isOrder2Open) {
                     try {
                         const resp2 = await getOrderById(pair.order2_id);
                         if (resp2.success && Array.isArray(resp2.data) && resp2.data.length > 0) {
-                            const status = resp2.data[resp2.data.length - 1].status;
+                            const status = resp2.data[resp2.data.length - 1].status?.toUpperCase();
                             statusMap[pair.order2_id] = status;
                         }
                     } catch { /* intentionally empty */ }
+                } else {
+                    statusMap[pair.order2_id] = order2StatusLocal;
                 }
+            } else if (pair.order2_id === 'WAITINGFORORDER1') {
+                statusMap[pair.order2_id] = 'WAITINGFORORDER1';
             }
         }));
         setOcoStatusMap(statusMap);
