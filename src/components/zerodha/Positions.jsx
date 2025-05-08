@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Table,
     TableBody,
@@ -17,7 +17,8 @@ import {
     Skeleton,
     Card,
     Grid,
-    Button
+    Button,
+    CircularProgress
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import { useZerodha } from '../../context/ZerodhaContext';
@@ -28,6 +29,7 @@ import OrderPopup from './OrderPopup';
 import moment from 'moment-business-days';
 import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
 import { getStrategies } from '../../services/strategies';
+import { getHolidays } from '../../services/holidays';
 import StrategyIcon from '@mui/icons-material/AutoGraph';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
@@ -182,11 +184,11 @@ const calculateTimeValue = (option, ltpMap) => {
     return Math.max(optionLTP - intrinsic, 0);
 };
 
-const calculateDaysToExpiry = (option) => {
+const calculateDaysToExpiry = async (option) => {
     const details = extractOptionDetails(option.tradingsymbol);
     if (!details || !details.expiry) return '';
-    // details.expiry example: 25JUN
-    // Parse as DDMMM with current year
+
+    // Parse expiry date
     const year = new Date().getFullYear();
     let expiryDate = moment(details.expiry + year, 'DDMMMYYYY');
     // If expiry already passed this year, use next year
@@ -194,7 +196,44 @@ const calculateDaysToExpiry = (option) => {
         expiryDate = expiryDate.add(1, 'year');
     }
     const today = moment().startOf('day');
-    return today.businessDiff(expiryDate);
+
+    try {
+        // Get holidays between today and expiry date
+        const holidays = await getHolidays({
+            startDate: today.format('YYYY-MM-DD'),
+            endDate: expiryDate.format('YYYY-MM-DD')
+        });
+
+        // Calculate total days
+        const totalDays = expiryDate.diff(today, 'days');
+
+        // Calculate weekends (Saturdays and Sundays)
+        let weekendDays = 0;
+        let currentDate = today.clone();
+        while (currentDate.isBefore(expiryDate) || currentDate.isSame(expiryDate, 'day')) {
+            const dayOfWeek = currentDate.day();
+            if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 is Sunday, 6 is Saturday
+                weekendDays++;
+            }
+            currentDate.add(1, 'day');
+        }
+
+        // Count holidays that fall on weekdays
+        const holidayDays = holidays.filter(holiday => {
+            const holidayDate = moment(holiday.date);
+            const dayOfWeek = holidayDate.day();
+            return dayOfWeek !== 0 && dayOfWeek !== 6; // Exclude weekends
+        }).length;
+
+        // Calculate working days
+        const workingDays = totalDays - weekendDays - holidayDays;
+
+        return workingDays;
+    } catch (error) {
+        console.error('Error calculating days to expiry:', error);
+        // Fallback to business days calculation if holiday fetch fails
+        return today.businessDiff(expiryDate);
+    }
 };
 
 const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
@@ -227,6 +266,9 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [strategyId, setStrategyId] = useState(null);
     const [strategyLoading, setStrategyLoading] = useState(false);
     const [manualPlAnchorEl, setManualPlAnchorEl] = useState(null);
+    const [daysToExpiryMap, setDaysToExpiryMap] = useState({});
+    const [calculatingDaysToExpiry, setCalculatingDaysToExpiry] = useState({});
+    const hasCalculatedDaysToExpiry = useRef(false);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -312,6 +354,38 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             });
         return () => { isMounted = false; };
     }, [underlying]);
+
+    // Calculate days to expiry for all options only once on mount
+    useEffect(() => {
+        const calculateAllDaysToExpiry = async () => {
+            // Skip if we've already calculated or if there are no positions
+            if (hasCalculatedDaysToExpiry.current || !positions || positions.length === 0) {
+                return;
+            }
+
+            const newDaysToExpiryMap = {};
+            const newCalculatingDaysToExpiry = {};
+
+            for (const position of positions) {
+                if (getPositionType(position.tradingsymbol) === 'Option') {
+                    newCalculatingDaysToExpiry[position.tradingsymbol] = true;
+                }
+            }
+            setCalculatingDaysToExpiry(newCalculatingDaysToExpiry);
+
+            for (const position of positions) {
+                if (getPositionType(position.tradingsymbol) === 'Option') {
+                    const days = await calculateDaysToExpiry(position);
+                    newDaysToExpiryMap[position.tradingsymbol] = days;
+                }
+            }
+            setDaysToExpiryMap(newDaysToExpiryMap);
+            setCalculatingDaysToExpiry({});
+            hasCalculatedDaysToExpiry.current = true;
+        };
+
+        calculateAllDaysToExpiry();
+    }, []); // Empty dependency array means this runs only once on mount
 
     const handleMenuClick = (event, position) => {
         event.stopPropagation();
@@ -439,7 +513,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const isOption = positionType === 'Option';
         const intrinsicValue = isOption ? calculateIntrinsicValue(position, ltpMap) : '';
         const timeValue = isOption ? calculateTimeValue(position, ltpMap) : '';
-        const daysToExpiry = isOption ? calculateDaysToExpiry(position) : '';
+        const isCalculatingDays = isOption && calculatingDaysToExpiry[position.tradingsymbol];
+        const daysToExpiry = isOption ? (isCalculatingDays ? '...' : daysToExpiryMap[position.tradingsymbol] || '') : '';
 
         return (
             <TableRow
@@ -523,7 +598,14 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                     {isOption ? formatCurrency(timeValue) : ''}
                 </StyledTableCell>
                 <StyledTableCell align="right">
-                    {isOption ? daysToExpiry : ''}
+                    {isOption ? (
+                        isCalculatingDays ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                <CircularProgress size={16} sx={{ mr: 1 }} />
+                                Calculating...
+                            </Box>
+                        ) : daysToExpiry
+                    ) : ''}
                 </StyledTableCell>
                 <StyledTableCell align="right">
                     {isClosed ? (
