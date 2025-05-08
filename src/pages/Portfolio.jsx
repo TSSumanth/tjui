@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress } from '@mui/material';
+import { Box, Typography, Container, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
@@ -39,6 +39,7 @@ const Portfolio = () => {
     const theme = useTheme();
     const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession, accountInfo } = useZerodha();
     const [localLoading, setLocalLoading] = useState(true);
+    const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
     // Scroll to top when component mounts
     useScrollToTop();
@@ -154,7 +155,8 @@ const Portfolio = () => {
         }, 0);
     }, [holdings]);
 
-    useEffect(() => {
+    // Manual refresh handler for portfolio value
+    const handlePortfolioValueRefresh = async () => {
         if (
             accountInfo &&
             accountInfo.clientId &&
@@ -168,36 +170,58 @@ const Portfolio = () => {
             const equity_positions_value = Number(positionsTotalValue) || 0;
             const total_account_value = equity_account_balance + equity_holdings_value + equity_positions_value;
 
-            const syncPortfolioValue = async () => {
-                try {
-                    const res = await getPortfolioValue({ account_id: accountInfo.clientId });
-                    if (res.success && res.data) {
-                        await updatePortfolioValue({
-                            id: res.data.id,
-                            account_id: accountInfo.clientId,
-                            account_member_name: accountInfo.name,
-                            equity_account_balance,
-                            equity_holdings_value,
-                            equity_positions_value,
-                            total_account_value
-                        });
-                    } else {
-                        await createPortfolioValue({
-                            account_member_name: accountInfo.name,
-                            account_id: accountInfo.clientId,
-                            equity_account_balance,
-                            equity_holdings_value,
-                            equity_positions_value,
-                            total_account_value
-                        });
-                    }
-                } catch (err) {
-                    // Optionally handle error
+            try {
+                const res = await getPortfolioValue({ account_id: accountInfo.clientId });
+                if (res.success && res.data) {
+                    await updatePortfolioValue({
+                        id: res.data.id,
+                        account_id: accountInfo.clientId,
+                        account_member_name: accountInfo.name,
+                        equity_account_balance,
+                        equity_holdings_value,
+                        equity_positions_value,
+                        total_account_value
+                    });
+                    setNotification({
+                        open: true,
+                        message: 'Portfolio value updated successfully',
+                        severity: 'success'
+                    });
+                } else {
+                    await createPortfolioValue({
+                        account_member_name: accountInfo.name,
+                        account_id: accountInfo.clientId,
+                        equity_account_balance,
+                        equity_holdings_value,
+                        equity_positions_value,
+                        total_account_value
+                    });
+                    setNotification({
+                        open: true,
+                        message: 'New portfolio value created successfully',
+                        severity: 'success'
+                    });
                 }
-            };
-            syncPortfolioValue();
+            } catch (err) {
+                console.error('Error updating portfolio value:', err);
+                setNotification({
+                    open: true,
+                    message: 'Failed to update portfolio value. Please try again.',
+                    severity: 'error'
+                });
+            }
+        } else {
+            setNotification({
+                open: true,
+                message: 'Unable to update portfolio value. Missing required data.',
+                severity: 'error'
+            });
         }
-    }, [accountInfo, totalEquityHoldingsValue, positionsTotalValue]);
+    };
+
+    const handleCloseNotification = () => {
+        setNotification(prev => ({ ...prev, open: false }));
+    };
 
     // Show loading state while initializing
     if (localLoading || loading) {
@@ -259,7 +283,7 @@ const Portfolio = () => {
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <ZerodhaSubHeader />
             <Container maxWidth={false} sx={{ mt: 4, px: { xs: 2, sm: 3, md: 4 } }}>
-                {/* Auto-sync switch */}
+                {/* Auto-sync switch and refresh buttons */}
                 <Box sx={{
                     display: 'flex',
                     justifyContent: 'flex-end',
@@ -298,7 +322,21 @@ const Portfolio = () => {
                             py: 0.5
                         }}
                     >
-                        {loading ? 'Refreshing...' : 'Refresh'}
+                        {loading ? 'Refreshing...' : 'Refresh Data'}
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<AccountBalanceIcon />}
+                        onClick={handlePortfolioValueRefresh}
+                        size="small"
+                        sx={{
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            px: 1.5,
+                            py: 0.5
+                        }}
+                    >
+                        Update Portfolio Value
                     </Button>
                 </Box>
 
@@ -542,7 +580,7 @@ const Portfolio = () => {
                         </Typography>
                         <Holdings />
                     </Paper>
-                    </Box>
+                </Box>
 
                 {/* Positions Section */}
                 <Box mb={4}>
@@ -552,8 +590,23 @@ const Portfolio = () => {
                         </Typography>
                         <Positions />
                     </Paper>
-                    </Box>
+                </Box>
             </Container>
+            <Snackbar
+                open={notification.open}
+                autoHideDuration={6000}
+                onClose={handleCloseNotification}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseNotification}
+                    severity={notification.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {notification.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

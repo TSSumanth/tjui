@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -10,100 +10,88 @@ import {
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 const HolidayForm = ({ open, onClose, onSubmit, initialData }) => {
-    const [formData, setFormData] = React.useState({
-        date: new Date(),
+    const [formData, setFormData] = useState({
+        date: dayjs(),
         name: '',
         description: ''
     });
 
-    const firstInputRef = useRef(null);
-
-    useEffect(() => {
-        if (open && firstInputRef.current) {
-            // Small delay to ensure the dialog is fully mounted
-            setTimeout(() => {
-                firstInputRef.current.focus();
-            }, 100);
-        }
-    }, [open]);
-
     useEffect(() => {
         if (initialData) {
             setFormData({
-                date: new Date(initialData.date),
-                name: initialData.name || '',
-                description: initialData.description || ''
-            });
-        } else {
-            setFormData({
-                date: new Date(),
-                name: '',
-                description: ''
+                ...initialData,
+                date: dayjs(initialData.date)
             });
         }
     }, [initialData]);
 
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleDateChange = (newDate) => {
+        setFormData(prev => ({
+            ...prev,
+            date: newDate
+        }));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit(formData);
+        onSubmit({
+            ...formData,
+            date: formData.date.toISOString()
+        });
     };
 
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            maxWidth="sm"
-            fullWidth
-            disableEnforceFocus // Add this to prevent focus trapping
-            keepMounted={false} // Add this to properly unmount the dialog
-        >
-            <form onSubmit={handleSubmit}>
-                <DialogTitle>
-                    {initialData ? 'Edit Holiday' : 'Add New Holiday'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                        <LocalizationProvider dateAdapter={AdapterDateFns}>
-                            <DatePicker
-                                label="Date"
-                                value={formData.date}
-                                onChange={(newDate) => setFormData(prev => ({ ...prev, date: newDate }))}
-                                slotProps={{
-                                    textField: {
-                                        fullWidth: true,
-                                        required: true,
-                                        inputRef: firstInputRef
-                                    }
-                                }}
-                            />
-                        </LocalizationProvider>
-                        <TextField
-                            label="Name"
-                            value={formData.name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            fullWidth
-                            required
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>
+                {initialData ? 'Edit Holiday' : 'Create New Holiday'}
+            </DialogTitle>
+            <DialogContent>
+                <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <DatePicker
+                            label="Date"
+                            value={formData.date}
+                            onChange={handleDateChange}
+                            renderInput={(params) => <TextField {...params} fullWidth />}
                         />
-                        <TextField
-                            label="Description"
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            fullWidth
-                            multiline
-                            rows={3}
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={onClose}>Cancel</Button>
-                    <Button type="submit" variant="contained" color="primary">
-                        {initialData ? 'Update' : 'Add'}
-                    </Button>
-                </DialogActions>
-            </form>
+                    </LocalizationProvider>
+                    <TextField
+                        name="name"
+                        label="Name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+                    <TextField
+                        name="description"
+                        label="Description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        fullWidth
+                        multiline
+                        rows={3}
+                    />
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button onClick={handleSubmit} variant="contained" color="primary">
+                    {initialData ? 'Update' : 'Create'}
+                </Button>
+            </DialogActions>
         </Dialog>
     );
 };
