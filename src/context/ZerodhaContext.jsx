@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
-import { getOrderPairs, updateOrderPairStatus, deleteOrderPair } from '../services/zerodha/oco';
+import { getOrderPairs, updateOrderPairStatus } from '../services/zerodha/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
 import { updateOaoOrderPair } from '../services/zerodha/oao';
 
@@ -9,7 +9,7 @@ const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
 const SESSION_CHECK_INTERVAL = 2000; // 2 seconds
-const FETCH_INTERVAL = 10000; // 10 seconds
+const FETCH_INTERVAL = 60000; // 60 seconds
 
 // Function to check if current time is within market hours (extended 30 mins after close)
 const isMarketHours = () => {
@@ -53,7 +53,6 @@ export const ZerodhaProvider = ({ children }) => {
 
     const isInitialLoadDone = useRef(false);
     const lastFetchTime = useRef(0);
-    const fetchTimeoutRef = useRef(null);
     const retryCount = useRef(0);
     const isMounted = useRef(true);
     const sessionCheckTimeoutRef = useRef(null);
@@ -104,6 +103,24 @@ export const ZerodhaProvider = ({ children }) => {
         }
     }, [sessionActive, lastChecked]);
 
+    // Fetch positions separately
+    const fetchPositions = useCallback(async () => {
+        if (!isMounted.current) return;
+        try {
+            setLoadingStates(prev => ({ ...prev, positions: true }));
+            const positionsRes = await makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions');
+            if (positionsRes && isMounted.current) {
+                setPositions(positionsRes.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching positions:', err);
+        } finally {
+            if (isMounted.current) {
+                setLoadingStates(prev => ({ ...prev, positions: false }));
+            }
+        }
+    }, []);
+
     // Fetch data
     const fetchData = useCallback(async (force = false) => {
         if (!isMounted.current) return;
@@ -144,25 +161,14 @@ export const ZerodhaProvider = ({ children }) => {
                     const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
                     if (holdingsRes && isMounted.current) {
                         setHoldings((holdingsRes.data || []).map(h => ({ ...h })));
+                        // After holdings are fetched successfully, fetch positions
+                        await fetchPositions();
                     }
                 } catch (err) {
                     console.error('Error fetching holdings:', err);
                 } finally {
                     if (isMounted.current) {
                         setLoadingStates(prev => ({ ...prev, holdings: false }));
-                    }
-                }
-
-                try {
-                    const positionsRes = await makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions');
-                    if (positionsRes && isMounted.current) {
-                        setPositions(positionsRes.data || []);
-                    }
-                } catch (err) {
-                    console.error('Error fetching positions:', err);
-                } finally {
-                    if (isMounted.current) {
-                        setLoadingStates(prev => ({ ...prev, positions: false }));
                     }
                 }
             }
@@ -178,7 +184,7 @@ export const ZerodhaProvider = ({ children }) => {
                 setLoading(false);
             }
         }
-    }, [checkSession]);
+    }, [checkSession, fetchPositions]);
 
     // Fetch orders separately
     const fetchOrders = useCallback(async () => {
@@ -198,42 +204,6 @@ export const ZerodhaProvider = ({ children }) => {
         } finally {
             if (isMounted.current) {
                 setLoadingStates(prev => ({ ...prev, orders: false }));
-            }
-        }
-    }, []);
-
-    // Fetch holdings separately
-    const fetchHoldings = useCallback(async () => {
-        if (!isMounted.current) return;
-        try {
-            setLoadingStates(prev => ({ ...prev, holdings: true }));
-            const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
-            if (holdingsRes && isMounted.current) {
-                setHoldings((holdingsRes.data || []).map(h => ({ ...h })));
-            }
-        } catch (err) {
-            console.error('Error fetching holdings:', err);
-        } finally {
-            if (isMounted.current) {
-                setLoadingStates(prev => ({ ...prev, holdings: false }));
-            }
-        }
-    }, []);
-
-    // Fetch positions separately
-    const fetchPositions = useCallback(async () => {
-        if (!isMounted.current) return;
-        try {
-            setLoadingStates(prev => ({ ...prev, positions: true }));
-            const positionsRes = await makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions');
-            if (positionsRes && isMounted.current) {
-                setPositions(positionsRes.data || []);
-            }
-        } catch (err) {
-            console.error('Error fetching positions:', err);
-        } finally {
-            if (isMounted.current) {
-                setLoadingStates(prev => ({ ...prev, positions: false }));
             }
         }
     }, []);
@@ -281,18 +251,16 @@ export const ZerodhaProvider = ({ children }) => {
         };
     }, []);
 
-    // Auto-sync effect - separate intervals for holdings and positions
+    // Auto-sync effect - single interval for holdings which triggers positions
     useEffect(() => {
         if (!isAutoSync || !isMarketHours()) return;
 
-        const holdingsInterval = setInterval(fetchHoldings, 5000);
-        const positionsInterval = setInterval(fetchPositions, 20000);
+        const syncInterval = setInterval(fetchData, FETCH_INTERVAL);
 
         return () => {
-            clearInterval(holdingsInterval);
-            clearInterval(positionsInterval);
+            clearInterval(syncInterval);
         };
-    }, [isAutoSync, fetchHoldings, fetchPositions]);
+    }, [isAutoSync, fetchData]);
 
     // Market hours check effect
     useEffect(() => {
@@ -549,7 +517,6 @@ export const ZerodhaProvider = ({ children }) => {
         holdings,
         positions,
         orders,
-        fetchHoldings,
         fetchPositions,
         ltpMap,
         ocoPairs,
