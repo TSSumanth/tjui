@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     Box,
     Button,
@@ -36,7 +36,7 @@ import {
     Stack,
     LinearProgress,
 } from "@mui/material";
-import { getStrategies, updateStrategy, getStrategyNotes } from "../../services/strategies";
+import { getStrategies, updateStrategy, getStrategyNotes, deleteStrategy } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
 import { addActionItem, getActionItems } from "../../services/actionitems";
 import { StockTradeForm } from "../Trades/StockTradeForm";
@@ -133,6 +133,9 @@ function UpdateStrategy({ id }) {
         status: 'idle' // 'idle' | 'syncing' | 'complete'
     });
     const navigate = useNavigate();
+    const hasSyncedOnLoad = useRef(false);
+    const [isZerodhaDataReady, setIsZerodhaDataReady] = useState(false);
+    const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -412,69 +415,69 @@ function UpdateStrategy({ id }) {
         }
     }, []);
 
-    const handleGenerateUnrealizedPL = async () => {
-        try {
-            let totalUnrealized = 0;
-            const updatedStockTrades = [];
-            const updatedOptionTrades = [];
+    // const handleGenerateUnrealizedPL = async () => {
+    //     try {
+    //         let totalUnrealized = 0;
+    //         const updatedStockTrades = [];
+    //         const updatedOptionTrades = [];
 
-            // Prepare stock trades updates
-            stockTrades.forEach(trade => {
-                if (trade.status === 'OPEN') {
-                    const updatedTrade = {
-                        ...trade,
-                        ltp: trade.ltp
-                    };
-                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-                    updatedTrade.unrealizedpl = unrealizedPL;
-                    totalUnrealized += unrealizedPL;
-                    updatedStockTrades.push(updatedTrade);
-                }
-            });
+    //         // Prepare stock trades updates
+    //         stockTrades.forEach(trade => {
+    //             if (trade.status === 'OPEN') {
+    //                 const updatedTrade = {
+    //                     ...trade,
+    //                     ltp: trade.ltp
+    //                 };
+    //                 const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+    //                 updatedTrade.unrealizedpl = unrealizedPL;
+    //                 totalUnrealized += unrealizedPL;
+    //                 updatedStockTrades.push(updatedTrade);
+    //             }
+    //         });
 
-            // Prepare option trades updates
-            optionTrades.forEach(trade => {
-                if (trade.status === 'OPEN') {
-                    const updatedTrade = {
-                        ...trade,
-                        ltp: trade.ltp
-                    };
-                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-                    updatedTrade.unrealizedpl = unrealizedPL;
-                    totalUnrealized += unrealizedPL;
-                    updatedOptionTrades.push(updatedTrade);
-                }
-            });
+    //         // Prepare option trades updates
+    //         optionTrades.forEach(trade => {
+    //             if (trade.status === 'OPEN') {
+    //                 const updatedTrade = {
+    //                     ...trade,
+    //                     ltp: trade.ltp
+    //                 };
+    //                 const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+    //                 updatedTrade.unrealizedpl = unrealizedPL;
+    //                 totalUnrealized += unrealizedPL;
+    //                 updatedOptionTrades.push(updatedTrade);
+    //             }
+    //         });
 
-            // Batch update all trades
-            const updatePromises = [
-                ...updatedStockTrades.map(trade => updateStockTrade(trade)),
-                ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
-            ];
+    //         // Batch update all trades
+    //         const updatePromises = [
+    //             ...updatedStockTrades.map(trade => updateStockTrade(trade)),
+    //             ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
+    //         ];
 
-            await Promise.all(updatePromises);
+    //         await Promise.all(updatePromises);
 
-            // Update local state
-            setStockTrades(prevTrades =>
-                prevTrades.map(trade => {
-                    const updatedTrade = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
-                    return updatedTrade || trade;
-                })
-            );
-            setOptionTrades(prevTrades =>
-                prevTrades.map(trade => {
-                    const updatedTrade = updatedOptionTrades.find(t => t.tradeid === trade.tradeid);
-                    return updatedTrade || trade;
-                })
-            );
+    //         // Update local state
+    //         setStockTrades(prevTrades =>
+    //             prevTrades.map(trade => {
+    //                 const updatedTrade = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
+    //                 return updatedTrade || trade;
+    //             })
+    //         );
+    //         setOptionTrades(prevTrades =>
+    //             prevTrades.map(trade => {
+    //                 const updatedTrade = updatedOptionTrades.find(t => t.tradeid === trade.tradeid);
+    //                 return updatedTrade || trade;
+    //             })
+    //         );
 
-            setShowLTPDialog(false);
-            calculatePLSummary();
-        } catch (error) {
-            console.error('Error updating LTPs:', error);
-            setError("Failed to update LTPs.");
-        }
-    };
+    //         setShowLTPDialog(false);
+    //         calculatePLSummary();
+    //     } catch (error) {
+    //         console.error('Error updating LTPs:', error);
+    //         setError("Failed to update LTPs.");
+    //     }
+    // };
 
     const checkAllTradesHaveLTP = useCallback(() => {
         const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
@@ -580,13 +583,6 @@ function UpdateStrategy({ id }) {
     };
 
     const handleGetLTPFromZerodha = async () => {
-        console.log('Get LTP from Zerodha clicked');
-        console.log('Zerodha Context:', {
-            sessionActive,
-            holdings: holdings?.length || 0,
-            positions: positions ? (Array.isArray(positions) ? positions.length : Object.keys(positions).length) : 0
-        });
-
         if (!sessionActive) {
             setSnackbar({
                 open: true,
@@ -596,7 +592,6 @@ function UpdateStrategy({ id }) {
             return;
         }
 
-        // Show confirmation dialog instead of proceeding directly
         setShowZerodhaConfirmDialog(true);
     };
 
@@ -606,90 +601,70 @@ function UpdateStrategy({ id }) {
         setSyncProgress({ total: 0, current: 0, status: 'syncing' });
 
         try {
-            // Check if we have Zerodha data
-            console.log('Zerodha Context State:', {
-                sessionActive,
-                holdingsCount: holdings?.length || 0,
-                positionsCount: Array.isArray(positions) ? positions.length :
-                    (positions && typeof positions === 'object' ? Object.keys(positions).length : 0)
-            });
-
             if (!sessionActive) {
                 throw new Error('No active Zerodha session');
             }
 
-            if (!holdings && !positions) {
-                throw new Error('No Zerodha data available');
-            }
-
-            // Get all open trades
             const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
             const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
             const totalTrades = openStockTrades.length + openOptionTrades.length;
             setSyncProgress(prev => ({ ...prev, total: totalTrades }));
 
-            console.log('Open Trades:', {
-                stockTrades: openStockTrades.map(t => ({
-                    symbol: t.symbol,
-                    asset: t.asset,
-                    strikePrice: t.strikeprize,
-                    type: t.tradetype
-                })),
-                optionTrades: openOptionTrades.map(t => ({
-                    symbol: t.symbol,
-                    asset: t.asset,
-                    strikePrice: t.strikeprize,
-                    type: t.tradetype
-                }))
-            });
+            const hasOptionOrFutureTrades = openOptionTrades.some(trade =>
+                trade.asset.includes('FUT') || trade.asset.includes('CE') || trade.asset.includes('PE')
+            );
 
-            // Create a map of asset names to their LTP from Zerodha
+            if (hasOptionOrFutureTrades && (!positions ||
+                (Array.isArray(positions) && positions.length === 0) &&
+                (!positions.net || positions.net.length === 0) &&
+                (!positions.day || positions.day.length === 0))) {
+                setSnackbar({
+                    open: true,
+                    message: 'Unable to sync option/future trades: No positions data available from Zerodha. Please ensure you have open positions in Zerodha.',
+                    severity: 'warning'
+                });
+                return;
+            }
+
             const zerodhaLTPMap = new Map();
 
-            // Add holdings LTP
             if (holdings && holdings.length > 0) {
-                console.log('Processing Zerodha Holdings:', holdings);
                 holdings.forEach(holding => {
                     if (holding.tradingsymbol && holding.last_price) {
                         zerodhaLTPMap.set(holding.tradingsymbol, holding.last_price);
-                        console.log(`Added holding LTP for ${holding.tradingsymbol}: ${holding.last_price}`);
                     }
                 });
             }
 
-            // Add positions LTP
             if (Array.isArray(positions)) {
-                console.log('Processing Zerodha Positions (Array):', positions);
                 positions.forEach(position => {
                     if (position.tradingsymbol && position.last_price) {
                         zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
-                        console.log(`Added position LTP for ${position.tradingsymbol}: ${position.last_price}`);
                     }
                 });
             } else if (positions && typeof positions === 'object') {
-                console.log('Processing Zerodha Positions (Object):', positions);
-                Object.values(positions).forEach(arr => {
-                    if (Array.isArray(arr)) {
-                        arr.forEach(position => {
-                            if (position.tradingsymbol && position.last_price) {
-                                zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
-                                console.log(`Added position LTP for ${position.tradingsymbol}: ${position.last_price}`);
-                            }
-                        });
-                    }
-                });
+                if (positions.net && Array.isArray(positions.net)) {
+                    positions.net.forEach(position => {
+                        if (position.tradingsymbol && position.last_price) {
+                            zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
+                        }
+                    });
+                }
+
+                if (positions.day && Array.isArray(positions.day)) {
+                    positions.day.forEach(position => {
+                        if (position.tradingsymbol && position.last_price) {
+                            zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
+                        }
+                    });
+                }
             }
 
-            console.log('Final LTP Map:', Object.fromEntries(zerodhaLTPMap));
-
-            // Update trades with Zerodha LTP
             const updatedStockTrades = [];
             const updatedOptionTrades = [];
 
-            // Update stock trades
             for (const trade of openStockTrades) {
                 const ltp = zerodhaLTPMap.get(trade.symbol);
-                console.log(`Checking stock trade ${trade.symbol} - Found LTP: ${ltp}`);
                 if (ltp) {
                     const updatedTrade = {
                         ...trade,
@@ -698,29 +673,30 @@ function UpdateStrategy({ id }) {
                     const unrealizedPL = calculateUnrealizedPL(updatedTrade);
                     updatedTrade.unrealizedpl = unrealizedPL;
                     updatedStockTrades.push(updatedTrade);
-                    console.log(`Updated stock trade ${trade.symbol} with LTP: ${ltp}`);
                 }
                 setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
             }
 
-            // Update option trades
             for (const trade of openOptionTrades) {
-                // For option trades, construct the full option symbol
-                // Format: SYMBOL + EXPIRY + STRIKE + TYPE
-                // Example: RELIANCE25JUN1400CE
-                const optionSymbol = `${trade.asset}${trade.strikeprize}${trade.asset.endsWith('CE') ? 'CE' : 'PE'}`;
-                console.log(`Checking option trade ${optionSymbol} - Found LTP: ${zerodhaLTPMap.get(optionSymbol)}`);
+                const isFuture = trade.asset.includes('FUT');
+                const optionSymbol = isFuture
+                    ? trade.asset
+                    : `${trade.asset}${trade.strikeprize}${trade.asset.endsWith('CE') ? 'CE' : 'PE'}`;
 
-                // Try to find a matching position by iterating through the LTP map
                 let matchedLTP = null;
                 for (const [symbol, ltp] of zerodhaLTPMap.entries()) {
-                    // Check if the symbol contains our option details
-                    if (symbol.includes(trade.asset) &&
-                        symbol.includes(trade.strikeprize) &&
-                        symbol.endsWith(trade.asset.endsWith('CE') ? 'CE' : 'PE')) {
-                        matchedLTP = ltp;
-                        console.log(`Found matching position: ${symbol} with LTP: ${ltp}`);
-                        break;
+                    if (isFuture) {
+                        if (symbol === optionSymbol) {
+                            matchedLTP = ltp;
+                            break;
+                        }
+                    } else {
+                        if (symbol.includes(trade.asset) &&
+                            symbol.includes(trade.strikeprize) &&
+                            symbol.endsWith(trade.asset.endsWith('CE') ? 'CE' : 'PE')) {
+                            matchedLTP = ltp;
+                            break;
+                        }
                     }
                 }
 
@@ -732,33 +708,36 @@ function UpdateStrategy({ id }) {
                     const unrealizedPL = calculateUnrealizedPL(updatedTrade);
                     updatedTrade.unrealizedpl = unrealizedPL;
                     updatedOptionTrades.push(updatedTrade);
-                    console.log(`Updated option trade ${optionSymbol} with LTP: ${matchedLTP}`);
-                } else {
-                    console.log(`No matching position found for ${optionSymbol}`);
                 }
                 setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
             }
 
-            // Update trades in database
             await Promise.all([
                 ...updatedStockTrades.map(trade => updateStockTrade(trade)),
                 ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
             ]);
 
-            // Refresh trades and P/L summary
             await fetchTrades();
             calculatePLSummary();
 
             const totalUpdated = updatedStockTrades.length + updatedOptionTrades.length;
             const totalOpen = openStockTrades.length + openOptionTrades.length;
 
-            setSnackbar({
-                open: true,
-                message: totalUpdated > 0
-                    ? `Successfully synced LTP from Zerodha for ${totalUpdated} out of ${totalOpen} open trades`
-                    : 'No matching trades found in Zerodha positions/holdings',
-                severity: totalUpdated > 0 ? 'success' : 'info'
-            });
+            if (totalUpdated === 0 && hasOptionOrFutureTrades) {
+                setSnackbar({
+                    open: true,
+                    message: 'No matching trades found in Zerodha positions. Please ensure your positions are open in Zerodha.',
+                    severity: 'warning'
+                });
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: totalUpdated > 0
+                        ? `Successfully synced LTP from Zerodha for ${totalUpdated} out of ${totalOpen} open trades`
+                        : 'No matching trades found in Zerodha positions/holdings',
+                    severity: totalUpdated > 0 ? 'success' : 'info'
+                });
+            }
         } catch (error) {
             console.error('Error updating LTP from Zerodha:', error);
             setSnackbar({
@@ -770,6 +749,26 @@ function UpdateStrategy({ id }) {
             setIsFetchingZerodhaLTP(false);
             setSyncProgress({ total: 0, current: 0, status: 'complete' });
         }
+    };
+
+    const handleDeleteStrategy = async () => {
+        try {
+            await deleteStrategy(id);
+            setSnackbar({
+                open: true,
+                message: 'Strategy deleted successfully',
+                severity: 'success'
+            });
+            navigate('/mystrategies');
+        } catch (error) {
+            console.error('Error deleting strategy:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to delete strategy',
+                severity: 'error'
+            });
+        }
+        setShowDeleteConfirmDialog(false);
     };
 
     useEffect(() => {
@@ -810,6 +809,58 @@ function UpdateStrategy({ id }) {
         };
         fetchAllTradeActionItems();
     }, [stockTrades, optionTrades]);
+
+    useEffect(() => {
+        if (sessionActive && holdings && positions) {
+            const hasHoldings = holdings.length > 0;
+            const hasPositions = Array.isArray(positions) ? positions.length > 0 :
+                (positions && typeof positions === 'object' ? Object.keys(positions).length > 0 : false);
+
+            setIsZerodhaDataReady(hasHoldings || hasPositions);
+        } else {
+            setIsZerodhaDataReady(false);
+        }
+    }, [sessionActive, holdings, positions]);
+
+    useEffect(() => {
+        const autoSyncLTP = async () => {
+            if (hasSyncedOnLoad.current ||
+                !sessionActive ||
+                !strategy ||
+                isFetchingZerodhaLTP) {
+                return;
+            }
+
+            const hasOpenTrades = stockTrades.some(trade => trade.status === 'OPEN') ||
+                optionTrades.some(trade => trade.status === 'OPEN');
+
+            if (!hasOpenTrades) {
+                return;
+            }
+
+            const hasHoldings = holdings && holdings.length > 0;
+            const hasPositions = positions && (
+                (Array.isArray(positions) && positions.length > 0) ||
+                (typeof positions === 'object' && (
+                    (positions.net && positions.net.length > 0) ||
+                    (positions.day && positions.day.length > 0)
+                ))
+            );
+
+            if (!hasHoldings && !hasPositions) {
+                return;
+            }
+
+            hasSyncedOnLoad.current = true;
+            await handleConfirmZerodhaSync();
+        };
+
+        const timer = setTimeout(() => {
+            autoSyncLTP();
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, [sessionActive, strategy, stockTrades, optionTrades, isFetchingZerodhaLTP, holdings, positions]);
 
     const PLSummaryCard = () => {
         const hasOpenTrades = [...stockTrades, ...optionTrades].some(trade => trade.status === 'OPEN');
@@ -1313,6 +1364,14 @@ function UpdateStrategy({ id }) {
                                 >
                                     Save Changes
                                 </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => setShowDeleteConfirmDialog(true)}
+                                >
+                                    Delete Strategy
+                                </Button>
                             </Box>
                         </CardContent>
                     </Card>
@@ -1782,6 +1841,31 @@ function UpdateStrategy({ id }) {
                         />
                     </Box>
                 </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={showDeleteConfirmDialog}
+                onClose={() => setShowDeleteConfirmDialog(false)}
+            >
+                <DialogTitle>Delete Strategy</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete this strategy? This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowDeleteConfirmDialog(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteStrategy}
+                        variant="contained"
+                        color="error"
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
             </Dialog>
         </Box>
     );
