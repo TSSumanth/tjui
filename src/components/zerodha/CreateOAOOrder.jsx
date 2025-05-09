@@ -41,7 +41,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
         price: '',
         product: 'CNC',
         order_type: 'LIMIT',
-        validity: 'DAY'
+        validity: 'DAY',
+        exchange: 'NSE'
     });
 
     // Filter open orders
@@ -67,6 +68,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
         if (!order2Details.tradingsymbol) return 'Trading symbol is required';
         if (!order2Details.quantity || order2Details.quantity <= 0) return 'Valid quantity is required';
         if (!order2Details.price || order2Details.price <= 0) return 'Valid price is required';
+        if (!order2Details.exchange) return 'Exchange is required';
         return null;
     };
 
@@ -113,7 +115,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
                     price: '',
                     product: 'CNC',
                     order_type: 'LIMIT',
-                    validity: 'DAY'
+                    validity: 'DAY',
+                    exchange: 'NSE'
                 });
             }, 1500);
         } catch (error) {
@@ -137,7 +140,8 @@ const CreateOAOOrder = ({ open, onClose }) => {
             price: '',
             product: 'CNC',
             order_type: 'LIMIT',
-            validity: 'DAY'
+            validity: 'DAY',
+            exchange: 'NSE'
         });
         onClose();
     };
@@ -238,6 +242,25 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     error={showValidation && (!order2Details.price || order2Details.price <= 0)}
                                     helperText={showValidation && (!order2Details.price || order2Details.price <= 0) ? 'Valid price is required' : ''}
                                 />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth required error={showValidation && !order2Details.exchange}>
+                                    <InputLabel>Exchange</InputLabel>
+                                    <Select
+                                        name="exchange"
+                                        value={order2Details.exchange}
+                                        label="Exchange"
+                                        onChange={handleOrder2Change}
+                                    >
+                                        <MenuItem value="">Select Exchange</MenuItem>
+                                        <MenuItem value="NSE">NSE</MenuItem>
+                                        <MenuItem value="NFO">NFO</MenuItem>
+                                        <MenuItem value="BSE">BSE</MenuItem>
+                                    </Select>
+                                    {showValidation && !order2Details.exchange && (
+                                        <Typography variant="caption" color="error">Exchange is required</Typography>
+                                    )}
+                                </FormControl>
                             </Grid>
                         </Grid>
                     )}
