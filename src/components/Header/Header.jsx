@@ -27,7 +27,7 @@ import EventIcon from '@mui/icons-material/Event';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import { useZerodha } from '../../context/ZerodhaContext';
-import PortfolioDashboardWidget from '../PortfolioDashboardWidget';
+import PortfolioDashboardWidget from '../PortfolioWidget/PortfolioDashboardWidget';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';

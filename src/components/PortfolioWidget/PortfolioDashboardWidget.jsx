@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { IconButton, Modal, Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tooltip, Avatar } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import CloseIcon from '@mui/icons-material/Close';
-import { getAllPortfolioValues } from '../services/portfolioValue';
-import { useZerodha } from '../context/ZerodhaContext';
-import { formatCurrency } from '../utils/formatters';
+import { getAllPortfolioValues } from '../../services/portfolioValue';
+import { useZerodha } from '../../context/ZerodhaContext';
+import { formatCurrency } from '../../utils/formatters';
 
 const modalStyle = {
     position: 'fixed',
