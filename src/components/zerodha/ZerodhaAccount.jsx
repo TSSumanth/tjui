@@ -1,33 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
     Button,
     Alert,
     Container,
-    Stack
+    Stack,
+    CircularProgress
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getAccessToken, logout } from '../../services/zerodha/authentication';
+import { useZerodha } from '../../context/ZerodhaContext';
 import Holdings from './Holdings';
 import Positions from './Positions';
 
 const ZerodhaAccount = () => {
     const navigate = useNavigate();
     const [activeSection, setActiveSection] = useState('holdings-positions');
-    const accessToken = getAccessToken();
+    const { isAuth, sessionActive, loading, handleLogout, checkSession } = useZerodha();
 
-    const handleLogout = () => {
-        logout();
+    useEffect(() => {
+        // Check session status when component mounts
+        checkSession(true);
+    }, [checkSession]);
+
+    const handleLogoutClick = () => {
+        handleLogout();
         navigate('/zerodha/login');
     };
 
-    if (!accessToken) {
+    if (loading) {
+        return (
+            <Container maxWidth="lg">
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                    <CircularProgress />
+                </Box>
+            </Container>
+        );
+    }
+
+    if (!isAuth || !sessionActive) {
         return (
             <Container maxWidth="lg">
                 <Box sx={{ p: 3 }}>
-                    <Alert severity="info">
-                        Please login to view your Zerodha account details.
+                    <Alert severity="warning">
+                        Your session has expired or is invalid. Please login again to continue.
                     </Alert>
                     <Button
                         variant="contained"
@@ -53,7 +69,7 @@ const ZerodhaAccount = () => {
                         <Button
                             variant="outlined"
                             color="error"
-                            onClick={handleLogout}
+                            onClick={handleLogoutClick}
                         >
                             Logout
                         </Button>

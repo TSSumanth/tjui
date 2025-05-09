@@ -83,21 +83,46 @@ export const ZerodhaProvider = ({ children }) => {
         }
 
         try {
-            // Instead of calling account API, just check if we have a valid token
+            // Check if we have a valid token
             const token = localStorage.getItem('zerodha_access_token');
-            const isValid = Boolean(token);
-
-            if (isMounted.current) {
-                setSessionActive(isValid);
-                setLastChecked(now);
-                setIsAuth(isValid);
+            if (!token) {
+                if (isMounted.current) {
+                    setSessionActive(false);
+                    setIsAuth(false);
+                    setLastChecked(now);
+                }
+                return false;
             }
-            return isValid;
+
+            // Try to fetch account info to validate token
+            try {
+                const accountRes = await getAccountInfo();
+                const isValid = accountRes && accountRes.success;
+
+                if (isMounted.current) {
+                    setSessionActive(isValid);
+                    setIsAuth(isValid);
+                    setLastChecked(now);
+                    if (isValid && accountRes.data) {
+                        setAccountInfo(accountRes.data);
+                    }
+                }
+                return isValid;
+            } catch (err) {
+                console.error('Error validating session:', err);
+                if (isMounted.current) {
+                    setSessionActive(false);
+                    setIsAuth(false);
+                    setLastChecked(now);
+                }
+                return false;
+            }
         } catch (err) {
             console.error('Error checking session:', err);
             if (isMounted.current) {
                 setSessionActive(false);
                 setIsAuth(false);
+                setLastChecked(now);
             }
             return false;
         }
@@ -215,29 +240,18 @@ export const ZerodhaProvider = ({ children }) => {
         const initializeApp = async () => {
             if (isInitialLoadDone.current || !isMounted.current) return;
 
-            const token = localStorage.getItem('zerodha_access_token');
-            console.log('Initializing app with token:', !!token);
+            setLoading(true);
+            const isSessionValid = await checkSession(true);
+            console.log('Initial session check result:', isSessionValid);
 
-            if (token) {
-                setIsAuth(true);
-                const isSessionValid = await checkSession(true);
-                console.log('Initial session check result:', isSessionValid);
+            if (isSessionValid && isMounted.current) {
+                await fetchData(true);
+                setIsAutoSync(isMarketHours());
+            }
 
-                if (isSessionValid && isMounted.current) {
-                    // Fetch account info only during initial load
-                    try {
-                        const accountRes = await makeApiCallWithRetry(() => getAccountInfo(), 'Failed to fetch account info');
-                        if (accountRes && accountRes.success) {
-                            setAccountInfo(accountRes.data);
-                        }
-                    } catch (err) {
-                        console.error('Error fetching account info:', err);
-                    }
-
-                    await fetchData(true);
-                    setIsAutoSync(isMarketHours());
-                    isInitialLoadDone.current = true;
-                }
+            isInitialLoadDone.current = true;
+            if (isMounted.current) {
+                setLoading(false);
             }
         };
 
@@ -249,7 +263,7 @@ export const ZerodhaProvider = ({ children }) => {
                 clearTimeout(sessionCheckTimeoutRef.current);
             }
         };
-    }, []);
+    }, [checkSession, fetchData]);
 
     // Auto-sync effect - single interval for holdings which triggers positions
     useEffect(() => {
