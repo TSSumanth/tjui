@@ -11,14 +11,15 @@ const modalStyle = {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: 800,
-    bgcolor: '#232946',
-    borderRadius: 12,
-    boxShadow: '0 8px 32px rgba(20,30,60,0.38)',
+    width: 1300,
+    maxWidth: '99vw',
+    bgcolor: '#fff',
+    borderRadius: 8,
+    boxShadow: 3,
     p: 0,
     outline: 'none',
     zIndex: 1300,
-    color: '#fff'
+    color: '#222',
 };
 
 const PortfolioDashboardWidget = () => {
@@ -50,160 +51,81 @@ const PortfolioDashboardWidget = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: 2,
-                        px: 3,
+                        px: 2,
                         py: 2,
-                        background: '#232946',
-                        borderTopLeftRadius: 12,
-                        borderTopRightRadius: 12,
-                        borderBottom: '2.5px solid #232946'
+                        borderBottom: '1px solid #eee',
                     }}>
-                        <AccountBalanceWalletIcon color="primary" sx={{ mr: 1 }} />
-                        <Typography variant="h6" fontWeight={600} color="#fff" sx={{ flex: 1 }}>
+                        <Typography variant="h6" fontWeight={600} color="#222">
                             Portfolio Dashboard
-                        </Typography>
-                        <Typography variant="body2" color="#90caf9" sx={{ ml: 2, fontWeight: 400 }}>
-                            Open the Portfolio page to get the latest Account Value
                         </Typography>
                         <IconButton onClick={handleClose} size="small"><CloseIcon /></IconButton>
                     </Box>
-                    <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 600, borderRadius: 0, boxShadow: 'none', background: 'transparent' }}>
-                        <Table stickyHeader size="small">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Name
-                                    </TableCell>
-                                    <TableCell
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Account ID
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Balance
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Equity Value
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Positions Value
-                                    </TableCell>
-                                    <TableCell
-                                        align="right"
-                                        sx={{
-                                            fontWeight: 700,
-                                            background: '#232946',
-                                            color: '#fff',
-                                            py: 1.5,
-                                            borderBottom: '2px solid #2c3142'
-                                        }}
-                                    >
-                                        Total Value
-                                    </TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {accounts.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} align="center">
-                                            <Typography variant="body2" color="text.secondary">No accounts found.</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {accounts.map((acc, index) => {
-                                    const isCurrent = accountInfo && acc.account_id === accountInfo.clientId;
-                                    return (
-                                        <TableRow
-                                            key={acc.id}
-                                            sx={{
-                                                background: isCurrent ? '#20243a' : '#181c2a',
-                                                borderLeft: isCurrent ? '4px solid #90caf9' : 'none',
-                                                '&:hover': { background: '#232946', cursor: 'pointer' },
-                                                borderBottom: '1.5px solid #232946'
-                                            }}
-                                        >
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <Avatar sx={{ width: 28, height: 28, bgcolor: isCurrent ? 'primary.main' : 'grey.300', fontSize: 14 }}>
-                                                        {acc.account_member_name?.[0] || '?'}
-                                                    </Avatar>
-                                                    <Typography fontWeight={isCurrent ? 600 : 500} color={isCurrent ? 'primary.main' : 'text.primary'}>
-                                                        {acc.account_member_name}
-                                                    </Typography>
-                                                </Box>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={isCurrent ? 600 : 400} color={isCurrent ? 'primary.main' : 'text.secondary'}>
-                                                    {acc.account_id}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : '#fff'}>
-                                                    ₹{formatCurrency(acc.equity_account_balance)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'info.main'}>
-                                                    ₹{formatCurrency(acc.equity_holdings_value)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'warning.main'}>
-                                                    ₹{formatCurrency(acc.equity_positions_value)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography fontWeight={600} color={isCurrent ? 'primary.main' : 'info.main'}>
-                                                    ₹{formatCurrency(acc.total_account_value)}
-                                                </Typography>
-                                            </TableCell>
+                    <Box sx={{ px: 2, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Open the Portfolio page and click on <b>Update Portfolio Value</b> to get the latest Account Value.
+                        </Typography>
+                        <Paper elevation={3} sx={{ borderRadius: 3, boxShadow: 3, overflow: 'auto', maxHeight: 520 }}>
+                            <TableContainer>
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow sx={{ background: '#f5f7fa' }}>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Name</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Account ID</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Balance</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Equity Value</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Positions Value</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Total Value</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark', fontSize: 16, py: 2 }}>Last Updated</TableCell>
                                         </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                                    </TableHead>
+                                    <TableBody>
+                                        {accounts.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={6} align="center">
+                                                    <Typography variant="body2" color="text.secondary">No accounts found.</Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {accounts.map((acc, idx) => {
+                                            const isCurrent = accountInfo && acc.account_id === accountInfo.clientId;
+                                            return (
+                                                <TableRow
+                                                    key={acc.id}
+                                                    sx={{
+                                                        background: idx % 2 === 0 ? '#f9fbfd' : '#fff',
+                                                        '&:hover': { background: '#e3f2fd' },
+                                                        transition: 'background 0.2s',
+                                                    }}
+                                                >
+                                                    <TableCell align="center" sx={{ fontWeight: isCurrent ? 700 : 500, color: isCurrent ? 'primary.main' : 'inherit', py: 2 }}>
+                                                        {acc.account_member_name}
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ color: isCurrent ? 'primary.main' : 'text.secondary', py: 2 }}>{acc.account_id}</TableCell>
+                                                    <TableCell align="center" sx={{ py: 2 }}>
+                                                        <Typography fontWeight={700} color="primary.main" fontSize={17}>₹{formatCurrency(acc.equity_account_balance)}</Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ py: 2 }}>
+                                                        <Typography fontWeight={700} color="success.main" fontSize={17}>₹{formatCurrency(acc.equity_holdings_value)}</Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ py: 2 }}>
+                                                        <Typography fontWeight={700} color="warning.main" fontSize={17}>₹{formatCurrency(acc.equity_positions_value)}</Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ py: 2 }}>
+                                                        <Typography fontWeight={700} color="info.main" fontSize={18}>₹{formatCurrency(acc.total_account_value)}</Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ py: 2 }}>
+                                                        <Typography fontWeight={700} color="info.main" fontSize={17}>
+                                                            {acc.updated_at ? new Date(acc.updated_at).toLocaleString() : '-'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+                    </Box>
                 </Box>
             </Modal>
         </>
