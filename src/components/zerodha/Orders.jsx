@@ -30,7 +30,7 @@ import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../service
 import { formatCurrency } from '../../utils/formatters';
 import LinkToTradePopup from './LinkToTradePopup';
 import { getOrders as getAppOrders } from '../../services/orders';
-import OcoOrderDialog from './OcoOrderDialog';
+import OcoOrderDialog from '../PairedOrders/OcoOrderDialog';
 import { isOcoOrder, getPairedOrderId } from '../../services/zerodha/oco';
 
 function formatOrderTime(timestamp) {
