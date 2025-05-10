@@ -614,6 +614,10 @@ function UpdateStrategy({ id }) {
                     // Immediately update the strategy in the backend
                     try {
                         await updateStrategy({ ...strategy, symbol_ltp: symbolLTP });
+                        // Refresh strategy state from backend
+                        const refreshedStrategy = await getStrategies({ id: strategy.id });
+                        const strategyData = Array.isArray(refreshedStrategy) ? refreshedStrategy[0] : refreshedStrategy;
+                        if (strategyData) setStrategy(strategyData);
                         setSnackbar({
                             open: true,
                             message: `Strategy updated with LTP ₹${symbolLTP}`,
@@ -857,7 +861,7 @@ function UpdateStrategy({ id }) {
             .map(trade => ({
                 instrument_type: trade.asset,
                 price: parseFloat(trade.entryprice),
-                quantity: parseInt(trade.quantity),
+                quantity: parseInt(trade.openquantity),
                 position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
                 lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
             }));
