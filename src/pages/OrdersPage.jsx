@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Container, Box, Typography, Button } from '@mui/material';
 import OrdersTable from '../components/zerodha/OrdersTable';
 import CreateOCOOrder from '../components/zerodha/CreateOCOOrder';
-import CreateOAOOrder from '../components/zerodha/CreateOAOOrder';
+import CreateOAOOrder from '../components/PairedOrders/CreateOAOOrder';
 
 export default function OrdersPage() {
     const [isOCODialogOpen, setIsOCODialogOpen] = useState(false);

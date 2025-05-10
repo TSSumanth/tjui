@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHead, TableRow, TableCell, TableBody, Radio, Snackbar, Alert, TextField, Grid, FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip, Paper, TableContainer, Chip } from '@mui/material';
-import PairedOrdersTable from '../components/zerodha/PairedOrdersTable';
+import PairedOrdersTable from '../components/PairedOrders/PairedOrdersTable';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
-import OcoOrderDialog from '../components/zerodha/OcoOrderDialog';
-import CreateOAOOrder from '../components/zerodha/CreateOAOOrder';
+import OcoOrderDialog from '../components/PairedOrders/OcoOrderDialog';
+import CreateOAOOrder from '../components/PairedOrders/CreateOAOOrder';
 import { useZerodha } from '../context/ZerodhaContext';
 import { createOrderPair, getOrderPairs, updateOrderPair, deleteOrderPair } from '../services/zerodha/oco';
 import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
