@@ -7,9 +7,8 @@ import CreateOAOOrder from '../components/zerodha/CreateOAOOrder';
 import { useZerodha } from '../context/ZerodhaContext';
 import { createOrderPair, getOrderPairs, updateOrderPair, deleteOrderPair } from '../services/zerodha/oco';
 import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
+import SOCreateDialog from '../components/PairedOrders/SOCreateDialog';
 
 export default function PairedOrdersPage() {
     const [isOCODialogOpen, setIsOCODialogOpen] = useState(false);
@@ -296,80 +295,13 @@ export default function PairedOrdersPage() {
                     <PairedOrdersTable />
 
                     {/* Saved Orders (SO) Table */}
-                    <Paper sx={{ mb: 3, p: 2 }}>
-                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                            Saved Orders (SO)
-                        </Typography>
-                        {savedOrders.length === 0 ? (
-                            <Typography variant="body1" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                                No saved orders found. Create a new saved order to get started.
-                            </Typography>
-                        ) : (
-                            <TableContainer>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Symbol</TableCell>
-                                            <TableCell>Qty</TableCell>
-                                            <TableCell>Price</TableCell>
-                                            <TableCell>Type</TableCell>
-                                            <TableCell>Product</TableCell>
-                                            <TableCell>Transaction</TableCell>
-                                            <TableCell>Last Updated</TableCell>
-                                            <TableCell>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {savedOrders.map(order => (
-                                            <TableRow
-                                                key={order.id}
-                                                sx={{
-                                                    backgroundColor: order.order1_details?.transaction_type === 'BUY'
-                                                        ? 'rgba(76, 175, 80, 0.1)'  // Light green for BUY
-                                                        : 'rgba(244, 67, 54, 0.1)', // Light red for SELL
-                                                    '&:hover': {
-                                                        backgroundColor: order.order1_details?.transaction_type === 'BUY'
-                                                            ? 'rgba(76, 175, 80, 0.2)'  // Darker green on hover
-                                                            : 'rgba(244, 67, 54, 0.2)', // Darker red on hover
-                                                    }
-                                                }}
-                                            >
-                                                <TableCell>{order.order1_details?.symbol || order.order1_details?.tradingsymbol}</TableCell>
-                                                <TableCell>{order.order1_details?.quantity}</TableCell>
-                                                <TableCell>{order.order1_details?.price}</TableCell>
-                                                <TableCell>{order.order1_details?.order_type}</TableCell>
-                                                <TableCell>{order.order1_details?.product}</TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        label={order.order1_details?.transaction_type}
-                                                        color={order.order1_details?.transaction_type === 'BUY' ? 'success' : 'error'}
-                                                        size="small"
-                                                        variant="outlined"
-                                                    />
-                                                </TableCell>
-                                                <TableCell>{order.order1_details?.lastupdatedat}</TableCell>
-                                                <TableCell>
-                                                    <IconButton onClick={() => handleUpdateSO(order)} color="primary">
-                                                        <EditIcon />
-                                                    </IconButton>
-                                                    <IconButton
-                                                        onClick={() => handlePlaceOrder(order)}
-                                                        color="success"
-                                                        disabled={placingOrder}
-                                                    >
-                                                        <PlayArrowIcon />
-                                                    </IconButton>
-                                                    <IconButton onClick={() => handleDeleteSO(order)} color="error">
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        )}
-                    </Paper>
+                    <SavedOrdersTable
+                        savedOrders={savedOrders}
+                        onEdit={handleUpdateSO}
+                        onPlace={handlePlaceOrder}
+                        onDelete={handleDeleteSO}
+                        placingOrder={placingOrder}
+                    />
                 </Box>
                 <OcoOrderDialog
                     open={isOCODialogOpen}
@@ -436,161 +368,15 @@ export default function PairedOrdersPage() {
                 </Dialog>
 
                 {/* Create Saved Order Dialog (manual entry) */}
-                <Dialog
+                <SOCreateDialog
                     open={showCreateSOOrderDialog}
                     onClose={() => setShowCreateSOOrderDialog(false)}
-                    maxWidth="sm"
-                    fullWidth
-                >
-                    <DialogTitle>Create Saved Order (SO)</DialogTitle>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Trading Symbol"
-                                    name="tradingsymbol"
-                                    value={soOrderDetails.tradingsymbol}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, tradingsymbol: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Transaction Type</InputLabel>
-                                    <Select
-                                        name="transaction_type"
-                                        value={soOrderDetails.transaction_type}
-                                        label="Transaction Type"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, transaction_type: e.target.value }))}
-                                    >
-                                        <MenuItem value="BUY">BUY</MenuItem>
-                                        <MenuItem value="SELL">SELL</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Quantity"
-                                    name="quantity"
-                                    type="number"
-                                    value={soOrderDetails.quantity}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, quantity: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Price"
-                                    name="price"
-                                    type="number"
-                                    value={soOrderDetails.price}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, price: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Product</InputLabel>
-                                    <Select
-                                        name="product"
-                                        value={soOrderDetails.product}
-                                        label="Product"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, product: e.target.value }))}
-                                        disabled={soOrderDetails.exchange === 'NFO'}
-                                    >
-                                        <MenuItem value="CNC">
-                                            <Tooltip title="Cash and Carry - For delivery based trading">
-                                                <span>CNC</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                        <MenuItem value="MIS">
-                                            <Tooltip title="Margin Intraday Square-off - For intraday trading with margin benefits. Positions must be closed by end of day.">
-                                                <span>MIS</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                        <MenuItem value="NRML">
-                                            <Tooltip title="Normal - For regular trading with standard margin requirements">
-                                                <span>NRML</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Order Type</InputLabel>
-                                    <Select
-                                        name="order_type"
-                                        value={soOrderDetails.order_type}
-                                        label="Order Type"
-                                        onChange={e => {
-                                            const newOrderType = e.target.value;
-                                            setSOOrderDetails(prev => ({
-                                                ...prev,
-                                                order_type: newOrderType,
-                                                price: newOrderType === 'MARKET' ? '' : prev.price
-                                            }));
-                                        }}
-                                        disabled={soOrderDetails.exchange === 'NFO'}
-                                    >
-                                        <MenuItem value="LIMIT">LIMIT</MenuItem>
-                                        <MenuItem value="MARKET">MARKET</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Validity</InputLabel>
-                                    <Select
-                                        name="validity"
-                                        value={soOrderDetails.validity}
-                                        label="Validity"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, validity: e.target.value }))}
-                                    >
-                                        <MenuItem value="DAY">DAY</MenuItem>
-                                        <MenuItem value="IOC">IOC</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Exchange</InputLabel>
-                                    <Select
-                                        name="exchange"
-                                        value={soOrderDetails.exchange}
-                                        label="Exchange"
-                                        onChange={e => {
-                                            const newExchange = e.target.value;
-                                            setSOOrderDetails(prev => ({
-                                                ...prev,
-                                                exchange: newExchange,
-                                                product: newExchange === 'NFO' ? 'NRML' : prev.product,
-                                                order_type: newExchange === 'NFO' ? 'LIMIT' : prev.order_type,
-                                                validity: newExchange === 'NFO' ? 'IOC' : prev.validity
-                                            }));
-                                        }}
-                                    >
-                                        <MenuItem value="NSE">NSE</MenuItem>
-                                        <MenuItem value="BSE">BSE</MenuItem>
-                                        <MenuItem value="NFO">NFO</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-                        {soOrderError && <Alert severity="error" sx={{ mt: 2 }}>{soOrderError}</Alert>}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setShowCreateSOOrderDialog(false)}>Cancel</Button>
-                        <Button
-                            variant="contained"
-                            color="success"
-                            onClick={handleSaveSOManual}
-                            disabled={soOrderLoading}
-                        >
-                            {soOrderLoading ? 'Saving...' : 'Save'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                    soOrderDetails={soOrderDetails}
+                    setSOOrderDetails={setSOOrderDetails}
+                    soOrderError={soOrderError}
+                    soOrderLoading={soOrderLoading}
+                    handleSaveSOManual={handleSaveSOManual}
+                />
 
                 {/* Update SO Dialog */}
                 <Dialog
