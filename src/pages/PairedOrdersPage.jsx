@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHead, TableRow, TableCell, TableBody, Radio, Snackbar, Alert, TextField, Grid, FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip } from '@mui/material';
+import { Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHead, TableRow, TableCell, TableBody, Radio, Snackbar, Alert, TextField, Grid, FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip, Paper, TableContainer, Chip } from '@mui/material';
 import PairedOrdersTable from '../components/zerodha/PairedOrdersTable';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import OcoOrderDialog from '../components/zerodha/OcoOrderDialog';
@@ -296,74 +296,80 @@ export default function PairedOrdersPage() {
                     <PairedOrdersTable />
 
                     {/* Saved Orders (SO) Table */}
-                    <Box sx={{ mt: 4 }}>
-                        <Typography variant="h6" gutterBottom>
+                    <Paper sx={{ mb: 3, p: 2 }}>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                             Saved Orders (SO)
                         </Typography>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Symbol</TableCell>
-                                    <TableCell>Qty</TableCell>
-                                    <TableCell>Price</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Transaction</TableCell>
-                                    <TableCell>Last Updated</TableCell>
-                                    <TableCell>Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {savedOrders.map(order => (
-                                    <TableRow
-                                        key={order.id}
-                                        sx={{
-                                            backgroundColor: order.order1_details?.transaction_type === 'BUY'
-                                                ? 'rgba(76, 175, 80, 0.1)'  // Light green for BUY
-                                                : 'rgba(244, 67, 54, 0.1)', // Light red for SELL
-                                            '&:hover': {
-                                                backgroundColor: order.order1_details?.transaction_type === 'BUY'
-                                                    ? 'rgba(76, 175, 80, 0.2)'  // Darker green on hover
-                                                    : 'rgba(244, 67, 54, 0.2)', // Darker red on hover
-                                            }
-                                        }}
-                                    >
-                                        <TableCell>{order.order1_details?.symbol || order.order1_details?.tradingsymbol}</TableCell>
-                                        <TableCell>{order.order1_details?.quantity}</TableCell>
-                                        <TableCell>{order.order1_details?.price}</TableCell>
-                                        <TableCell>{order.order1_details?.order_type}</TableCell>
-                                        <TableCell>
-                                            <Typography
+                        {savedOrders.length === 0 ? (
+                            <Typography variant="body1" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                                No saved orders found. Create a new saved order to get started.
+                            </Typography>
+                        ) : (
+                            <TableContainer>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Symbol</TableCell>
+                                            <TableCell>Qty</TableCell>
+                                            <TableCell>Price</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Product</TableCell>
+                                            <TableCell>Transaction</TableCell>
+                                            <TableCell>Last Updated</TableCell>
+                                            <TableCell>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {savedOrders.map(order => (
+                                            <TableRow
+                                                key={order.id}
                                                 sx={{
-                                                    color: order.order1_details?.transaction_type === 'BUY'
-                                                        ? 'success.main'  // Green for BUY
-                                                        : 'error.main',   // Red for SELL
-                                                    fontWeight: 'bold'
+                                                    backgroundColor: order.order1_details?.transaction_type === 'BUY'
+                                                        ? 'rgba(76, 175, 80, 0.1)'  // Light green for BUY
+                                                        : 'rgba(244, 67, 54, 0.1)', // Light red for SELL
+                                                    '&:hover': {
+                                                        backgroundColor: order.order1_details?.transaction_type === 'BUY'
+                                                            ? 'rgba(76, 175, 80, 0.2)'  // Darker green on hover
+                                                            : 'rgba(244, 67, 54, 0.2)', // Darker red on hover
+                                                    }
                                                 }}
                                             >
-                                                {order.order1_details?.transaction_type}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>{order.order1_details?.lastupdatedat}</TableCell>
-                                        <TableCell>
-                                            <IconButton onClick={() => handleUpdateSO(order)} color="primary">
-                                                <EditIcon />
-                                            </IconButton>
-                                            <IconButton
-                                                onClick={() => handlePlaceOrder(order)}
-                                                color="success"
-                                                disabled={placingOrder}
-                                            >
-                                                <PlayArrowIcon />
-                                            </IconButton>
-                                            <IconButton onClick={() => handleDeleteSO(order)} color="error">
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </Box>
+                                                <TableCell>{order.order1_details?.symbol || order.order1_details?.tradingsymbol}</TableCell>
+                                                <TableCell>{order.order1_details?.quantity}</TableCell>
+                                                <TableCell>{order.order1_details?.price}</TableCell>
+                                                <TableCell>{order.order1_details?.order_type}</TableCell>
+                                                <TableCell>{order.order1_details?.product}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={order.order1_details?.transaction_type}
+                                                        color={order.order1_details?.transaction_type === 'BUY' ? 'success' : 'error'}
+                                                        size="small"
+                                                        variant="outlined"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{order.order1_details?.lastupdatedat}</TableCell>
+                                                <TableCell>
+                                                    <IconButton onClick={() => handleUpdateSO(order)} color="primary">
+                                                        <EditIcon />
+                                                    </IconButton>
+                                                    <IconButton
+                                                        onClick={() => handlePlaceOrder(order)}
+                                                        color="success"
+                                                        disabled={placingOrder}
+                                                    >
+                                                        <PlayArrowIcon />
+                                                    </IconButton>
+                                                    <IconButton onClick={() => handleDeleteSO(order)} color="error">
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </Paper>
                 </Box>
                 <OcoOrderDialog
                     open={isOCODialogOpen}
@@ -490,7 +496,7 @@ export default function PairedOrdersPage() {
                                         value={soOrderDetails.product}
                                         label="Product"
                                         onChange={e => setSOOrderDetails(prev => ({ ...prev, product: e.target.value }))}
-                                        disabled={soOrderDetails.exchange === 'NFO' && soOrderDetails.product === 'CNC'}
+                                        disabled={soOrderDetails.exchange === 'NFO'}
                                     >
                                         <MenuItem value="CNC">
                                             <Tooltip title="Cash and Carry - For delivery based trading">
@@ -517,7 +523,15 @@ export default function PairedOrdersPage() {
                                         name="order_type"
                                         value={soOrderDetails.order_type}
                                         label="Order Type"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, order_type: e.target.value }))}
+                                        onChange={e => {
+                                            const newOrderType = e.target.value;
+                                            setSOOrderDetails(prev => ({
+                                                ...prev,
+                                                order_type: newOrderType,
+                                                price: newOrderType === 'MARKET' ? '' : prev.price
+                                            }));
+                                        }}
+                                        disabled={soOrderDetails.exchange === 'NFO'}
                                     >
                                         <MenuItem value="LIMIT">LIMIT</MenuItem>
                                         <MenuItem value="MARKET">MARKET</MenuItem>
@@ -550,7 +564,9 @@ export default function PairedOrdersPage() {
                                             setSOOrderDetails(prev => ({
                                                 ...prev,
                                                 exchange: newExchange,
-                                                product: newExchange === 'NFO' ? 'NRML' : prev.product
+                                                product: newExchange === 'NFO' ? 'NRML' : prev.product,
+                                                order_type: newExchange === 'NFO' ? 'LIMIT' : prev.order_type,
+                                                validity: newExchange === 'NFO' ? 'IOC' : prev.validity
                                             }));
                                         }}
                                     >
@@ -641,7 +657,7 @@ export default function PairedOrdersPage() {
                                         value={soOrderDetails.product}
                                         label="Product"
                                         onChange={e => setSOOrderDetails(prev => ({ ...prev, product: e.target.value }))}
-                                        disabled={soOrderDetails.exchange === 'NFO' && soOrderDetails.product === 'CNC'}
+                                        disabled={soOrderDetails.exchange === 'NFO'}
                                     >
                                         <MenuItem value="CNC">
                                             <Tooltip title="Cash and Carry - For delivery based trading">
@@ -676,6 +692,7 @@ export default function PairedOrdersPage() {
                                                 price: newOrderType === 'MARKET' ? '' : prev.price
                                             }));
                                         }}
+                                        disabled={soOrderDetails.exchange === 'NFO'}
                                     >
                                         <MenuItem value="LIMIT">LIMIT</MenuItem>
                                         <MenuItem value="MARKET">MARKET</MenuItem>
@@ -708,7 +725,9 @@ export default function PairedOrdersPage() {
                                             setSOOrderDetails(prev => ({
                                                 ...prev,
                                                 exchange: newExchange,
-                                                product: newExchange === 'NFO' ? 'NRML' : prev.product
+                                                product: newExchange === 'NFO' ? 'NRML' : prev.product,
+                                                order_type: newExchange === 'NFO' ? 'LIMIT' : prev.order_type,
+                                                validity: newExchange === 'NFO' ? 'IOC' : prev.validity
                                             }));
                                         }}
                                     >
