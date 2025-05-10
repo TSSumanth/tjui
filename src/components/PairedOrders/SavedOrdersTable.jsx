@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, TableHead, TableRow, TableCell, TableBody, IconButton, Chip, TableContainer, Paper } from '@mui/material';
+import { Table, TableHead, TableRow, TableCell, TableBody, IconButton, Chip, TableContainer, Paper, Typography } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -13,6 +13,9 @@ function formatDate(dateStr) {
 export default function SavedOrdersTable({ savedOrders, onEdit, onPlace, onDelete, placingOrder }) {
     return (
         <Paper sx={{ mb: 3, p: 2 }}>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Saved Orders (SO)
+            </Typography>
             <TableContainer>
                 <Table>
                     <TableHead>
