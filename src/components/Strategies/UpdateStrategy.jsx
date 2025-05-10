@@ -36,7 +36,7 @@ import {
     Stack,
     LinearProgress,
 } from "@mui/material";
-import { getStrategies, updateStrategy, getStrategyNotes, deleteStrategy } from "../../services/strategies";
+import { getStrategies, updateStrategy, getStrategyNotes, deleteStrategy, getOpenStrategies } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
 import { addActionItem, getActionItems } from "../../services/actionitems";
 import { StockTradeForm } from "../Trades/StockTradeForm";
@@ -138,6 +138,7 @@ function UpdateStrategy({ id }) {
     const hasSyncedOnLoad = useRef(false);
     const [isZerodhaDataReady, setIsZerodhaDataReady] = useState(false);
     const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
+    const [openStrategies, setOpenStrategies] = useState([]);
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -843,6 +844,18 @@ function UpdateStrategy({ id }) {
         return () => clearTimeout(timer);
     }, [sessionActive, strategy, stockTrades, optionTrades, isFetchingZerodhaLTP, holdings, positions]);
 
+    useEffect(() => {
+        const fetchOpenStrategies = async () => {
+            try {
+                const response = await getOpenStrategies();
+                setOpenStrategies(response);
+            } catch (err) {
+                // Optionally handle error
+            }
+        };
+        fetchOpenStrategies();
+    }, []);
+
     const PLSummaryCard = () => {
         const hasOpenTrades = [...stockTrades, ...optionTrades].some(trade => trade.status === 'OPEN');
         const tradesNeedingUpdate = React.useMemo(() => {
@@ -1197,29 +1210,38 @@ function UpdateStrategy({ id }) {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                mb: 4,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                pb: 2
-            }}>
+            {/* Top bar: Dropdown left, Back button right */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                <FormControl sx={{ minWidth: 300 }}>
+                    <InputLabel id="strategy-select-label">Select Strategy</InputLabel>
+                    <Select
+                        labelId="strategy-select-label"
+                        value={strategy?.id || ""}
+                        label="Select Strategy"
+                        onChange={e => {
+                            const selectedId = e.target.value;
+                            if (selectedId !== strategy?.id) {
+                                navigate(`/updatestrategy/${selectedId}`);
+                            }
+                        }}
+                    >
+                        {openStrategies.map(s => (
+                            <MenuItem key={s.id} value={s.id}>
+                                {s.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
                 <Button
                     startIcon={<ArrowBackIcon />}
                     onClick={() => navigate('/mystrategies')}
-                    sx={{
-                        mr: 3,
-                        color: 'text.primary',
-                        '&:hover': {
-                            backgroundColor: 'action.hover',
-                        }
-                    }}
+                    variant="contained"
+                    color="secondary"
+                    sx={{ ml: 2, fontWeight: 'bold', textTransform: 'none' }}
                 >
                     Back to Strategies
                 </Button>
             </Box>
-
             <Grid container spacing={4}>
                 {/* Combined Strategy Details and P/L Summary Section */}
                 <Grid item xs={12}>
