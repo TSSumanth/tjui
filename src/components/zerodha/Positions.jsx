@@ -37,6 +37,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import TodayIcon from '@mui/icons-material/Today';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -57,7 +58,6 @@ const getPositionType = (tradingsymbol) => {
     }
     return 'Stock';
 };
-
 
 const extractOptionDetails = (tradingsymbol) => {
     // Early return for non-option symbols
@@ -83,70 +83,48 @@ const extractOptionDetails = (tradingsymbol) => {
     }
 };
 
-const calculateBreakeven = (positions) => {
-    // Early return if futures positions are present
-    const hasFutures = positions.some(p => p.tradingsymbol.endsWith('FUT'));
-    if (hasFutures) return null;
+const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
+    if (!positions || positions.length === 0) return null;
 
-    // Early return if no option positions
-    const optionPositions = positions.filter(p => p.tradingsymbol.endsWith('CE') || p.tradingsymbol.endsWith('PE'));
-    if (optionPositions.length === 0) return null;
+    // Transform positions into the format expected by the new calculator
+    const options = positions.map(position => ({
+        instrument_type: position.tradingsymbol,
+        price: parseFloat(position.average_price) || 0,
+        quantity: Math.abs(parseInt(position.quantity) || 0),
+        position: position.quantity > 0 ? 'BUY' : 'SELL',
+        lot_size: parseInt(position.lot_size) || 0
+    }));
 
-    // Find CE and PE positions
-    const cePosition = optionPositions.find(pos => pos.tradingsymbol.endsWith('CE'));
-    const pePosition = optionPositions.find(pos => pos.tradingsymbol.endsWith('PE'));
-
-    // Calculate total premium paid across all positions
-    const totalPremium = optionPositions.reduce((sum, pos) => {
-        const quantity = parseInt(pos.quantity) || 0;
-        const premium = parseFloat(pos.average_price) || 0;
-        const positionPremium = pos.quantity > 0 ? premium * quantity : -premium * quantity;
-        return sum + positionPremium;
+    // Calculate total premium
+    const totalPremium = options.reduce((sum, option) => {
+        const premium = option.price * option.quantity;
+        return option.position === 'BUY' ? sum + premium : sum - premium;
     }, 0);
 
-    let upsideBreakeven = null;
-    let downsideBreakeven = null;
+    // Parse manual P/L value
+    const manualPl = parseFloat(manualPlValue) || 0;
 
-    if (cePosition) {
-        const optionDetails = extractOptionDetails(cePosition.tradingsymbol);
-        if (optionDetails) {
-            const ceStrike = optionDetails.strike;
-            const ceQuantity = parseInt(cePosition.quantity) || 0;
-            if (ceQuantity > 0) {
-                // For CE: Strike Price + (Total Premium / CE Quantity)
-                upsideBreakeven = ceStrike + (totalPremium / ceQuantity);
-            }
-        }
-    }
+    console.log('manualPl:', manualPl);
+    console.log('currentPrice:', currentPrice);
+    console.log('options:', JSON.stringify(options));
 
-    if (pePosition) {
-        const optionDetails = extractOptionDetails(pePosition.tradingsymbol);
-        if (optionDetails) {
-            const peStrike = optionDetails.strike;
-            const peQuantity = parseInt(pePosition.quantity) || 0;
-            if (peQuantity > 0) {
-                // For PE: Strike Price - (Total Premium / PE Quantity)
-                downsideBreakeven = peStrike - (totalPremium / peQuantity);
-            }
-        }
-    }
+    // Call the new calculator with all required attributes
+    const breakEvenPoints = calculateBreakEven({
+        current_price: currentPrice,
+        manual_pl: manualPl,
+        options: options
+    });
 
-    // Only return breakeven points if we have valid calculations
-    const breakevenPoints = [downsideBreakeven, upsideBreakeven].filter(point => point !== null && !isNaN(point));
-    if (breakevenPoints.length === 0) {
-        return {
-            breakevenPoints: [],
-            netPremium: totalPremium,
-            perLotPremium: totalPremium,
-            currentPrice: positions[0]?.last_price
-        };
-    }
+    // Filter out zero values and sort the break-even points
+    const validBreakEvenPoints = [breakEvenPoints.lower, breakEvenPoints.upper]
+        .filter(point => point !== 0 && !isNaN(point))
+        .sort((a, b) => a - b);
 
     return {
-        breakevenPoints: breakevenPoints.sort((a, b) => a - b),
+        breakevenPoints: validBreakEvenPoints,
         netPremium: totalPremium,
         perLotPremium: totalPremium,
-        currentPrice: positions[0]?.last_price
+        currentPrice: currentPrice
     };
 };
 
@@ -226,6 +204,16 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             return acc;
         }, { dayPnL: 0, totalPnL: 0 });
     }, [positions]);
+
+    // Memoize the break-even calculation
+    const breakEvenResult = React.useMemo(() => {
+        if (!positions || positions.length === 0) return null;
+
+        // Get the current price from LTP map first, then fallback to position's last_price
+        const currentPrice = ltpMap[underlying] || positions[0]?.last_price || positions[0]?.average_price || 0;
+
+        return calculateBreakeven(positions, manualPl, currentPrice);
+    }, [positions, manualPl, ltpMap, underlying]);
 
     // Handle smooth updates
     React.useEffect(() => {
@@ -637,8 +625,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <CalculateIcon color="info" fontSize="small" />
                             <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
-                                Breakeven: {calculateBreakeven(positions) && calculateBreakeven(positions).breakevenPoints.length > 0
-                                    ? `↓${formatCurrency(calculateBreakeven(positions).breakevenPoints[0])} / ↑${formatCurrency(calculateBreakeven(positions).breakevenPoints[1])}`
+                                Breakeven: {breakEvenResult && breakEvenResult.breakevenPoints.length > 0
+                                    ? `↓${formatCurrency(breakEvenResult.breakevenPoints[0])} / ↑${formatCurrency(breakEvenResult.breakevenPoints[1])}`
                                     : 'N/A'}
                             </Typography>
                         </Box>

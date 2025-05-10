@@ -111,18 +111,18 @@ function calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES,
     }
     let total_future_profit = 0;
     for (const future of FUTURES) {
-            if (future.position.toUpperCase() === 'BUY') {
-                total_future_profit += (stock_price - future.price) * future.quantity;
-            } else {
-                total_future_profit -= (stock_price - future.price) * future.quantity;
-            }
+        if (future.position.toUpperCase() === 'BUY') {
+            total_future_profit += (stock_price - future.price) * future.quantity;
+        } else {
+            total_future_profit -= (stock_price - future.price) * future.quantity;
+        }
     }
     return total_call_profit + total_put_profit + total_future_profit;
 }
 
 function findUpperBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium, max_stock_movement = 20) {
     let break_even = 0;
-    for (let stock_price = CURRENT_STOCK_PRICE; stock_price < CURRENT_STOCK_PRICE * ((100 + max_stock_movement)/100) ; stock_price++) {
+    for (let stock_price = CURRENT_STOCK_PRICE; stock_price < CURRENT_STOCK_PRICE * ((100 + max_stock_movement) / 100); stock_price++) {
         let total_pl = calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES, stock_price);
         if (total_pl > total_premium) {
             break_even = stock_price;
@@ -134,7 +134,7 @@ function findUpperBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PR
 
 function findLowerBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium, max_stock_movement = 20) {
     let break_even = 0;
-    for (let stock_price = CURRENT_STOCK_PRICE; stock_price > CURRENT_STOCK_PRICE * ((100 - max_stock_movement)/100) ; stock_price--) {
+    for (let stock_price = CURRENT_STOCK_PRICE; stock_price > CURRENT_STOCK_PRICE * ((100 - max_stock_movement) / 100); stock_price--) {
         let total_pl = calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES, stock_price);
         if (total_pl > total_premium) {
             break_even = stock_price;
@@ -147,7 +147,7 @@ function findLowerBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PR
 function calculateBreakEven(input) {
     let break_even_points = { upper: 0, lower: 0 };
     let manual_pl = input.manual_pl || 0;
-    const CURRENT_STOCK_PRICE = input.current_price;
+    const CURRENT_STOCK_PRICE = (input.current_price).toFixed(0); 
     const {
         CALL_OPTIONS,
         PUT_OPTIONS,
@@ -158,7 +158,7 @@ function calculateBreakEven(input) {
         total_put_premium,
         total_future_premium
     } = parseOptions(input.options);
-    const total_premium = calculateTotalPremium(total_call_premium, total_put_premium, total_future_premium) + manual_pl;
+    const total_premium = calculateTotalPremium(total_call_premium, total_put_premium, total_future_premium) - manual_pl;
     const sortedCallStrikes = Array.from(CALL_STRIKE_PRICES).sort((a, b) => a - b);
     const sortedPutStrikes = Array.from(PUT_STRIKE_PRICES).sort((a, b) => a - b);
     console.log('Sorted CALL STRIKE PRICES:', sortedCallStrikes);
@@ -172,39 +172,16 @@ function calculateBreakEven(input) {
 
 
 let input1 = {
-    current_price: 1400,
-    manual_pl: 0,
-    options: [
-        {
-            instrument_type: "RELIANCE25JUN1400PE",
-            price: 40,
-            quantity: 1000,
-            position: "BUY",
-            lot_size: 500
-        },
-        {
-            instrument_type: "RELIANCE25JUN1500CE",
-            price: 5,
-            quantity: 1000,
-            position: "SELL",
-            lot_size: 500
-        },
-        {
-            instrument_type: "RELIANCE25JUN1400CE",
-            price: 45,
-            quantity: 500,
-            position: "BUY",
-            lot_size: 500
-        },
-        {
-            instrument_type: "RELIANCE25JUNFUT",
-            price: 1420,
-            quantity: 500,
-            position: "BUY",
-            lot_size: 500
-        }
-    ]
-}
-// calculateBreakEven(input1);
+    current_price: 1500,
+    manual_pl: 28072,
 
-export default calculateBreakEven; 
+    options: [
+        { "instrument_type": "INFY25JUN1480CE", "price": 60.4, "quantity": 1600, "position": "BUY", "lot_size": 0 },
+        { "instrument_type": "INFY25MAY1520PE", "price": 44, "quantity": 400, "position": "BUY", "lot_size": 0 },
+        { "instrument_type": "INFY25MAYFUT", "price": 1425.4, "quantity": 800, "position": "SELL", "lot_size": 0 }
+    ]
+
+}
+calculateBreakEven(input1);
+
+module.exports = { calculateBreakEven }; 
