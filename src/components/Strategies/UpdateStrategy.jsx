@@ -58,6 +58,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import { useZerodha } from '../../context/ZerodhaContext';
 import SyncIcon from '@mui/icons-material/Sync';
+import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 
 const TABLE_STYLES = {
     container: {
@@ -610,6 +611,21 @@ function UpdateStrategy({ id }) {
                         message: `Fetched LTP ₹${symbolLTP} for ${strategy.symbol}`,
                         severity: 'success'
                     });
+                    // Immediately update the strategy in the backend
+                    try {
+                        await updateStrategy({ ...strategy, symbol_ltp: symbolLTP });
+                        setSnackbar({
+                            open: true,
+                            message: `Strategy updated with LTP ₹${symbolLTP}`,
+                            severity: 'success'
+                        });
+                    } catch (err) {
+                        setSnackbar({
+                            open: true,
+                            message: 'Failed to update strategy with new LTP',
+                            severity: 'error'
+                        });
+                    }
                 } else {
                     setSnackbar({
                         open: true,
@@ -830,59 +846,29 @@ function UpdateStrategy({ id }) {
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
 
-        // Calculate combined breakeven range
-        const combinedBreakeven = React.useMemo(() => {
-            const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
-            if (openOptionTrades.length === 0) return null;
-
-            // Find CE and PE positions
-            const cePosition = openOptionTrades.find(trade => trade.asset.endsWith('CE'));
-            const pePosition = openOptionTrades.find(trade => trade.asset.endsWith('PE'));
-
-            // Calculate total premium paid across all positions
-            const totalPremium = openOptionTrades.reduce((sum, trade) => {
-                const quantity = parseInt(trade.quantity) || 0;
-                const lotSize = parseInt(trade.lotsize) || 1;
-                const lots = quantity / lotSize;
-                const premium = parseFloat(trade.entryprice) || 0;
-                // Calculate premium per lot: premium * lotSize
-                const premiumPerLot = premium * lotSize;
-                const positionPremium = trade.tradetype === 'LONG' ? premiumPerLot * lots : -premiumPerLot * lots;
-                return sum + positionPremium;
-            }, 0);
-
-            // Calculate effective premium: (Total Premium - Realized P/L) / Lot Size
-            const effectivePremium = (totalPremium - plSummary.realizedPL) / (openOptionTrades[0]?.lotsize);
-
-            let upsideBreakeven = null;
-            let downsideBreakeven = null;
-
-            if (cePosition) {
-                const ceStrike = parseFloat(cePosition.strikeprize) || 0;
-                const ceQuantity = parseInt(cePosition.quantity) || 0;
-                const ceLotSize = parseInt(cePosition.lotsize) || 1;
-                const ceLots = ceQuantity / ceLotSize;
-                // For CE: Strike Price + (Effective Premium / CE Lots)
-                upsideBreakeven = ceStrike + (effectivePremium / ceLots);
-            }
-
-            if (pePosition) {
-                const peStrike = parseFloat(pePosition.strikeprize) || 0;
-                const peQuantity = parseInt(pePosition.quantity) || 0;
-                const peLotSize = parseInt(pePosition.lotsize) || 1;
-                const peLots = peQuantity / peLotSize;
-                // For PE: Strike Price - (Effective Premium / PE Lots)
-                downsideBreakeven = peStrike - (effectivePremium / peLots);
-            }
-
-            return {
-                totalPremium,
-                effectivePremium,
-                realizedPL: plSummary.realizedPL,
-                upsideBreakeven,
-                downsideBreakeven
-            };
-        }, [optionTrades, plSummary.realizedPL]);
+        // Remove combinedBreakeven calculation and UI
+        // --- NEW: Calculate break-even using breakEvenCalculator.js ---
+        const openOptionAndFutureTrades = optionTrades
+            .filter(trade => trade.status === 'OPEN' && (
+                trade.asset.endsWith('CE') ||
+                trade.asset.endsWith('PE') ||
+                trade.asset.endsWith('FUT')
+            ))
+            .map(trade => ({
+                instrument_type: trade.asset,
+                price: parseFloat(trade.entryprice),
+                quantity: parseInt(trade.quantity),
+                position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
+                lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
+            }));
+        const breakEvenPoints = (strategy?.symbol_ltp && openOptionAndFutureTrades.length > 0)
+            ? calculateBreakEven({
+                current_price: parseFloat(strategy.symbol_ltp),
+                manual_pl: plSummary.realizedPL,
+                options: openOptionAndFutureTrades
+            })
+            : null;
+        // --- END NEW ---
 
         return (
             <Card sx={{ mb: 3 }}>
@@ -965,42 +951,34 @@ function UpdateStrategy({ id }) {
                             </Typography>
                         </Grid>
 
-                        {/* Option Positions Breakeven Section */}
-                        {optionTrades.some(trade => trade.status === 'OPEN') && combinedBreakeven && (
+                        {/* --- NEW: Break-even from breakEvenCalculator.js --- */}
+                        {breakEvenPoints && (
                             <Grid item xs={12}>
                                 <Divider sx={{ my: 2 }} />
                                 <Typography variant="subtitle2" color="text.secondary">
-                                    Breakeven Points
+                                    Break-even Points (using Symbol LTP and Realized P/L)
                                 </Typography>
-
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                                    <Alert severity="info" sx={{ mb: 2 }}>
-                                        Note: Breakeven calculations are rough estimates that consider your realized P/L from closed positions.
-                                        The actual breakeven may vary based on market conditions and position adjustments.
-                                    </Alert>
-                                    {combinedBreakeven.upsideBreakeven !== null && (
-                                        <Box>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Upside Breakeven
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                                ₹{combinedBreakeven.upsideBreakeven.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                    {combinedBreakeven.downsideBreakeven !== null && (
-                                        <Box>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Downside Breakeven
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                                ₹{combinedBreakeven.downsideBreakeven.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                    )}
+                                <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mt: 1 }}>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Lower Break-even
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                            ₹{breakEvenPoints.lower}
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Upper Break-even
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                            ₹{breakEvenPoints.upper}
+                                        </Typography>
+                                    </Box>
                                 </Box>
                             </Grid>
                         )}
+                        {/* --- END NEW --- */}
                     </Grid>
                 </CardContent>
             </Card>
