@@ -372,7 +372,8 @@ function UpdateStrategy({ id }) {
             const updatedStrategy = {
                 ...strategy,
                 realized_pl: plSummary.realizedPL,
-                unrealized_pl: plSummary.unrealizedPL
+                unrealized_pl: plSummary.unrealizedPL,
+                symbol_ltp: strategy.symbol_ltp !== undefined ? strategy.symbol_ltp : ''
             };
 
             await updateStrategy(updatedStrategy);
@@ -414,70 +415,6 @@ function UpdateStrategy({ id }) {
             return quantity * (entryPrice - ltp);
         }
     }, []);
-
-    // const handleGenerateUnrealizedPL = async () => {
-    //     try {
-    //         let totalUnrealized = 0;
-    //         const updatedStockTrades = [];
-    //         const updatedOptionTrades = [];
-
-    //         // Prepare stock trades updates
-    //         stockTrades.forEach(trade => {
-    //             if (trade.status === 'OPEN') {
-    //                 const updatedTrade = {
-    //                     ...trade,
-    //                     ltp: trade.ltp
-    //                 };
-    //                 const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-    //                 updatedTrade.unrealizedpl = unrealizedPL;
-    //                 totalUnrealized += unrealizedPL;
-    //                 updatedStockTrades.push(updatedTrade);
-    //             }
-    //         });
-
-    //         // Prepare option trades updates
-    //         optionTrades.forEach(trade => {
-    //             if (trade.status === 'OPEN') {
-    //                 const updatedTrade = {
-    //                     ...trade,
-    //                     ltp: trade.ltp
-    //                 };
-    //                 const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-    //                 updatedTrade.unrealizedpl = unrealizedPL;
-    //                 totalUnrealized += unrealizedPL;
-    //                 updatedOptionTrades.push(updatedTrade);
-    //             }
-    //         });
-
-    //         // Batch update all trades
-    //         const updatePromises = [
-    //             ...updatedStockTrades.map(trade => updateStockTrade(trade)),
-    //             ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
-    //         ];
-
-    //         await Promise.all(updatePromises);
-
-    //         // Update local state
-    //         setStockTrades(prevTrades =>
-    //             prevTrades.map(trade => {
-    //                 const updatedTrade = updatedStockTrades.find(t => t.tradeid === trade.tradeid);
-    //                 return updatedTrade || trade;
-    //             })
-    //         );
-    //         setOptionTrades(prevTrades =>
-    //             prevTrades.map(trade => {
-    //                 const updatedTrade = updatedOptionTrades.find(t => t.tradeid === trade.tradeid);
-    //                 return updatedTrade || trade;
-    //             })
-    //         );
-
-    //         setShowLTPDialog(false);
-    //         calculatePLSummary();
-    //     } catch (error) {
-    //         console.error('Error updating LTPs:', error);
-    //         setError("Failed to update LTPs.");
-    //     }
-    // };
 
     const checkAllTradesHaveLTP = useCallback(() => {
         const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
@@ -659,6 +596,29 @@ function UpdateStrategy({ id }) {
                     });
                 }
             }
+
+            // --- NEW: Update symbol_ltp for the strategy if symbol exists in LTP map ---
+            if (strategy?.symbol) {
+                const symbolLTP = zerodhaLTPMap.get(strategy.symbol);
+                if (symbolLTP !== undefined) {
+                    setStrategy(prev => ({
+                        ...prev,
+                        symbol_ltp: symbolLTP
+                    }));
+                    setSnackbar({
+                        open: true,
+                        message: `Fetched LTP ₹${symbolLTP} for ${strategy.symbol}`,
+                        severity: 'success'
+                    });
+                } else {
+                    setSnackbar({
+                        open: true,
+                        message: `No LTP found for symbol ${strategy.symbol} in holdings/positions.`,
+                        severity: 'warning'
+                    });
+                }
+            }
+            // --- END NEW ---
 
             const updatedStockTrades = [];
             const updatedOptionTrades = [];
@@ -1312,6 +1272,18 @@ function UpdateStrategy({ id }) {
                                         fullWidth
                                         onChange={(e) => setStrategy(prev => ({ ...prev, symbol: e.target.value }))}
                                         size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        label="Symbol LTP (optional)"
+                                        name="symbol_ltp"
+                                        type="number"
+                                        fullWidth
+                                        value={strategy?.symbol_ltp || ''}
+                                        onChange={e => setStrategy(prev => ({ ...prev, symbol_ltp: e.target.value }))}
+                                        inputProps={{ step: "0.01", min: "0" }}
+                                        sx={{ mb: 2 }}
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={6}>

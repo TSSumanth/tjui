@@ -13,7 +13,8 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
         name: "",
         description: "",
         created_at: dayjs(),
-        symbol: ""
+        symbol: "",
+        symbol_ltp: ""
     });
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -74,6 +75,15 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
                         onChange={handleChange}
                     />
                     <TextField
+                        label="Symbol LTP (optional)"
+                        name="symbol_ltp"
+                        type="number"
+                        fullWidth
+                        value={strategydetails.symbol_ltp}
+                        onChange={handleChange}
+                        inputProps={{ step: "0.01", min: "0" }}
+                    />
+                    <TextField
                         select
                         label="Status"
                         name="status"
@@ -98,7 +108,7 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
                             label="Created Date"
                             value={strategydetails.created_at}
                             onChange={(newValue) => handleDateTimeChange(newValue)}
-                            renderInput={(params) => <TextField {...params} />}
+                            slotProps={{ textField: { fullWidth: true } }}
                         />
                     </LocalizationProvider>
                 </DialogContent>
