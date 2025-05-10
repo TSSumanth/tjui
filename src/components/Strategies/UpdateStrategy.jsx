@@ -58,6 +58,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import { useZerodha } from '../../context/ZerodhaContext';
 import SyncIcon from '@mui/icons-material/Sync';
+import EditIcon from '@mui/icons-material/Edit';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 
 const TABLE_STYLES = {
@@ -1307,9 +1308,10 @@ function UpdateStrategy({ id }) {
                                 </Button>
                                 <Button
                                     variant="outlined"
+                                    startIcon={<EditIcon />}
                                     onClick={() => setShowLTPDialog(true)}
                                 >
-                                    Update LTP
+                                    Update LTP Manually
                                 </Button>
                                 <Button
                                     variant="contained"
