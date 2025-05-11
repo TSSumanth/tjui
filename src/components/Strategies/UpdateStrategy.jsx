@@ -977,22 +977,22 @@ function UpdateStrategy({ id }) {
                                     Break-even Points (using Symbol LTP and Realized P/L)
                                 </Typography>
                                 <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mt: 1 }}>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">
                                             Lower Break-even
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                             ₹{breakEvenPoints.lower}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
+                                            </Typography>
+                                        </Box>
+                                        <Box>
+                                            <Typography variant="caption" color="text.secondary">
                                             Upper Break-even
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                             ₹{breakEvenPoints.upper}
-                                        </Typography>
-                                    </Box>
+                                            </Typography>
+                                        </Box>
                                 </Box>
                             </Grid>
                         )}
