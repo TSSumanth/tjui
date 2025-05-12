@@ -72,7 +72,7 @@ const Portfolio = () => {
     // Process positions data
     const processedPositions = React.useMemo(() => {
         if (!positions || !positions.net) return [];
-        const allPositions = [...(positions.net || []), ...(positions.day || [])];
+        const allPositions = positions.net || [];
         // Filter out duplicates based on tradingsymbol
         return allPositions.filter((position, index, self) =>
             index === self.findIndex((p) => p.tradingsymbol === position.tradingsymbol)
@@ -129,20 +129,21 @@ const Portfolio = () => {
     // Calculate F&O Positions Total Value
     const positionsTotalValue = React.useMemo(() => {
         if (!positions || !positions.net) return 0;
-        const allPositions = [...(positions.net || []), ...(positions.day || [])];
-        let longValue = 0;
-        let shortPnL = 0;
+        const allPositions = positions.net || [];
+        let totalValue = 0;
         allPositions.forEach((position) => {
             const posType = getPositionType(position.tradingsymbol);
             if ((posType === 'Future' || posType === 'Option') && position.quantity !== 0) {
-                if (position.quantity > 0) {
-                    longValue += Number(position.quantity) * Number(position.last_price || 0);
-                } else if (position.quantity < 0) {
-                    shortPnL += Number(position.pnl) || 0;
+                if (posType === 'Option' && position.quantity > 0) {
+                    // Long Option: use notional value
+                    totalValue += Number(position.quantity) * Number(position.last_price || 0);
+                } else {
+                    // Futures (any direction) and short Options: use PnL
+                    totalValue += Number(position.pnl) || 0;
                 }
             }
         });
-        return longValue + shortPnL;
+        return totalValue;
     }, [positions]);
 
     // Calculate Total Equity Holdings Value
@@ -154,6 +155,29 @@ const Portfolio = () => {
             return sum + (quantity * lastPrice);
         }, 0);
     }, [holdings]);
+
+    // Add breakdown for F&O summary card
+    const { longOptionsNotional, shortOptionsPnL, futuresPnL } = React.useMemo(() => {
+        if (!positions || !positions.net) return { longOptionsNotional: 0, shortOptionsPnL: 0, futuresPnL: 0 };
+        const allPositions = positions.net || [];
+        let longOptionsNotional = 0;
+        let shortOptionsPnL = 0;
+        let futuresPnL = 0;
+        allPositions.forEach((position) => {
+            const posType = getPositionType(position.tradingsymbol);
+            if (position.quantity !== 0) {
+                if (posType === 'Option' && position.quantity > 0) {
+                    longOptionsNotional += Number(position.quantity) * Number(position.last_price || 0);
+                } else if (posType === 'Option' && position.quantity < 0) {
+                    console.log('Short Option Detected:', position);
+                    shortOptionsPnL += Number(position.pnl) || 0;
+                } else if (posType === 'Future') {
+                    futuresPnL += Number(position.pnl) || 0;
+                }
+            }
+        });
+        return { longOptionsNotional, shortOptionsPnL, futuresPnL };
+    }, [positions]);
 
     // Manual refresh handler for portfolio value
     const handlePortfolioValueRefresh = async () => {
@@ -453,7 +477,7 @@ const Portfolio = () => {
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
                                             Total Value
-                                            <Tooltip title="Total = Long positions' value + Short positions' P&L.">
+                                            <Tooltip title="Total = Long Options Notional + Short Options P&L + Futures P&L">
                                                 <InfoIcon fontSize="small" sx={{ ml: 0.5, fontSize: '0.875rem', color: 'text.secondary' }} />
                                             </Tooltip>
                                         </Typography>
@@ -585,9 +609,31 @@ const Portfolio = () => {
                 {/* Positions Section */}
                 <Box mb={4}>
                     <Paper sx={{ p: 3, borderRadius: 2 }}>
-                        <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 3 }}>
-                            Positions
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                            <Typography variant="h5" color="text.primary">
+                                Positions
+                            </Typography>
+                            <Stack direction="row" spacing={3} sx={{ alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Tooltip title="Calculated using open quantity and LTP">
+                                        <span>Long Options Notional Value:</span>
+                                    </Tooltip>
+                                    <span style={{ fontFamily: 'monospace', color: longOptionsNotional >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(longOptionsNotional)}</span>
+                                </Typography>
+                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Tooltip title="Shows Overall P/L of short options">
+                                        <span>Short Opt. P/L:</span>
+                                    </Tooltip>
+                                    <span style={{ fontFamily: 'monospace', color: shortOptionsPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(shortOptionsPnL)}</span>
+                                </Typography>
+                                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Tooltip title="Shows Overall P/L of Futures">
+                                        <span>Futures P/L:</span>
+                                    </Tooltip>
+                                    <span style={{ fontFamily: 'monospace', color: futuresPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(futuresPnL)}</span>
+                                </Typography>
+                            </Stack>
+                        </Box>
                         <Positions />
                     </Paper>
                 </Box>
