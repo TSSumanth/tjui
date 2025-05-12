@@ -417,15 +417,33 @@ export const ZerodhaProvider = ({ children }) => {
                                 // Order 1 is cancelled, mark the pair as completed
                                 await updateOrderPair(pair.id, { status: 'COMPLETED' });
                             } else if (order1Status === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
-                                // Order 1 is complete, create Order 2
+                                // Order 1 is complete, create Order 2 (only once)
                                 try {
                                     const data = await placeOrder(pair.order2_details);
                                     if (data.success && data.order_id) {
-                                        // Update the pair with order2_id using the updateOrderPair function
+                                        // PATCH backend with order2_id after first attempt
                                         await updateOrderPair(pair.id, { order2_id: data.order_id });
+                                    } else {
+                                        // PATCH backend with a special error status and order2_details
+                                        await updateOrderPair(pair.id, {
+                                            order2_id: 'FAILED',
+                                            order2_details: {
+                                                ...pair.order2_details,
+                                                orderstatus: 'FAILED',
+                                                error: data.error || 'Unknown error from Zerodha'
+                                            }
+                                        });
                                     }
                                 } catch (error) {
-                                    console.error('Error creating Order 2:', error);
+                                    // PATCH backend with a special error status and order2_details
+                                    await updateOrderPair(pair.id, {
+                                        order2_id: 'FAILED',
+                                        order2_details: {
+                                            ...pair.order2_details,
+                                            orderstatus: 'FAILED',
+                                            error: error.message || 'Unknown error from Zerodha'
+                                        }
+                                    });
                                 }
                             } else if (order1Status === 'COMPLETE' && order2Status === 'COMPLETE') {
                                 // Both orders are complete

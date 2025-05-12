@@ -24,4 +24,9 @@ export const getOaoOrderPairs = async () => {
 
 export const deleteOaoOrderPair = async (id) => {
     await api.delete(`${API_URLS.ORDER_PAIRS}/${id}`);
+};
+
+export const updateOaoOrderPair = async (id, order2_details) => {
+    const resp = await api.patch(`${API_URLS.ORDER_PAIRS}/${id}`, { order2_details });
+    return resp.data;
 }; 
