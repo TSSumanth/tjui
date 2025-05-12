@@ -100,10 +100,10 @@ export default function PairedOrdersPage() {
     // Handler to save SO
     const handleSaveSO = async () => {
         if (!selectedCancelledOrder) return;
-        const { id, ...orderDetails } = selectedCancelledOrder;
+        const { order_id, ...orderDetails } = selectedCancelledOrder;
         const payload = {
             type: 'SO',
-            order1_id: id,
+            order1_id: order_id,
             order1_details: {
                 ...orderDetails,
                 lastupdatedat: new Date().toISOString(),
@@ -386,7 +386,10 @@ export default function PairedOrdersPage() {
                                             style={{ cursor: 'pointer' }}
                                         >
                                             <TableCell>
-                                                <Radio checked={selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id} />
+                                                <Radio
+                                                    checked={Boolean(selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id)}
+                                                    onChange={() => setSelectedCancelledOrder(order)}
+                                                />
                                             </TableCell>
                                             <TableCell>{order.tradingsymbol}</TableCell>
                                             <TableCell>{order.quantity}</TableCell>

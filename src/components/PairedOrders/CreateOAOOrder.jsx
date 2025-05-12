@@ -21,7 +21,8 @@ import {
     Paper,
     CircularProgress,
     Alert,
-    Snackbar
+    Snackbar,
+    Tooltip
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { createOaoOrderPair } from '../../services/zerodha/oao';
@@ -69,6 +70,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
         if (!order2Details.quantity || order2Details.quantity <= 0) return 'Valid quantity is required';
         if (!order2Details.price || order2Details.price <= 0) return 'Valid price is required';
         if (!order2Details.exchange) return 'Exchange is required';
+        if (order2Details.order_type === 'LIMIT' && (!order2Details.price || order2Details.price <= 0)) return 'Price is required for LIMIT orders';
         return null;
     };
 
@@ -210,6 +212,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     <Select
                                         name="transaction_type"
                                         value={order2Details.transaction_type}
+                                        label="Transaction Type"
                                         onChange={handleOrder2Change}
                                     >
                                         <MenuItem value="BUY">BUY</MenuItem>
@@ -241,7 +244,72 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                     required
                                     error={showValidation && (!order2Details.price || order2Details.price <= 0)}
                                     helperText={showValidation && (!order2Details.price || order2Details.price <= 0) ? 'Valid price is required' : ''}
+                                    disabled={order2Details.order_type === 'MARKET'}
                                 />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Product</InputLabel>
+                                    <Select
+                                        name="product"
+                                        value={order2Details.product}
+                                        label="Product"
+                                        onChange={handleOrder2Change}
+                                        disabled={order2Details.exchange === 'NFO'}
+                                    >
+                                        <MenuItem value="CNC">
+                                            <Tooltip title="Cash and Carry - For delivery based trading">
+                                                <span>CNC</span>
+                                            </Tooltip>
+                                        </MenuItem>
+                                        <MenuItem value="MIS">
+                                            <Tooltip title="Margin Intraday Square-off - For intraday trading with margin benefits. Positions must be closed by end of day.">
+                                                <span>MIS</span>
+                                            </Tooltip>
+                                        </MenuItem>
+                                        <MenuItem value="NRML">
+                                            <Tooltip title="Normal - For regular trading with standard margin requirements">
+                                                <span>NRML</span>
+                                            </Tooltip>
+                                        </MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Order Type</InputLabel>
+                                    <Select
+                                        name="order_type"
+                                        value={order2Details.order_type}
+                                        label="Order Type"
+                                        onChange={e => {
+                                            const newOrderType = e.target.value;
+                                            setOrder2Details(prev => ({
+                                                ...prev,
+                                                order_type: newOrderType,
+                                                price: newOrderType === 'MARKET' ? '' : prev.price
+                                            }));
+                                        }}
+                                        disabled={order2Details.exchange === 'NFO'}
+                                    >
+                                        <MenuItem value="LIMIT">LIMIT</MenuItem>
+                                        <MenuItem value="MARKET">MARKET</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Validity</InputLabel>
+                                    <Select
+                                        name="validity"
+                                        value={order2Details.validity}
+                                        label="Validity"
+                                        onChange={handleOrder2Change}
+                                    >
+                                        <MenuItem value="DAY">DAY</MenuItem>
+                                        <MenuItem value="IOC">IOC</MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <FormControl fullWidth required error={showValidation && !order2Details.exchange}>
@@ -250,12 +318,20 @@ const CreateOAOOrder = ({ open, onClose }) => {
                                         name="exchange"
                                         value={order2Details.exchange}
                                         label="Exchange"
-                                        onChange={handleOrder2Change}
+                                        onChange={e => {
+                                            const newExchange = e.target.value;
+                                            setOrder2Details(prev => ({
+                                                ...prev,
+                                                exchange: newExchange,
+                                                product: newExchange === 'NFO' ? 'NRML' : prev.product,
+                                                order_type: newExchange === 'NFO' ? 'LIMIT' : prev.order_type,
+                                                validity: newExchange === 'NFO' ? 'IOC' : prev.validity
+                                            }));
+                                        }}
                                     >
-                                        <MenuItem value="">Select Exchange</MenuItem>
                                         <MenuItem value="NSE">NSE</MenuItem>
-                                        <MenuItem value="NFO">NFO</MenuItem>
                                         <MenuItem value="BSE">BSE</MenuItem>
+                                        <MenuItem value="NFO">NFO</MenuItem>
                                     </Select>
                                     {showValidation && !order2Details.exchange && (
                                         <Typography variant="caption" color="error">Exchange is required</Typography>
