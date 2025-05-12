@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pagination, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, MenuItem, Paper, InputAdornment, IconButton } from '@mui/material';
 import { getAllMarketAnalysis, createMarketAnalysis, updateMarketAnalysis, deleteMarketAnalysis } from '../services/marketanalysis';
-import SimpleAnalysisTable from '../components/MarketAnalysis/SimpleAnalysisTable';
+import AnalysisTable from '../components/MarketAnalysis/AnalysisTable';
 import CreateAnalysisDialog from '../components/MarketAnalysis/CreateAnalysisDialog';
 import EditAnalysisDialog from '../components/MarketAnalysis/EditAnalysisDialog';
 import { initialForm, expectationOptions } from '../components/MarketAnalysis/shared';
@@ -249,7 +249,7 @@ export default function MarketAnalysis() {
                     </Grid>
                 </Grid>
             </Paper>
-            <SimpleAnalysisTable
+            <AnalysisTable
                 rows={rows}
                 loading={loading}
                 error={error}

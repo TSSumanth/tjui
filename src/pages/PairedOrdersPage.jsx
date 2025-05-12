@@ -40,13 +40,49 @@ export default function PairedOrdersPage() {
     useEffect(() => {
         if (showStoreCancelledOrderDialog) {
             const fetchCancelledOrders = async () => {
-                const today = new Date().toISOString().slice(0, 10);
-                const allOrders = await getOrders();
-                const ordersArray = Array.isArray(allOrders) ? allOrders : [];
-                const filtered = ordersArray.filter(
-                    o => o.status === 'CANCELLED' && o.updated_at && o.updated_at.slice(0, 10) === today
-                );
-                setCancelledOrders(filtered);
+                try {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const response = await getOrders();
+                    console.log('Raw orders response:', response);
+                    const allOrders = response.data || [];
+                    console.log('All orders:', allOrders);
+                    const ordersArray = Array.isArray(allOrders) ? allOrders : [];
+                    const filtered = ordersArray.filter(
+                        o => {
+                            console.log('Complete order object:', o);
+                            // Check if status is CANCELLED (case insensitive)
+                            const isCancelled = o.status && o.status.toUpperCase() === 'CANCELLED';
+
+                            // Try different timestamp fields
+                            let orderDate;
+                            const timestamp = o.order_timestamp || o.created_at || o.modified_at || o.timestamp;
+                            if (timestamp) {
+                                const date = new Date(timestamp);
+                                orderDate = date.toISOString().slice(0, 10);
+                            }
+
+                            console.log('Order details:', {
+                                status: o.status,
+                                isCancelled,
+                                timestamp,
+                                orderDate,
+                                today
+                            });
+
+                            return isCancelled && orderDate === today;
+                        }
+                    );
+                    console.log('Filtered cancelled orders:', filtered);
+                    setCancelledOrders(filtered);
+                } catch (error) {
+                    console.error('Error fetching cancelled orders:', error);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to fetch cancelled orders',
+                        severity: 'error'
+                    });
+                    setCancelledOrders([]);
+                }
             };
             fetchCancelledOrders();
         }
@@ -56,7 +92,7 @@ export default function PairedOrdersPage() {
     useEffect(() => {
         const fetchSavedOrders = async () => {
             const allPairs = await getOrderPairs();
-            setSavedOrders(allPairs.filter(pair => pair.type === 'SO'));
+            setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
         };
         fetchSavedOrders();
     }, [showStoreCancelledOrderDialog, snackbar.open]);
@@ -158,7 +194,7 @@ export default function PairedOrdersPage() {
             setEditingSO(null);
             // Refresh the saved orders list
             const allPairs = await getOrderPairs();
-            setSavedOrders(allPairs.filter(pair => pair.type === 'SO'));
+            setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
         } catch (e) {
             setSOOrderError('Failed to update order.');
         }
@@ -203,7 +239,8 @@ export default function PairedOrdersPage() {
                 setSnackbar({ open: true, message: 'Order placed successfully!', severity: 'success' });
                 // Refresh the orders list
                 const allOrders = await getOrders();
-                setSavedOrders(allOrders.filter(o => o.type === 'SO'));
+                const ordersArray = Array.isArray(allOrders) ? allOrders : [];
+                setSavedOrders(ordersArray.filter(o => o.type === 'SO'));
             } else {
                 throw new Error(response.error || 'Failed to place order');
             }
@@ -224,7 +261,7 @@ export default function PairedOrdersPage() {
             setSnackbar({ open: true, message: 'Order deleted successfully!', severity: 'success' });
             // Refresh the saved orders list
             const allPairs = await getOrderPairs();
-            setSavedOrders(allPairs.filter(pair => pair.type === 'SO'));
+            setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
         } catch (e) {
             setSnackbar({
                 open: true,
@@ -319,40 +356,52 @@ export default function PairedOrdersPage() {
                     onClose={() => setShowStoreCancelledOrderDialog(false)}
                     maxWidth="md"
                     fullWidth
+                    aria-labelledby="store-cancelled-order-dialog-title"
+                    aria-describedby="store-cancelled-order-dialog-description"
                 >
-                    <DialogTitle>Select a Cancelled Order to Save</DialogTitle>
-                    <DialogContent>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell />
-                                    <TableCell>Symbol</TableCell>
-                                    <TableCell>Qty</TableCell>
-                                    <TableCell>Price</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Last Updated</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {cancelledOrders.map(order => (
-                                    <TableRow
-                                        key={order.id}
-                                        selected={selectedCancelledOrder && selectedCancelledOrder.id === order.id}
-                                        onClick={() => setSelectedCancelledOrder(order)}
-                                        style={{ cursor: 'pointer' }}
-                                    >
-                                        <TableCell>
-                                            <Radio checked={selectedCancelledOrder && selectedCancelledOrder.id === order.id} />
-                                        </TableCell>
-                                        <TableCell>{order.symbol}</TableCell>
-                                        <TableCell>{order.quantity}</TableCell>
-                                        <TableCell>{order.price}</TableCell>
-                                        <TableCell>{order.order_type}</TableCell>
-                                        <TableCell>{order.updated_at}</TableCell>
+                    <DialogTitle id="store-cancelled-order-dialog-title">Select a Cancelled Order to Save</DialogTitle>
+                    <DialogContent id="store-cancelled-order-dialog-description">
+                        {cancelledOrders.length === 0 ? (
+                            <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 2 }}>
+                                No cancelled orders found for today.
+                            </Typography>
+                        ) : (
+                            <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell />
+                                        <TableCell>Symbol</TableCell>
+                                        <TableCell>Qty</TableCell>
+                                        <TableCell>Price</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Last Updated</TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHead>
+                                <TableBody>
+                                    {cancelledOrders.map(order => (
+                                        <TableRow
+                                            key={order.order_id}
+                                            selected={selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id}
+                                            onClick={() => setSelectedCancelledOrder(order)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <TableCell>
+                                                <Radio checked={selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id} />
+                                            </TableCell>
+                                            <TableCell>{order.tradingsymbol}</TableCell>
+                                            <TableCell>{order.quantity}</TableCell>
+                                            <TableCell>{order.price}</TableCell>
+                                            <TableCell>{order.order_type}</TableCell>
+                                            <TableCell>
+                                                {order.order_timestamp || order.created_at || order.modified_at || order.timestamp
+                                                    ? new Date(order.order_timestamp || order.created_at || order.modified_at || order.timestamp).toLocaleString()
+                                                    : 'N/A'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setShowStoreCancelledOrderDialog(false)}>Cancel</Button>

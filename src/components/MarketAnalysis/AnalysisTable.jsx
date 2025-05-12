@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Tooltip, Box, Typography } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import AnalysisViewDialog from './AnalysisViewDialog';
 
-export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDelete, textCellStyle, smallTextCellStyle, viewButtonCellStyle }) {
+export default function AnalysisTable({ rows, loading, error, onEdit, onDelete, textCellStyle, smallTextCellStyle, viewButtonCellStyle }) {
     const [viewDialog, setViewDialog] = useState({ open: false, title: '', content: '' });
     const handleViewAnalysis = (title, content) => {
         setViewDialog({ open: true, title, content });
@@ -13,6 +14,25 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
         if (event.target.closest('button')) return;
         onEdit(row);
     };
+    // Helper for tooltips on truncated text
+    const renderCellWithTooltip = (value, style, maxLen = 30) => {
+        if (!value) return '-';
+        const isTruncated = value.length > maxLen;
+        return (
+            <Tooltip title={isTruncated ? value : ''} arrow placement="top">
+                <span style={{ ...style, display: 'inline-block', maxWidth: style.maxWidth, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{value}</span>
+            </Tooltip>
+        );
+    };
+    // Empty state
+    if (!loading && (!rows || rows.length === 0)) {
+        return (
+            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" sx={{ mt: 6, mb: 6 }}>
+                <InfoOutlinedIcon color="disabled" sx={{ fontSize: 60, mb: 1 }} />
+                <Typography variant="h6" color="text.secondary">No analysis data found.</Typography>
+            </Box>
+        );
+    }
     return (
         <>
             <TableContainer
@@ -21,7 +41,8 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                     mt: 2,
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     borderRadius: '16px',
-                    overflow: 'hidden'
+                    overflow: 'auto',
+                    maxWidth: '100vw',
                 }}
             >
                 <Table sx={{ minWidth: 900 }} aria-label="market analysis table">
@@ -29,7 +50,7 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                         <TableRow
                             sx={{
                                 background: 'linear-gradient(90deg, #1976d2 60%, #1565c0 100%)',
-                                boxShadow: '0 2px 8px rgba(25, 118, 210, 0.15)',
+                                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.18)',
                                 height: 64,
                                 borderTopLeftRadius: '16px',
                                 borderTopRightRadius: '16px',
@@ -38,7 +59,7 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                                 zIndex: 2
                             }}
                         >
-                            <TableCell sx={{ ...smallTextCellStyle, color: 'white', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: 1 }}>Date</TableCell>
+                            <TableCell sx={{ ...smallTextCellStyle, color: 'white', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: 1, position: 'sticky', left: 0, background: 'inherit', zIndex: 3 }}>Date</TableCell>
                             <TableCell sx={{ ...smallTextCellStyle, color: 'white', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: 1 }}>Event Day</TableCell>
                             <TableCell sx={{ ...viewButtonCellStyle, color: 'white', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: 1 }}>Event Description</TableCell>
                             <TableCell sx={{ ...textCellStyle, color: 'white', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: 1 }}>Pre-Market Expectation</TableCell>
@@ -53,12 +74,21 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                             <TableRow
                                 key={row.id || idx}
                                 sx={{
-                                    '&:nth-of-type(odd)': { backgroundColor: 'action.hover' },
-                                    '&:hover': { backgroundColor: 'action.selected', cursor: 'pointer' }
+                                    backgroundColor: idx % 2 === 0 ? 'action.hover' : '#f5f7fa',
+                                    borderBottom: '1.5px solid #e3e6ee',
+                                    '&:hover': {
+                                        backgroundColor: 'action.selected',
+                                        boxShadow: '0 2px 8px rgba(25, 118, 210, 0.10)',
+                                        transform: 'scale(1.01)',
+                                        transition: 'all 0.15s',
+                                    },
+                                    cursor: 'pointer',
                                 }}
                                 onClick={e => handleRowClick(row, e)}
                             >
-                                <TableCell sx={smallTextCellStyle}>{row.date}</TableCell>
+                                <TableCell sx={{ ...smallTextCellStyle, position: 'sticky', left: 0, background: '#fff', zIndex: 2 }}>
+                                    {row.date}
+                                </TableCell>
                                 <TableCell sx={smallTextCellStyle}>{(row.event_day === 1 || row.event_day === '1') ? 'Yes' : 'No'}</TableCell>
                                 <TableCell sx={viewButtonCellStyle}>
                                     {row.event_description ? (
@@ -71,7 +101,9 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                                         </IconButton>
                                     ) : '-'}
                                 </TableCell>
-                                <TableCell sx={textCellStyle}>{row.premarket_expectation}</TableCell>
+                                <TableCell sx={textCellStyle}>
+                                    {renderCellWithTooltip(row.premarket_expectation, textCellStyle)}
+                                </TableCell>
                                 <TableCell sx={viewButtonCellStyle}>
                                     <IconButton
                                         size="small"
@@ -81,7 +113,9 @@ export default function SimpleAnalysisTable({ rows, loading, error, onEdit, onDe
                                         <VisibilityIcon />
                                     </IconButton>
                                 </TableCell>
-                                <TableCell sx={textCellStyle}>{row.market_movement}</TableCell>
+                                <TableCell sx={textCellStyle}>
+                                    {renderCellWithTooltip(row.market_movement, textCellStyle)}
+                                </TableCell>
                                 <TableCell sx={viewButtonCellStyle}>
                                     <IconButton
                                         size="small"
