@@ -103,36 +103,36 @@ const ZerodhaAccount = () => {
         return (
             <>
                 {subHeader}
-            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Container maxWidth="lg">
-                    <Box sx={{
-                        mt: 8,
-                        textAlign: 'center',
-                        p: 4,
-                        bgcolor: 'background.paper',
-                        borderRadius: 2,
-                        boxShadow: 1
-                    }}>
-                        <AccountBalanceWalletIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                        <Typography variant="h5" gutterBottom>
-                            Please authenticate with Zerodha
-                        </Typography>
-                        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                            Connect your Zerodha account to view your portfolio and trading information
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            size="large"
-                            startIcon={<LinkIcon />}
-                            onClick={handleConnect}
-                            disabled={loading}
-                        >
-                            {loading ? 'Connecting...' : 'Connect to Zerodha'}
-                        </Button>
-                    </Box>
-                </Container>
-            </Box>
+                <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+                    <Container maxWidth="lg">
+                        <Box sx={{
+                            mt: 8,
+                            textAlign: 'center',
+                            p: 4,
+                            bgcolor: 'background.paper',
+                            borderRadius: 2,
+                            boxShadow: 1
+                        }}>
+                            <AccountBalanceWalletIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                            <Typography variant="h5" gutterBottom>
+                                Please authenticate with Zerodha
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                                Connect your Zerodha account to view your portfolio and trading information
+                            </Typography>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="large"
+                                startIcon={<LinkIcon />}
+                                onClick={handleConnect}
+                                disabled={loading}
+                            >
+                                {loading ? 'Connecting...' : 'Connect to Zerodha'}
+                            </Button>
+                        </Box>
+                    </Container>
+                </Box>
             </>
         );
     }
@@ -140,42 +140,42 @@ const ZerodhaAccount = () => {
     return (
         <>
             {subHeader}
-        <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
                 <Container maxWidth={false} disableGutters sx={{ py: 2, px: 2 }}>
-                {/* Header Section */}
-                <Box sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    mb: 3
-                }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <ShowChartIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-                        <Typography variant="h4">Zerodha Account</Typography>
-                    </Box>
-                    <Stack direction="row" spacing={2}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
+                    {/* Header Section */}
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 3
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <ShowChartIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+                            <Typography variant="h4">Zerodha Account</Typography>
+                        </Box>
+                        <Stack direction="row" spacing={2}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<RefreshIcon />}
                                 onClick={handleRefresh}
                                 disabled={loading}
-                        >
+                            >
                                 {loading ? 'Refreshing...' : 'Refresh'}
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            component={Link}
-                            to="/zerodha/portfolio"
-                        >
-                            View Portfolio
-                        </Button>
-                    </Stack>
-                </Box>
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                component={Link}
+                                to="/zerodha/portfolio"
+                            >
+                                View Portfolio
+                            </Button>
+                        </Stack>
+                    </Box>
 
-                {/* Main Content */}
+                    {/* Main Content */}
                     {accountInfo && (
-                <Grid container spacing={3}>
+                        <Grid container spacing={3}>
                             {/* Account Summary */}
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 3 }}>
@@ -220,17 +220,17 @@ const ZerodhaAccount = () => {
                                     <Grid container spacing={2}>
                                         {[
                                             {
-                                                label: 'Available',
+                                                label: 'Days Opening Balance',
                                                 value: accountInfo.margins.equity.available,
                                                 color: 'success'
                                             },
                                             {
-                                                label: 'Utilized',
+                                                label: 'Amount Utilized today',
                                                 value: accountInfo.margins.equity.utilised,
                                                 color: 'warning'
                                             },
                                             {
-                                                label: 'Net',
+                                                label: 'Available balance',
                                                 value: accountInfo.margins.equity.net,
                                                 color: 'info'
                                             },
@@ -246,7 +246,7 @@ const ZerodhaAccount = () => {
                                             },
                                             {
                                                 label: 'Total Account Value',
-                                                value: accountInfo.margins.equity.available +
+                                                value: accountInfo.margins.equity.net +
                                                     accountInfo.margins.equity.utilised +
                                                     accountInfo.margins.equity.exposure +
                                                     accountInfo.margins.equity.optionPremium,
@@ -254,20 +254,20 @@ const ZerodhaAccount = () => {
                                             }
                                         ].map((item, index) => (
                                             <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
-                                            <Paper
-                                                sx={{
+                                                <Paper
+                                                    sx={{
                                                         p: 2,
                                                         bgcolor: alpha(theme.palette[item.color].main, 0.1),
                                                         border: `1px solid ${alpha(theme.palette[item.color].main, 0.2)}`
-                                                }}
-                                            >
+                                                    }}
+                                                >
                                                     <Typography variant="subtitle2" color="text.secondary">
-                                                    {item.label}
-                                                </Typography>
+                                                        {item.label}
+                                                    </Typography>
                                                     <Typography variant="h6" color={`${item.color}.main`}>
-                                                    ₹{formatCurrency(item.value)}
-                                                </Typography>
-                                            </Paper>
+                                                        ₹{formatCurrency(item.value)}
+                                                    </Typography>
+                                                </Paper>
                                             </Grid>
                                         ))}
                                     </Grid>
@@ -286,26 +286,26 @@ const ZerodhaAccount = () => {
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, height: 56, flexWrap: 'wrap', width: '100%' }}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', flex: '1 1 180px', pr: 2, height: '100%', minWidth: 120 }}>
                                                         <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
-                                            Mutual Fund Holdings
-                                        </Typography>
+                                                            Mutual Fund Holdings
+                                                        </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', gap: 2, height: '100%', flex: 3 }}>
                                                         <Paper elevation={2} sx={{ p: 0, flex: '1 1 120px', minWidth: 100, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                                                             <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 0 }}>
                                                                 Invested
-                                                                </Typography>
+                                                            </Typography>
                                                             <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
                                                                 ₹{formatCurrency(totalInvested)}
-                                                                </Typography>
-                                                            </Paper>
+                                                            </Typography>
+                                                        </Paper>
                                                         <Paper elevation={2} sx={{ p: 0, flex: '1 1 120px', minWidth: 100, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                                                             <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 0 }}>
-                                                                    Current Value
-                                                                </Typography>
+                                                                Current Value
+                                                            </Typography>
                                                             <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
-                                                                    ₹{formatCurrency(currentValue)}
-                                                                </Typography>
-                                                            </Paper>
+                                                                ₹{formatCurrency(currentValue)}
+                                                            </Typography>
+                                                        </Paper>
                                                         <Paper elevation={2} sx={{ p: 0, flex: '1 1 120px', minWidth: 100, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                                                             <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 0 }}>
                                                                 Total P/L
@@ -317,60 +317,60 @@ const ZerodhaAccount = () => {
                                                                     color: totalPL >= 0 ? 'success.main' : 'error.main',
                                                                     lineHeight: 1
                                                                 }}
-                                                                >
+                                                            >
                                                                 ₹{formatCurrency(totalPL)}
-                                                                </Typography>
-                                                            </Paper>
-                                            </Box>
-                                    </Box>
-                                    <TableContainer>
+                                                            </Typography>
+                                                        </Paper>
+                                                    </Box>
+                                                </Box>
+                                                <TableContainer>
                                                     <Table>
-                                            <TableHead>
-                                                <TableRow>
+                                                        <TableHead>
+                                                            <TableRow>
                                                                 <TableCell>Scheme</TableCell>
                                                                 <TableCell align="right">Units</TableCell>
                                                                 <TableCell align="right">Average Cost</TableCell>
                                                                 <TableCell align="right">Current NAV</TableCell>
                                                                 <TableCell align="right">Current Value</TableCell>
                                                                 <TableCell align="right">P&L</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
+                                                            </TableRow>
+                                                        </TableHead>
+                                                        <TableBody>
                                                             {accountInfo.mutualFunds.map((fund, index) => {
                                                                 const currentValue = fund.units * fund.current_nav;
-                                                    const investedValue = fund.units * fund.average_cost;
+                                                                const investedValue = fund.units * fund.average_cost;
                                                                 const pnl = currentValue - investedValue;
                                                                 const pnlPercentage = (pnl / investedValue) * 100;
 
-                                                    return (
+                                                                return (
                                                                     <TableRow key={index}>
                                                                         <TableCell>{fund.scheme_name}</TableCell>
                                                                         <TableCell align="right">{fund.units.toFixed(2)}</TableCell>
                                                                         <TableCell align="right">₹{formatCurrency(fund.average_cost)}</TableCell>
                                                                         <TableCell align="right">₹{formatCurrency(fund.current_nav)}</TableCell>
                                                                         <TableCell align="right">₹{formatCurrency(currentValue)}</TableCell>
-                                                            <TableCell align="right">
-                                                                <Typography
+                                                                        <TableCell align="right">
+                                                                            <Typography
                                                                                 color={pnl >= 0 ? 'success.main' : 'error.main'}
-                                                                >
+                                                                            >
                                                                                 ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
-                                                                </Typography>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                </Paper>
+                                                                            </Typography>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                );
+                                                            })}
+                                                        </TableBody>
+                                                    </Table>
+                                                </TableContainer>
+                                            </Paper>
                                         </Grid>
                                     );
                                 })()
                             )}
                         </Grid>
                     )}
-            </Container>
-        </Box>
+                </Container>
+            </Box>
         </>
     );
 };

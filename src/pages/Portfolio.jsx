@@ -185,11 +185,11 @@ const Portfolio = () => {
             accountInfo &&
             accountInfo.clientId &&
             accountInfo.name &&
-            accountInfo.margins?.equity?.available !== undefined &&
+            accountInfo.margins?.equity?.net !== undefined &&
             totalEquityHoldingsValue !== undefined &&
             positionsTotalValue !== undefined
         ) {
-            const equity_account_balance = Number(accountInfo.margins.equity.available) || 0;
+            const equity_account_balance = Number(accountInfo.margins.equity.net) || 0;
             const equity_holdings_value = Number(totalEquityHoldingsValue) || 0;
             const equity_positions_value = Number(positionsTotalValue) || 0;
             const total_account_value = equity_account_balance + equity_holdings_value + equity_positions_value;
