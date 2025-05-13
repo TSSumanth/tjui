@@ -125,18 +125,9 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Paper elevation={3} sx={{ p: 2 }}>
+                        <Paper>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                                 <Typography variant="h6">Open Orders</Typography>
-                                <IconButton
-                                    size="small"
-                                    onClick={async () => {
-                                        await fetchOrders();
-                                        setSnackbar({ open: true, message: 'Orders refreshed successfully', severity: 'success' });
-                                    }}
-                                >
-                                    <RefreshIcon />
-                                </IconButton>
                             </Box>
                             <TableContainer>
                                 <Table size="small">

@@ -241,7 +241,7 @@ export default function PairedOrdersPage() {
 
     // Handler for updating SO
     const handleUpdateSO = (order) => {
-        setEditingSO(order);
+        // First set the form data
         setSOOrderDetails({
             tradingsymbol: order.order1_details.tradingsymbol || order.order1_details.symbol,
             transaction_type: order.order1_details.transaction_type,
@@ -252,7 +252,12 @@ export default function PairedOrdersPage() {
             validity: order.order1_details.validity,
             exchange: order.order1_details.exchange
         });
-        setIsUpdateSODialogOpen(true);
+        // Then set the editing state
+        setEditingSO(order);
+        // Finally open the dialog
+        setTimeout(() => {
+            setIsUpdateSODialogOpen(true);
+        }, 0);
     };
 
     // Handler for saving updated SO
@@ -269,8 +274,10 @@ export default function PairedOrdersPage() {
         try {
             await updateOrderPair(editingSO.id, payload);
             setSnackbar({ open: true, message: 'Order updated successfully!', severity: 'success' });
+            // Close dialog and reset state
             setIsUpdateSODialogOpen(false);
             setEditingSO(null);
+            resetSOForm();
             // Refresh the saved orders list
             const allPairs = await getOrderPairs();
             setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
@@ -483,6 +490,25 @@ export default function PairedOrdersPage() {
                 soOrderError={soOrderError}
                 soOrderLoading={soOrderLoading}
                 handleSaveSOManual={handleSaveSOManual}
+            />
+
+            {/* Edit Saved Order Dialog */}
+            <SOCreateDialog
+                open={isUpdateSODialogOpen}
+                onClose={() => {
+                    // First close the dialog
+                    setIsUpdateSODialogOpen(false);
+                    // Then reset state after a small delay to ensure proper focus management
+                    setTimeout(() => {
+                        setEditingSO(null);
+                        resetSOForm();
+                    }, 0);
+                }}
+                soOrderDetails={soOrderDetails}
+                setSOOrderDetails={setSOOrderDetails}
+                soOrderError={soOrderError}
+                soOrderLoading={soOrderLoading}
+                handleSaveSOManual={handleSaveUpdatedSO}
             />
 
             {/* Store Cancelled Order Dialog */}
