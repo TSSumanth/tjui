@@ -14,13 +14,13 @@ import {
     CircularProgress,
     Alert,
     Snackbar,
-    Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Tooltip, Box, IconButton
+    Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Tooltip, Box, IconButton, Radio
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { deleteOaoOrderPair, updateOaoOrderPair } from '../../services/zerodha/oao';
-import { deleteOrderPair } from '../../services/zerodha/oco';
+import { deleteOrderPair, createOrderPair } from '../../services/zerodha/oco';
 import { Delete, Edit, Refresh } from '@mui/icons-material';
-import { placeOrder } from '../../services/zerodha/api';
+import { placeOrder, getOrders } from '../../services/zerodha/api';
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -41,6 +41,9 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
     const [error, setError] = useState(null);
     const [editOaoDialogOpen, setEditOaoDialogOpen] = useState(false);
     const [editingOaoPair, setEditingOaoPair] = useState(null);
+    const [showStoreCancelledOrderDialog, setShowStoreCancelledOrderDialog] = useState(false);
+    const [cancelledOrders, setCancelledOrders] = useState([]);
+    const [selectedCancelledOrder, setSelectedCancelledOrder] = useState(null);
 
     useEffect(() => {
         refreshOcoPairs();
@@ -87,6 +90,58 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
             handleEditOaoDialogClose();
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to update OAO order. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleStoreCancelledOrder = async () => {
+        setShowStoreCancelledOrderDialog(true);
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const response = await getOrders();
+            const allOrders = response.data || [];
+            const ordersArray = Array.isArray(allOrders) ? allOrders : [];
+            const filtered = ordersArray.filter(o => {
+                const isCancelled = o.status && o.status.toUpperCase() === 'CANCELLED';
+                let orderDate;
+                const timestamp = o.order_timestamp || o.created_at || o.modified_at || o.timestamp;
+                if (timestamp) {
+                    const date = new Date(timestamp);
+                    orderDate = date.toISOString().slice(0, 10);
+                }
+                return isCancelled && orderDate === today;
+            });
+            setCancelledOrders(filtered);
+        } catch (error) {
+            console.error('Error fetching cancelled orders:', error);
+            setError('Failed to fetch cancelled orders');
+        }
+    };
+
+    const handleSaveSO = async () => {
+        if (!selectedCancelledOrder) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const { order_id, ...orderDetails } = selectedCancelledOrder;
+            const payload = {
+                type: 'SO',
+                order1_id: order_id,
+                order1_details: {
+                    ...orderDetails,
+                    lastupdatedat: new Date().toISOString(),
+                },
+                order2_id: '',
+                order2_details: {},
+            };
+            await createOrderPair(payload);
+            await refreshOcoPairs();
+            if (onChange) onChange();
+            setShowStoreCancelledOrderDialog(false);
+            setSelectedCancelledOrder(null);
+        } catch (error) {
+            setError(error.response?.data?.message || 'Failed to save order. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -261,168 +316,255 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
     }
 
     return (
-        <Box>
-            {/* Active OCO Orders */}
-            <Box mb={4}>
-                <Typography variant="h6" gutterBottom>
-                    Active OCO Orders
-                </Typography>
-                {activePairs.length > 0 ? (
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Order 1</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Order 2</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Last Updated</TableCell>
-                                    <TableCell>Action</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {activePairs.map((pair) => {
-                                    const status1 = ocoStatusMap[pair.order1_id] || '';
-                                    const status2 = ocoStatusMap[pair.order2_id] || '';
-                                    return (
-                                        <TableRow key={pair.id}>
-                                            <TableCell>
-                                                {pair.order1_details?.tradingsymbol || ''} <br />
-                                                <small>{pair.order1_id}</small>
-                                            </TableCell>
-                                            <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
-                                            <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                            <TableCell>
-                                                {pair.order2_details?.tradingsymbol || ''} <br />
-                                                <small>{pair.order2_id}</small>
-                                            </TableCell>
-                                            <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
-                                            <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
-                                            <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="outlined"
-                                                    color="error"
-                                                    size="small"
-                                                    onClick={() => handleCancel(pair.id, pair.type)}
-                                                    disabled={loading}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                ) : (
-                    <Typography variant="body2" color="text.secondary">
-                        No active OCO orders for today
+        <>
+            <Box>
+                {/* Active OCO Orders */}
+                <Box mb={4}>
+                    <Typography variant="h6" gutterBottom>
+                        Active OCO Orders
                     </Typography>
-                )}
-            </Box>  
+                    {activePairs.length > 0 ? (
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Order 1</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Order 2</TableCell>
+                                        <TableCell>Type</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Last Updated</TableCell>
+                                        <TableCell>Action</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {activePairs.map((pair) => {
+                                        const status1 = ocoStatusMap[pair.order1_id] || '';
+                                        const status2 = ocoStatusMap[pair.order2_id] || '';
+                                        return (
+                                            <TableRow key={pair.id}>
+                                                <TableCell>
+                                                    {pair.order1_details?.tradingsymbol || ''} <br />
+                                                    <small>{pair.order1_id}</small>
+                                                </TableCell>
+                                                <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
+                                                <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                                <TableCell>
+                                                    {pair.order2_details?.tradingsymbol || ''} <br />
+                                                    <small>{pair.order2_id}</small>
+                                                </TableCell>
+                                                <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
+                                                <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                                <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <Button
+                                                            variant="outlined"
+                                                            color="error"
+                                                            size="small"
+                                                            onClick={() => handleCancel(pair.id, pair.type)}
+                                                            disabled={loading}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary">
+                            No active OCO orders for today
+                        </Typography>
+                    )}
+                </Box>
 
-            {/* Active OAO Orders */}
-            <Box mb={4}>
-                <Typography variant="h6" gutterBottom>
-                    Active OAO Orders
-                </Typography>
-            {activeOaoPairs.length > 0 ? (
+                {/* Active OAO Orders */}
                 <Box mb={4}>
                     <Typography variant="h6" gutterBottom>
                         Active OAO Orders
                     </Typography>
+                    {activeOaoPairs.length > 0 ? (
+                        <Box mb={4}>
+                            <Typography variant="h6" gutterBottom>
+                                Active OAO Orders
+                            </Typography>
+                            <TableContainer component={Paper}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Order 1</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Order 2 Details</TableCell>
+                                            <TableCell>Order 2 ID</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Last Updated</TableCell>
+                                            <TableCell>Action</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {activeOaoPairs.map((pair) => {
+                                            const status1 = ocoStatusMap[pair.order1_id] || '';
+                                            const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
+                                            const showRetry = pair.order2_id === 'FAILED';
+                                            return (
+                                                <TableRow key={pair.id}>
+                                                    <TableCell>
+                                                        {pair.order1_details?.tradingsymbol || ''} <br />
+                                                        <small>{pair.order1_id}</small>
+                                                    </TableCell>
+                                                    <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
+                                                    <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                                    <TableCell>
+                                                        {pair.order2_details ? (
+                                                            <>
+                                                                {pair.order2_details.tradingsymbol || ''} <br />
+                                                                {pair.order2_details.transaction_type || ''} <br />
+                                                                Qty: {pair.order2_details.quantity || ''} <br />
+                                                                Price: {pair.order2_details.price || ''}
+                                                            </>
+                                                        ) : ''}
+                                                    </TableCell>
+                                                    <TableCell>{pair.order2_id || '-'}</TableCell>
+                                                    <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                                    <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                                    <TableCell>
+                                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                                            {showRetry ? (
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    color="primary"
+                                                                    size="small"
+                                                                    onClick={() => handleEditOao(pair)}
+                                                                    disabled={loading}
+                                                                >
+                                                                    Retry
+                                                                </Button>
+                                                            ) : (
+                                                                <Button
+                                                                    variant="outlined"
+                                                                    color="primary"
+                                                                    size="small"
+                                                                    onClick={() => handleEditOao(pair)}
+                                                                    disabled={loading}
+                                                                >
+                                                                    Edit
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="error"
+                                                                size="small"
+                                                                onClick={() => handleCancel(pair.id, pair.type)}
+                                                                disabled={loading}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary">
+                            No active OAO orders for today
+                        </Typography>
+                    )}
+                </Box>
+            </Box>
+
+            {/* Store Cancelled Order Dialog */}
+            <Dialog
+                open={showStoreCancelledOrderDialog}
+                onClose={() => {
+                    setShowStoreCancelledOrderDialog(false);
+                    setSelectedCancelledOrder(null);
+                }}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Store Cancelled Order</DialogTitle>
+                <DialogContent>
                     <TableContainer component={Paper}>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Order 1</TableCell>
+                                    <TableCell>Select</TableCell>
+                                    <TableCell>Order ID</TableCell>
+                                    <TableCell>Symbol</TableCell>
                                     <TableCell>Type</TableCell>
+                                    <TableCell>Quantity</TableCell>
+                                    <TableCell>Price</TableCell>
                                     <TableCell>Status</TableCell>
-                                    <TableCell>Order 2 Details</TableCell>
-                                    <TableCell>Order 2 ID</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Last Updated</TableCell>
-                                    <TableCell>Action</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {activeOaoPairs.map((pair) => {
-                                    const status1 = ocoStatusMap[pair.order1_id] || '';
-                                    const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
-                                    const showRetry = pair.order2_id === 'FAILED';
-                                    return (
-                                        <TableRow key={pair.id}>
-                                            <TableCell>
-                                                {pair.order1_details?.tradingsymbol || ''} <br />
-                                                <small>{pair.order1_id}</small>
-                                            </TableCell>
-                                            <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
-                                            <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                            <TableCell>
-                                                {pair.order2_details ? (
-                                                    <>
-                                                        {pair.order2_details.tradingsymbol || ''} <br />
-                                                        {pair.order2_details.transaction_type || ''} <br />
-                                                        Qty: {pair.order2_details.quantity || ''} <br />
-                                                        Price: {pair.order2_details.price || ''}
-                                                    </>
-                                                ) : ''}
-                                            </TableCell>
-                                            <TableCell>{pair.order2_id || '-'}</TableCell>
-                                            <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
-                                            <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                    {showRetry ? (
-                                                        <Button
-                                                            variant="outlined"
-                                                            color="primary"
-                                                            size="small"
-                                                            onClick={() => handleEditOao(pair)}
-                                                            disabled={loading}
-                                                        >
-                                                            Retry
-                                                        </Button>
-                                                    ) : (
-                                                        <Button
-                                                            variant="outlined"
-                                                            color="primary"
-                                                            size="small"
-                                                            onClick={() => handleEditOao(pair)}
-                                                            disabled={loading}
-                                                        >
-                                                            Edit
-                                                        </Button>
-                                                    )}
-                                                    <Button
-                                                        variant="outlined"
-                                                        color="error"
-                                                        size="small"
-                                                        onClick={() => handleCancel(pair.id, pair.type)}
-                                                        disabled={loading}
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                </Box>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
+                                {cancelledOrders.map((order) => (
+                                    <TableRow key={order.order_id}>
+                                        <TableCell>
+                                            <Radio
+                                                checked={selectedCancelledOrder?.order_id === order.order_id}
+                                                onChange={() => setSelectedCancelledOrder(order)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>{order.order_id}</TableCell>
+                                        <TableCell>{order.tradingsymbol}</TableCell>
+                                        <TableCell>{order.transaction_type}</TableCell>
+                                        <TableCell>{order.quantity}</TableCell>
+                                        <TableCell>{order.price}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={order.status}
+                                                color="default"
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
                     </TableContainer>
-                </Box>
-            ) : (
-                <Typography variant="body2" color="text.secondary">
-                    No active OAO orders for today
-                </Typography>
-            )}
-        </Box>
-        </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => {
+                            setShowStoreCancelledOrderDialog(false);
+                            setSelectedCancelledOrder(null);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveSO}
+                        variant="contained"
+                        color="primary"
+                        disabled={!selectedCancelledOrder || loading}
+                    >
+                        {loading ? 'Saving...' : 'Save Order'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={!!error}
+                autoHideDuration={6000}
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setError(null)} severity="error">
+                    {error}
+                </Alert>
+            </Snackbar>
+        </>
     );
 }
 

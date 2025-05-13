@@ -75,9 +75,39 @@ export default function PairedOrdersPage() {
     const [editingSO, setEditingSO] = useState(null);
     const [isUpdateSODialogOpen, setIsUpdateSODialogOpen] = useState(false);
     const [placingOrder, setPlacingOrder] = useState(false);
+    const [showCreateOaoDialog, setShowCreateOaoDialog] = useState(false);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
+    };
+
+    const handleStoreCancelledOrder = async () => {
+        setShowStoreCancelledOrderDialog(true);
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const response = await getOrders();
+            const allOrders = response.data || [];
+            const ordersArray = Array.isArray(allOrders) ? allOrders : [];
+            const filtered = ordersArray.filter(o => {
+                const isCancelled = o.status && o.status.toUpperCase() === 'CANCELLED';
+                let orderDate;
+                const timestamp = o.order_timestamp || o.created_at || o.modified_at || o.timestamp;
+                if (timestamp) {
+                    const date = new Date(timestamp);
+                    orderDate = date.toISOString().slice(0, 10);
+                }
+                return isCancelled && orderDate === today;
+            });
+            setCancelledOrders(filtered);
+        } catch (error) {
+            console.error('Error fetching cancelled orders:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to fetch cancelled orders',
+                severity: 'error'
+            });
+            setCancelledOrders([]);
+        }
     };
 
     // Fetch today's cancelled orders when dialog opens
@@ -144,25 +174,30 @@ export default function PairedOrdersPage() {
     // Handler to save SO
     const handleSaveSO = async () => {
         if (!selectedCancelledOrder) return;
-        const { order_id, ...orderDetails } = selectedCancelledOrder;
-        const payload = {
-            type: 'SO',
-            order1_id: order_id,
-            order1_details: {
-                ...orderDetails,
-                lastupdatedat: new Date().toISOString(),
-            },
-            order2_id: '',
-            order2_details: {},
-        };
+        setSOOrderLoading(true);
+        setSOOrderError(null);
         try {
+            const { order_id, ...orderDetails } = selectedCancelledOrder;
+            const payload = {
+                type: 'SO',
+                order1_id: order_id,
+                order1_details: {
+                    ...orderDetails,
+                    lastupdatedat: new Date().toISOString(),
+                },
+                order2_id: '',
+                order2_details: {},
+            };
             await createOrderPair(payload);
+            await refreshOcoPairs();
+            setShowStoreCancelledOrderDialog(false);
+            setSelectedCancelledOrder(null);
             setSnackbar({ open: true, message: 'Order saved successfully!', severity: 'success' });
         } catch (e) {
-            setSnackbar({ open: true, message: 'Failed to save order.', severity: 'error' });
+            setSOOrderError('Failed to save order.');
+        } finally {
+            setSOOrderLoading(false);
         }
-        setShowStoreCancelledOrderDialog(false);
-        setSelectedCancelledOrder(null);
     };
 
     // Handler to save SO from manual entry
@@ -383,8 +418,18 @@ export default function PairedOrdersPage() {
                                     variant="contained"
                                     color="primary"
                                     onClick={() => setShowCreateSOOrderDialog(true)}
+                                    sx={{ mr: 1 }}
                                 >
-                                    Create Saved Order
+                                    Save Order
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleStoreCancelledOrder}
+                                    disabled={placingOrder}
+                                    sx={{ mr: 1 }}
+                                >
+                                    Store Cancelled Order
                                 </Button>
                             </Box>
                         </Box>
@@ -439,6 +484,78 @@ export default function PairedOrdersPage() {
                 soOrderLoading={soOrderLoading}
                 handleSaveSOManual={handleSaveSOManual}
             />
+
+            {/* Store Cancelled Order Dialog */}
+            <Dialog
+                open={showStoreCancelledOrderDialog}
+                onClose={() => {
+                    setShowStoreCancelledOrderDialog(false);
+                    setSelectedCancelledOrder(null);
+                }}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Store Cancelled Order</DialogTitle>
+                <DialogContent>
+                    <TableContainer component={Paper}>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Select</TableCell>
+                                    <TableCell>Order ID</TableCell>
+                                    <TableCell>Symbol</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Quantity</TableCell>
+                                    <TableCell>Price</TableCell>
+                                    <TableCell>Status</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {cancelledOrders.map((order) => (
+                                    <TableRow key={order.order_id}>
+                                        <TableCell>
+                                            <Radio
+                                                checked={selectedCancelledOrder?.order_id === order.order_id}
+                                                onChange={() => setSelectedCancelledOrder(order)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>{order.order_id}</TableCell>
+                                        <TableCell>{order.tradingsymbol}</TableCell>
+                                        <TableCell>{order.transaction_type}</TableCell>
+                                        <TableCell>{order.quantity}</TableCell>
+                                        <TableCell>{order.price}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={order.status}
+                                                color="default"
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => {
+                            setShowStoreCancelledOrderDialog(false);
+                            setSelectedCancelledOrder(null);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveSO}
+                        variant="contained"
+                        color="primary"
+                        disabled={!selectedCancelledOrder || soOrderLoading}
+                    >
+                        {soOrderLoading ? 'Saving...' : 'Save Order'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar
                 open={snackbar.open}
