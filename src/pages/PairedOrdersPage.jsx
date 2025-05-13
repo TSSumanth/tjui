@@ -1,5 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHead, TableRow, TableCell, TableBody, Radio, Snackbar, Alert, TextField, Grid, FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip, Paper, TableContainer, Chip } from '@mui/material';
+import {
+    Container,
+    Typography,
+    Box,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Table,
+    TableHead,
+    TableRow,
+    TableCell,
+    TableBody,
+    Radio,
+    Snackbar,
+    Alert,
+    TextField,
+    Grid,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    IconButton,
+    Tooltip,
+    Paper,
+    TableContainer,
+    Chip,
+    Tabs,
+    Tab
+} from '@mui/material';
 import PairedOrdersTable from '../components/PairedOrders/PairedOrdersTable';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import OcoOrderDialog from '../components/PairedOrders/OcoOrderDialog';
@@ -11,7 +41,16 @@ import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
 import SOCreateDialog from '../components/PairedOrders/SOCreateDialog';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
+function TabPanel({ children, value, index }) {
+    return (
+        <div hidden={value !== index} style={{ padding: '20px 0' }}>
+            {value === index && children}
+        </div>
+    );
+}
+
 export default function PairedOrdersPage() {
+    const [tabValue, setTabValue] = useState(0);
     const [isOCODialogOpen, setIsOCODialogOpen] = useState(false);
     const [isOAODialogOpen, setIsOAODialogOpen] = useState(false);
     const [showStoreCancelledOrderDialog, setShowStoreCancelledOrderDialog] = useState(false);
@@ -36,6 +75,10 @@ export default function PairedOrdersPage() {
     const [editingSO, setEditingSO] = useState(null);
     const [isUpdateSODialogOpen, setIsUpdateSODialogOpen] = useState(false);
     const [placingOrder, setPlacingOrder] = useState(false);
+
+    const handleTabChange = (event, newValue) => {
+        setTabValue(newValue);
+    };
 
     // Fetch today's cancelled orders when dialog opens
     useEffect(() => {
@@ -287,344 +330,126 @@ export default function PairedOrdersPage() {
     };
 
     return (
-        <>
+        <Container maxWidth="xl">
             <ZerodhaSubHeader />
-            <Container maxWidth="xl">
-                <Box sx={{ my: 4 }}>
-                    <Typography variant="body1" color="text.secondary" paragraph>
-                        Manage your One-Cancels-Other (OCO), One-After-Other (OAO), and Saved Orders (SO) here.
-                    </Typography>
-                    <Box sx={{
-                        mb: 3,
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 2,
-                        alignItems: 'center'
-                    }}>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => setIsOCODialogOpen(true)}
-                        >
-                            Create OCO Order
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => setIsOAODialogOpen(true)}
-                        >
-                            Create OAO Order
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="secondary"
-                            onClick={() => setShowStoreCancelledOrderDialog(true)}
-                        >
-                            Store Cancelled Order
-                        </Button>
-                        <Button
-                            variant="contained"
-                            color="success"
-                            onClick={() => {
-                                resetSOForm();
-                                setShowCreateSOOrderDialog(true);
-                            }}
-                        >
-                            Create Saved Order
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="primary"
-                            onClick={async () => {
-                                await refreshOcoPairs();
-                                const allPairs = await getOrderPairs();
-                                setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
-                                setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
-                            }}
-                            startIcon={<RefreshIcon />}
-                        >
-                            Refresh Orders
-                        </Button>
-                    </Box>
-                    <PairedOrdersTable />
+            <Box sx={{ my: 4 }}>
+                <Typography variant="h4" component="h1" gutterBottom>
+                    Paired Orders
+                </Typography>
 
-                    {/* Saved Orders (SO) Table */}
-                    <SavedOrdersTable
-                        savedOrders={savedOrders}
-                        onEdit={handleUpdateSO}
-                        onPlace={handlePlaceOrder}
-                        onDelete={handleDeleteSO}
-                        placingOrder={placingOrder}
-                    />
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs value={tabValue} onChange={handleTabChange}>
+                        <Tab label="Active Orders" />
+                        <Tab label="Completed Orders" />
+                    </Tabs>
                 </Box>
-                <OcoOrderDialog
-                    open={isOCODialogOpen}
-                    onClose={() => setIsOCODialogOpen(false)}
-                    orders={orders ? orders.filter(order => order.status === 'OPEN') : []}
-                />
-                <CreateOAOOrder
-                    open={isOAODialogOpen}
-                    onClose={() => setIsOAODialogOpen(false)}
-                />
 
-                {/* Store Cancelled Order Dialog */}
-                <Dialog
-                    open={showStoreCancelledOrderDialog}
-                    onClose={() => setShowStoreCancelledOrderDialog(false)}
-                    maxWidth="md"
-                    fullWidth
-                    aria-labelledby="store-cancelled-order-dialog-title"
-                    aria-describedby="store-cancelled-order-dialog-description"
-                >
-                    <DialogTitle id="store-cancelled-order-dialog-title">Select a Cancelled Order to Save</DialogTitle>
-                    <DialogContent id="store-cancelled-order-dialog-description">
-                        {cancelledOrders.length === 0 ? (
-                            <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 2 }}>
-                                No cancelled orders found for today.
-                            </Typography>
-                        ) : (
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell />
-                                        <TableCell>Symbol</TableCell>
-                                        <TableCell>Qty</TableCell>
-                                        <TableCell>Price</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Last Updated</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {cancelledOrders.map(order => (
-                                        <TableRow
-                                            key={order.order_id}
-                                            selected={selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id}
-                                            onClick={() => setSelectedCancelledOrder(order)}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            <TableCell>
-                                                <Radio
-                                                    checked={Boolean(selectedCancelledOrder && selectedCancelledOrder.order_id === order.order_id)}
-                                                    onChange={() => setSelectedCancelledOrder(order)}
-                                                />
-                                            </TableCell>
-                                            <TableCell>{order.tradingsymbol}</TableCell>
-                                            <TableCell>{order.quantity}</TableCell>
-                                            <TableCell>{order.price}</TableCell>
-                                            <TableCell>{order.order_type}</TableCell>
-                                            <TableCell>
-                                                {order.order_timestamp || order.created_at || order.modified_at || order.timestamp
-                                                    ? new Date(order.order_timestamp || order.created_at || order.modified_at || order.timestamp).toLocaleString()
-                                                    : 'N/A'}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setShowStoreCancelledOrderDialog(false)}>Cancel</Button>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleSaveSO}
-                            disabled={!selectedCancelledOrder}
-                        >
-                            Save
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                {/* Active Orders Tab */}
+                <TabPanel value={tabValue} index={0}>
+                    <Box sx={{ mb: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'right', alignItems: 'center', mb: 2 }}>
+                            <Box>
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    onClick={async () => {
+                                        await refreshOcoPairs();
+                                        const allPairs = await getOrderPairs();
+                                        setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
+                                        setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
+                                    }}
+                                    startIcon={<RefreshIcon />}
+                                    sx={{ mr: 1 }}
+                                >
+                                    Refresh Orders
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => setIsOCODialogOpen(true)}
+                                    sx={{ mr: 1 }}
+                                >
+                                    Create OCO
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => setIsOAODialogOpen(true)}
+                                    sx={{ mr: 1 }}
+                                >
+                                    Create OAO
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => setShowCreateSOOrderDialog(true)}
+                                >
+                                    Create Saved Order
+                                </Button>
+                            </Box>
+                        </Box>
+                        <PairedOrdersTable />
+                        <SavedOrdersTable
+                            savedOrders={savedOrders}
+                            onEdit={handleUpdateSO}
+                            onPlace={handlePlaceOrder}
+                            onDelete={handleDeleteSO}
+                            placingOrder={placingOrder}
+                        />
+                    </Box>
+                </TabPanel>
 
-                {/* Create Saved Order Dialog (manual entry) */}
-                <SOCreateDialog
-                    open={showCreateSOOrderDialog}
-                    onClose={() => setShowCreateSOOrderDialog(false)}
-                    soOrderDetails={soOrderDetails}
-                    setSOOrderDetails={setSOOrderDetails}
-                    soOrderError={soOrderError}
-                    soOrderLoading={soOrderLoading}
-                    handleSaveSOManual={handleSaveSOManual}
-                />
+                {/* Completed Orders Tab */}
+                <TabPanel value={tabValue} index={1}>
+                    <Box sx={{ mb: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'right', alignItems: 'center', mb: 2 }}>
+                            <Button
+                                variant="outlined"
+                                color="primary"
+                                onClick={async () => {
+                                    await refreshOcoPairs();
+                                    setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
+                                }}
+                                startIcon={<RefreshIcon />}
+                            >
+                                Refresh Orders
+                            </Button>
+                        </Box>
+                        <PairedOrdersTable showCompleted={true} />
+                    </Box>
+                </TabPanel>
+            </Box>
 
-                {/* Update SO Dialog */}
-                <Dialog
-                    open={isUpdateSODialogOpen}
-                    onClose={() => {
-                        setIsUpdateSODialogOpen(false);
-                        setEditingSO(null);
-                    }}
-                    maxWidth="sm"
-                    fullWidth
-                >
-                    <DialogTitle>Update Saved Order (SO)</DialogTitle>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Trading Symbol"
-                                    name="tradingsymbol"
-                                    value={soOrderDetails.tradingsymbol}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, tradingsymbol: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Transaction Type</InputLabel>
-                                    <Select
-                                        name="transaction_type"
-                                        value={soOrderDetails.transaction_type}
-                                        label="Transaction Type"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, transaction_type: e.target.value }))}
-                                    >
-                                        <MenuItem value="BUY">BUY</MenuItem>
-                                        <MenuItem value="SELL">SELL</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Quantity"
-                                    name="quantity"
-                                    type="number"
-                                    value={soOrderDetails.quantity}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, quantity: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Price"
-                                    name="price"
-                                    type="number"
-                                    value={soOrderDetails.price}
-                                    onChange={e => setSOOrderDetails(prev => ({ ...prev, price: e.target.value }))}
-                                    disabled={soOrderDetails.order_type === 'MARKET'}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Product</InputLabel>
-                                    <Select
-                                        name="product"
-                                        value={soOrderDetails.product}
-                                        label="Product"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, product: e.target.value }))}
-                                        disabled={soOrderDetails.exchange === 'NFO'}
-                                    >
-                                        <MenuItem value="CNC">
-                                            <Tooltip title="Cash and Carry - For delivery based trading">
-                                                <span>CNC</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                        <MenuItem value="MIS">
-                                            <Tooltip title="Margin Intraday Square-off - For intraday trading with margin benefits. Positions must be closed by end of day.">
-                                                <span>MIS</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                        <MenuItem value="NRML">
-                                            <Tooltip title="Normal - For regular trading with standard margin requirements">
-                                                <span>NRML</span>
-                                            </Tooltip>
-                                        </MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Order Type</InputLabel>
-                                    <Select
-                                        name="order_type"
-                                        value={soOrderDetails.order_type}
-                                        label="Order Type"
-                                        onChange={e => {
-                                            const newOrderType = e.target.value;
-                                            setSOOrderDetails(prev => ({
-                                                ...prev,
-                                                order_type: newOrderType,
-                                                price: newOrderType === 'MARKET' ? '' : prev.price
-                                            }));
-                                        }}
-                                        disabled={soOrderDetails.exchange === 'NFO'}
-                                    >
-                                        <MenuItem value="LIMIT">LIMIT</MenuItem>
-                                        <MenuItem value="MARKET">MARKET</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Validity</InputLabel>
-                                    <Select
-                                        name="validity"
-                                        value={soOrderDetails.validity}
-                                        label="Validity"
-                                        onChange={e => setSOOrderDetails(prev => ({ ...prev, validity: e.target.value }))}
-                                    >
-                                        <MenuItem value="DAY">DAY</MenuItem>
-                                        <MenuItem value="IOC">IOC</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Exchange</InputLabel>
-                                    <Select
-                                        name="exchange"
-                                        value={soOrderDetails.exchange}
-                                        label="Exchange"
-                                        onChange={e => {
-                                            const newExchange = e.target.value;
-                                            setSOOrderDetails(prev => ({
-                                                ...prev,
-                                                exchange: newExchange,
-                                                product: newExchange === 'NFO' ? 'NRML' : prev.product,
-                                                order_type: newExchange === 'NFO' ? 'LIMIT' : prev.order_type,
-                                                validity: newExchange === 'NFO' ? 'IOC' : prev.validity
-                                            }));
-                                        }}
-                                    >
-                                        <MenuItem value="NSE">NSE</MenuItem>
-                                        <MenuItem value="BSE">BSE</MenuItem>
-                                        <MenuItem value="NFO">NFO</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-                        {soOrderError && <Alert severity="error" sx={{ mt: 2 }}>{soOrderError}</Alert>}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => {
-                            setIsUpdateSODialogOpen(false);
-                            setEditingSO(null);
-                        }}>Cancel</Button>
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={handleSaveUpdatedSO}
-                            disabled={soOrderLoading}
-                        >
-                            {soOrderLoading ? 'Updating...' : 'Update'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-                <Snackbar
-                    open={snackbar.open}
-                    autoHideDuration={3000}
-                    onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                >
-                    <Alert
-                        onClose={() => setSnackbar({ ...snackbar, open: false })}
-                        severity={snackbar.severity}
-                        sx={{ width: '100%' }}
-                    >
-                        {snackbar.message}
-                    </Alert>
-                </Snackbar>
-            </Container>
-        </>
+            {/* Dialogs */}
+            <OcoOrderDialog
+                open={isOCODialogOpen}
+                onClose={() => setIsOCODialogOpen(false)}
+                orders={orders ? orders.filter(order => order.status === 'OPEN') : []}
+            />
+            <CreateOAOOrder
+                open={isOAODialogOpen}
+                onClose={() => setIsOAODialogOpen(false)}
+            />
+            <SOCreateDialog
+                open={showCreateSOOrderDialog}
+                onClose={() => setShowCreateSOOrderDialog(false)}
+                soOrderDetails={soOrderDetails}
+                setSOOrderDetails={setSOOrderDetails}
+                soOrderError={soOrderError}
+                soOrderLoading={soOrderLoading}
+                handleSaveSOManual={handleSaveSOManual}
+            />
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={3000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </Container>
     );
 } 

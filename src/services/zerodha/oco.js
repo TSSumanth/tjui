@@ -121,8 +121,14 @@ export const createOrderPair = async ({
     return resp.data;
 };
 
-export const getOrderPairs = async () => {
-    const resp = await api.get('/api/order-pairs');
+export const getOrderPairs = async (status = null) => {
+    const url = status ? `/api/order-pairs?status=${status}` : '/api/order-pairs';
+    const resp = await api.get(url);
+    return resp.data;
+};
+
+export const getCompletedOrderPairs = async () => {
+    const resp = await api.get('/api/order-pairs/completed');
     return resp.data;
 };
 

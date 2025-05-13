@@ -124,79 +124,58 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent>
-                    <Box mb={2}>
-                        <Typography variant="body2" color="text.secondary">
-                            Select two orders to create an OCO pair. When one order is executed, the other will be automatically cancelled.
-                        </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Paper elevation={3} sx={{ p: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h6">Open Orders</Typography>
+                                <IconButton
+                                    size="small"
+                                    onClick={async () => {
+                                        await fetchOrders();
+                                        setSnackbar({ open: true, message: 'Orders refreshed successfully', severity: 'success' });
+                                    }}
+                                >
+                                    <RefreshIcon />
+                                </IconButton>
+                            </Box>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Order ID</TableCell>
+                                            <TableCell>Symbol</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Price</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Action</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {orders.map((order) => (
+                                            <TableRow key={order.order_id}>
+                                                <TableCell>{order.order_id}</TableCell>
+                                                <TableCell>{order.tradingsymbol}</TableCell>
+                                                <TableCell>{order.order_type}</TableCell>
+                                                <TableCell>{order.price}</TableCell>
+                                                <TableCell>{order.status}</TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
+                                                        color="primary"
+                                                        onClick={() => handleOrderSelect(order)}
+                                                        disabled={selectedOrders.length >= 2}
+                                                    >
+                                                        Select
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
                     </Box>
-
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
-                        </Alert>
-                    )}
-
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Select</TableCell>
-                                    <TableCell>Order ID</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Symbol</TableCell>
-                                    <TableCell>Transaction</TableCell>
-                                    <TableCell>Quantity</TableCell>
-                                    <TableCell>Price</TableCell>
-                                    <TableCell>Time</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {orders.map((order) => (
-                                    <TableRow
-                                        key={order.order_id}
-                                        onClick={() => handleOrderSelect(order)}
-                                        sx={{
-                                            cursor: 'pointer',
-                                            backgroundColor: selectedOrders.find(o => o.order_id === order.order_id)
-                                                ? 'action.selected'
-                                                : 'inherit'
-                                        }}
-                                    >
-                                        <TableCell>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedOrders.some(o => o.order_id === order.order_id)}
-                                                onChange={() => { }}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        </TableCell>
-                                        <TableCell>{order.order_id}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={order.status}
-                                                color={getStatusColor(order.status)}
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                        <TableCell>{order.order_type}</TableCell>
-                                        <TableCell>{order.tradingsymbol}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={order.transaction_type}
-                                                color={order.transaction_type === 'BUY' ? 'success' : 'error'}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        </TableCell>
-                                        <TableCell>{order.quantity}</TableCell>
-                                        <TableCell>{formatCurrency(order.price)}</TableCell>
-                                        <TableCell>{formatOrderTime(order.order_timestamp)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={onClose} disabled={loading}>Cancel</Button>
