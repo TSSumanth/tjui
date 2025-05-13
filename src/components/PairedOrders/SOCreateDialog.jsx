@@ -1,5 +1,7 @@
 import React from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Alert, Tooltip } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Alert, Tooltip, IconButton } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { useZerodha } from '../../context/ZerodhaContext';
 
 export default function SOCreateDialog({
     open,
@@ -10,6 +12,8 @@ export default function SOCreateDialog({
     soOrderLoading,
     handleSaveSOManual
 }) {
+    const { fetchOrders } = useZerodha();
+
     return (
         <Dialog
             open={open}
@@ -17,7 +21,17 @@ export default function SOCreateDialog({
             maxWidth="sm"
             fullWidth
         >
-            <DialogTitle>Create Saved Order (SO)</DialogTitle>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Create Saved Order (SO)
+                <IconButton
+                    onClick={async () => {
+                        await fetchOrders();
+                    }}
+                    size="small"
+                >
+                    <RefreshIcon />
+                </IconButton>
+            </DialogTitle>
             <DialogContent>
                 <Grid container spacing={2} sx={{ mt: 1 }}>
                     <Grid item xs={12} sm={6}>

@@ -18,10 +18,13 @@ import {
     Chip,
     CircularProgress,
     Alert,
-    Snackbar
+    Snackbar,
+    IconButton
 } from '@mui/material';
 import { addOcoPair, isOcoOrder, createOrderPair } from '../../services/zerodha/oco';
 import { formatCurrency } from '../../utils/formatters';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { useZerodha } from '../../context/ZerodhaContext';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -37,6 +40,8 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const { fetchOrders } = useZerodha();
 
     const handleOrderSelect = (order) => {
         if (selectedOrders.find(o => o.order_id === order.order_id)) {
@@ -106,7 +111,18 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
     return (
         <>
             <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-                <DialogTitle>Create One Cancels Other (OCO) Order</DialogTitle>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Create One Cancels Other (OCO) Order
+                    <IconButton
+                        onClick={async () => {
+                            await fetchOrders();
+                            setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
+                        }}
+                        size="small"
+                    >
+                        <RefreshIcon />
+                    </IconButton>
+                </DialogTitle>
                 <DialogContent>
                     <Box mb={2}>
                         <Typography variant="body2" color="text.secondary">
@@ -200,6 +216,16 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                 message="OCO Pair created successfully!"
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             />
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={3000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </>
     );
 } 

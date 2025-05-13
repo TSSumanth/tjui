@@ -22,19 +22,22 @@ import {
     CircularProgress,
     Alert,
     Snackbar,
-    Tooltip
+    Tooltip,
+    IconButton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { createOaoOrderPair } from '../../services/zerodha/oao';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const CreateOAOOrder = ({ open, onClose }) => {
-    const { orders } = useZerodha();
+    const { orders, fetchOrders } = useZerodha();
     const [step, setStep] = useState(1);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const [showValidation, setShowValidation] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [order2Details, setOrder2Details] = useState({
         tradingsymbol: '',
         transaction_type: 'BUY',
@@ -151,8 +154,17 @@ const CreateOAOOrder = ({ open, onClose }) => {
     return (
         <>
             <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-                <DialogTitle>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {step === 1 ? 'Select First Order' : 'Specify Second Order Details'}
+                    <IconButton
+                        onClick={async () => {
+                            await fetchOrders();
+                            setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
+                        }}
+                        size="small"
+                    >
+                        <RefreshIcon />
+                    </IconButton>
                 </DialogTitle>
                 <DialogContent>
                     {step === 1 ? (
@@ -381,6 +393,16 @@ const CreateOAOOrder = ({ open, onClose }) => {
             >
                 <Alert onClose={() => setSuccess(false)} severity="success">
                     OAO order created successfully!
+                </Alert>
+            </Snackbar>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={3000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+                    {snackbar.message}
                 </Alert>
             </Snackbar>
         </>

@@ -9,6 +9,7 @@ import { createOrderPair, getOrderPairs, updateOrderPair, deleteOrderPair } from
 import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
 import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
 import SOCreateDialog from '../components/PairedOrders/SOCreateDialog';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 export default function PairedOrdersPage() {
     const [isOCODialogOpen, setIsOCODialogOpen] = useState(false);
@@ -18,7 +19,7 @@ export default function PairedOrdersPage() {
     const [selectedCancelledOrder, setSelectedCancelledOrder] = useState(null);
     const [savedOrders, setSavedOrders] = useState([]);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const { orders } = useZerodha();
+    const { orders, refreshOcoPairs } = useZerodha();
     const [showCreateSOOrderDialog, setShowCreateSOOrderDialog] = useState(false);
     const [soOrderDetails, setSOOrderDetails] = useState({
         tradingsymbol: '',
@@ -293,12 +294,17 @@ export default function PairedOrdersPage() {
                     <Typography variant="body1" color="text.secondary" paragraph>
                         Manage your One-Cancels-Other (OCO), One-After-Other (OAO), and Saved Orders (SO) here.
                     </Typography>
-                    <div style={{ marginBottom: '20px' }}>
+                    <Box sx={{
+                        mb: 3,
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 2,
+                        alignItems: 'center'
+                    }}>
                         <Button
                             variant="contained"
                             color="primary"
                             onClick={() => setIsOCODialogOpen(true)}
-                            style={{ marginRight: '10px' }}
                         >
                             Create OCO Order
                         </Button>
@@ -306,7 +312,6 @@ export default function PairedOrdersPage() {
                             variant="contained"
                             color="primary"
                             onClick={() => setIsOAODialogOpen(true)}
-                            style={{ marginRight: '10px' }}
                         >
                             Create OAO Order
                         </Button>
@@ -314,7 +319,6 @@ export default function PairedOrdersPage() {
                             variant="contained"
                             color="secondary"
                             onClick={() => setShowStoreCancelledOrderDialog(true)}
-                            style={{ marginRight: '10px' }}
                         >
                             Store Cancelled Order
                         </Button>
@@ -328,7 +332,20 @@ export default function PairedOrdersPage() {
                         >
                             Create Saved Order
                         </Button>
-                    </div>
+                        <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={async () => {
+                                await refreshOcoPairs();
+                                const allPairs = await getOrderPairs();
+                                setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
+                                setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
+                            }}
+                            startIcon={<RefreshIcon />}
+                        >
+                            Refresh Orders
+                        </Button>
+                    </Box>
                     <PairedOrdersTable />
 
                     {/* Saved Orders (SO) Table */}
