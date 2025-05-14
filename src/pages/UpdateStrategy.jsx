@@ -8,9 +8,8 @@ const UpdateStrategyPage = () => {
     const strategy = location.state?.strategy;
     console.log("Details: " + strategy)
     return (
-        <div>
-            <UpdateStrategy id={id} />
-        </div>);
+        <UpdateStrategy id={id} />
+    );
 };
 
 export default UpdateStrategyPage;
