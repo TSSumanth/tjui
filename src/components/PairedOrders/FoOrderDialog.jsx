@@ -13,7 +13,9 @@ import {
     MenuItem,
     Alert,
     Autocomplete,
-    CircularProgress
+    CircularProgress,
+    Box,
+    Typography
 } from '@mui/material';
 import { getInstruments } from '../../services/zerodha/api';
 
@@ -24,7 +26,8 @@ export default function FoOrderDialog({
     setOrderDetails,
     error,
     loading,
-    onSave
+    onSave,
+    isEditing
 }) {
     const dialogRef = useRef(null);
     const [instruments, setInstruments] = useState([]);
@@ -47,13 +50,16 @@ export default function FoOrderDialog({
             setInputValue('');
             setSelectedInstrument(null);
         } else {
+            if (orderDetails.tradingsymbol) {
+                setInputValue(orderDetails.tradingsymbol);
+            }
             setTimeout(() => {
                 if (dialogRef.current) {
                     dialogRef.current.focus();
                 }
             }, 0);
         }
-    }, [open, setOrderDetails]);
+    }, [open, setOrderDetails, orderDetails.tradingsymbol]);
 
     const handleClose = () => {
         setOrderDetails({
@@ -98,27 +104,6 @@ export default function FoOrderDialog({
         return () => clearTimeout(timer);
     }, [inputValue]);
 
-    const handleQuantityChange = (e) => {
-        const value = e.target.value;
-        setOrderDetails(prev => ({ ...prev, quantity: value }));
-    };
-
-    const handleQuantityIncrement = () => {
-        if (selectedInstrument) {
-            const currentQuantity = parseInt(orderDetails.quantity) || 0;
-            const newQuantity = currentQuantity + selectedInstrument.lot_size;
-            setOrderDetails(prev => ({ ...prev, quantity: newQuantity.toString() }));
-        }
-    };
-
-    const handleQuantityDecrement = () => {
-        if (selectedInstrument) {
-            const currentQuantity = parseInt(orderDetails.quantity) || 0;
-            const newQuantity = Math.max(0, currentQuantity - selectedInstrument.lot_size);
-            setOrderDetails(prev => ({ ...prev, quantity: newQuantity.toString() }));
-        }
-    };
-
     return (
         <Dialog
             open={open}
@@ -129,9 +114,10 @@ export default function FoOrderDialog({
             disableAutoFocus
             ref={dialogRef}
             tabIndex={-1}
+            aria-labelledby="fo-order-dialog-title"
         >
-            <DialogTitle>
-                Create F&O Order
+            <DialogTitle id="fo-order-dialog-title">
+                {isEditing ? 'Edit F&O Order' : 'Create F&O Order'}
             </DialogTitle>
             <DialogContent>
                 <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -151,7 +137,8 @@ export default function FoOrderDialog({
                                     setOrderDetails(prev => ({
                                         ...prev,
                                         tradingsymbol: newValue.tradingsymbol,
-                                        quantity: newValue.lot_size
+                                        exchange: 'NFO',
+                                        quantity: newValue.lot_size.toString()
                                     }));
                                     setSelectedInstrument(newValue);
                                 }
@@ -161,6 +148,7 @@ export default function FoOrderDialog({
                                     {...params}
                                     label="Trading Symbol"
                                     fullWidth
+                                    autoFocus
                                     InputProps={{
                                         ...params.InputProps,
                                         endAdornment: (
@@ -175,6 +163,19 @@ export default function FoOrderDialog({
                             loading={searchLoading}
                             noOptionsText="No instruments found"
                             loadingText="Searching..."
+                            isOptionEqualToValue={(option, value) =>
+                                option.instrument_token === value.instrument_token
+                            }
+                            renderOption={(props, option) => (
+                                <li {...props} key={option.instrument_token}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                        <Typography>{option.tradingsymbol}</Typography>
+                                        <Typography color="text.secondary" sx={{ ml: 2 }}>
+                                            Lot: {option.lot_size}
+                                        </Typography>
+                                    </Box>
+                                </li>
+                            )}
                         />
                     </Grid>
 
@@ -200,23 +201,43 @@ export default function FoOrderDialog({
                             name="quantity"
                             type="number"
                             value={orderDetails.quantity}
-                            onChange={handleQuantityChange}
+                            onChange={e => {
+                                const value = e.target.value;
+                                if (selectedInstrument && value % selectedInstrument.lot_size !== 0) {
+                                    return;
+                                }
+                                setOrderDetails(prev => ({ ...prev, quantity: value }));
+                            }}
                             InputProps={{
                                 inputProps: {
                                     min: 0,
                                     step: selectedInstrument ? selectedInstrument.lot_size : 1
-                                },
-                                onKeyDown: (e) => {
-                                    if (e.key === 'ArrowUp') {
-                                        e.preventDefault();
-                                        handleQuantityIncrement();
-                                    } else if (e.key === 'ArrowDown') {
-                                        e.preventDefault();
-                                        handleQuantityDecrement();
-                                    }
                                 }
                             }}
+                            helperText={selectedInstrument ? `Must be in multiples of ${selectedInstrument.lot_size}` : ''}
                         />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth>
+                            <InputLabel>Order Type</InputLabel>
+                            <Select
+                                name="order_type"
+                                value={orderDetails.order_type}
+                                label="Order Type"
+                                onChange={e => {
+                                    const newOrderType = e.target.value;
+                                    setOrderDetails(prev => ({
+                                        ...prev,
+                                        order_type: newOrderType,
+                                        price: newOrderType === 'MARKET' ? '' : prev.price
+                                    }));
+                                }}
+                            >
+                                <MenuItem value="LIMIT">LIMIT</MenuItem>
+                                <MenuItem value="MARKET">MARKET</MenuItem>
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
@@ -227,7 +248,22 @@ export default function FoOrderDialog({
                             type="number"
                             value={orderDetails.price}
                             onChange={e => setOrderDetails(prev => ({ ...prev, price: e.target.value }))}
+                            disabled={orderDetails.order_type === 'MARKET'}
                         />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth>
+                            <InputLabel>Exchange</InputLabel>
+                            <Select
+                                name="exchange"
+                                value={orderDetails.exchange}
+                                label="Exchange"
+                                disabled={true}
+                            >
+                                <MenuItem value="NFO">NFO</MenuItem>
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
@@ -235,7 +271,7 @@ export default function FoOrderDialog({
                             <InputLabel>Product</InputLabel>
                             <Select
                                 name="product"
-                                value={orderDetails.product}
+                                value="NRML"
                                 label="Product"
                                 disabled={true}
                             >
@@ -251,8 +287,9 @@ export default function FoOrderDialog({
                                 name="validity"
                                 value={orderDetails.validity}
                                 label="Validity"
-                                disabled={true}
+                                onChange={e => setOrderDetails(prev => ({ ...prev, validity: e.target.value }))}
                             >
+                                <MenuItem value="DAY">DAY</MenuItem>
                                 <MenuItem value="IOC">IOC</MenuItem>
                             </Select>
                         </FormControl>
@@ -260,6 +297,17 @@ export default function FoOrderDialog({
                 </Grid>
             </DialogContent>
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            <DialogActions>
+                <Button onClick={handleClose}>Cancel</Button>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={onSave}
+                    disabled={loading}
+                >
+                    {loading ? 'Saving...' : 'Save F&O Order'}
+                </Button>
+            </DialogActions>
         </Dialog>
     );
 } 
