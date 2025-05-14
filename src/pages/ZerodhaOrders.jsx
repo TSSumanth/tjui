@@ -8,7 +8,7 @@ import {
     Button,
     Stack,
 } from '@mui/material';
-import Orders from '../components/zerodha/Orders';
+import Orders from '../components/zerodhaorders/Orders';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import { useZerodha } from '../context/ZerodhaContext';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -30,14 +30,15 @@ const ZerodhaOrders = () => {
         <>
             <ZerodhaSubHeader />
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Container maxWidth={false} sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
+                <Container maxWidth="xl">
                     <Paper sx={{ p: 3, borderRadius: 2 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                             <Typography variant="h5">
                                 Orders
                             </Typography>
                             <Button
-                                variant="outlined"
+                                variant="contained"
+                                color="primary"
                                 startIcon={<RefreshIcon />}
                                 onClick={handleRefresh}
                                 disabled={loadingStates.orders}
