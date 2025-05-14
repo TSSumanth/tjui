@@ -29,39 +29,35 @@ const ZerodhaOrders = () => {
     return (
         <>
             <ZerodhaSubHeader />
-            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-                <Container maxWidth="xl">
-                    <Paper sx={{ p: 3, borderRadius: 2 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                            <Typography variant="h5">
-                                Orders
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<RefreshIcon />}
-                                onClick={handleRefresh}
-                                disabled={loadingStates.orders}
-                                size="small"
-                                sx={{
-                                    borderRadius: 1.5,
-                                    textTransform: 'none',
-                                    px: 1.5,
-                                    py: 0.5
-                                }}
-                            >
-                                {loadingStates.orders ? 'Refreshing...' : 'Refresh'}
-                            </Button>
-                        </Stack>
-                        {loadingStates.orders ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : (
-                            <Orders />
-                        )}
-                    </Paper>
-                </Container>
+            <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', p: 3 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                    <Typography variant="h5">
+                        Orders
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<RefreshIcon />}
+                        onClick={handleRefresh}
+                        disabled={loadingStates.orders}
+                        size="small"
+                        sx={{
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            px: 1.5,
+                            py: 0.5
+                        }}
+                    >
+                        {loadingStates.orders ? 'Refreshing...' : 'Refresh'}
+                    </Button>
+                </Stack>
+                {loadingStates.orders ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                        <CircularProgress />
+                    </Box>
+                ) : (
+                    <Orders />
+                )}
             </Box>
         </>
     );
