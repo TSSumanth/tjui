@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import moment from 'moment';
 import {
     Dialog,
@@ -15,14 +15,12 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Chip,
     CircularProgress,
     Alert,
     Snackbar,
     IconButton
 } from '@mui/material';
-import { addOcoPair, isOcoOrder, createOrderPair } from '../../services/zerodha/oco';
-import { formatCurrency } from '../../utils/formatters';
+import { createOrderPair } from '../../services/zerodha/oco';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useZerodha } from '../../context/ZerodhaContext';
 
@@ -42,6 +40,28 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
     const [showSuccess, setShowSuccess] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const { fetchOrders } = useZerodha();
+    const dialogRef = useRef(null);
+
+    // Reset selected orders when dialog opens/closes
+    useEffect(() => {
+        if (!open) {
+            setSelectedOrders([]);
+        } else {
+            // Focus the dialog when it opens
+            setTimeout(() => {
+                if (dialogRef.current) {
+                    dialogRef.current.focus();
+                }
+            }, 0);
+        }
+    }, [open]);
+
+    const handleClose = () => {
+        setSelectedOrders([]);
+        setError('');
+        setShowSuccess(false);
+        onClose();
+    };
 
     const handleOrderSelect = (order) => {
         if (selectedOrders.find(o => o.order_id === order.order_id)) {
@@ -110,12 +130,22 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
 
     return (
         <>
-            <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+            <Dialog
+                open={open}
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
+                disableEnforceFocus
+                disableAutoFocus
+                ref={dialogRef}
+                tabIndex={-1}
+            >
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     Create One Cancels Other (OCO) Order
                     <IconButton
                         onClick={async () => {
                             await fetchOrders();
+                            setSelectedOrders([]);
                             setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
                         }}
                         size="small"
@@ -155,9 +185,9 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                                                         variant="contained"
                                                         color="primary"
                                                         onClick={() => handleOrderSelect(order)}
-                                                        disabled={selectedOrders.length >= 2}
+                                                        disabled={selectedOrders.length >= 2 || selectedOrders.some(o => o.order_id === order.order_id)}
                                                     >
-                                                        Select
+                                                        {selectedOrders.some(o => o.order_id === order.order_id) ? 'Selected' : 'Select'}
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
@@ -169,7 +199,7 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                    <Button onClick={handleClose} disabled={loading}>Cancel</Button>
                     <Button
                         onClick={handleSubmit}
                         variant="contained"
