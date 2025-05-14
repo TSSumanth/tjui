@@ -4,29 +4,8 @@ import {
     Typography,
     Box,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Table,
-    TableHead,
-    TableRow,
-    TableCell,
-    TableBody,
-    Radio,
     Snackbar,
     Alert,
-    TextField,
-    Grid,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    IconButton,
-    Tooltip,
-    Paper,
-    TableContainer,
-    Chip,
     Tabs,
     Tab
 } from '@mui/material';
@@ -38,8 +17,9 @@ import { useZerodha } from '../context/ZerodhaContext';
 import { createOrderPair, getOrderPairs, updateOrderPair, deleteOrderPair } from '../services/zerodha/oco';
 import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
 import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
-import SOCreateDialog from '../components/PairedOrders/SOCreateDialog';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import StockOrderDialog from '../components/PairedOrders/StockOrderDialog';
+import FoOrderDialog from '../components/PairedOrders/FoOrderDialog';
 
 function TabPanel({ children, value, index }) {
     return (
@@ -60,6 +40,7 @@ export default function PairedOrdersPage() {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const { orders, refreshOcoPairs } = useZerodha();
     const [showCreateSOOrderDialog, setShowCreateSOOrderDialog] = useState(false);
+    const [showCreateFOOrderDialog, setShowCreateFOOrderDialog] = useState(false);
     const [soOrderDetails, setSOOrderDetails] = useState({
         tradingsymbol: '',
         transaction_type: 'BUY',
@@ -75,7 +56,18 @@ export default function PairedOrdersPage() {
     const [editingSO, setEditingSO] = useState(null);
     const [isUpdateSODialogOpen, setIsUpdateSODialogOpen] = useState(false);
     const [placingOrder, setPlacingOrder] = useState(false);
-    const [showCreateOaoDialog, setShowCreateOaoDialog] = useState(false);
+    const [foOrderDetails, setFOOrderDetails] = useState({
+        tradingsymbol: '',
+        transaction_type: 'BUY',
+        quantity: '',
+        price: '',
+        product: 'CNC',
+        order_type: 'LIMIT',
+        validity: 'DAY',
+        exchange: 'NSE'
+    });
+    const [foOrderError, setFOOrderError] = useState(null);
+    const [foOrderLoading, setFOOrderLoading] = useState(false);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -244,20 +236,18 @@ export default function PairedOrdersPage() {
         // First set the form data
         setSOOrderDetails({
             tradingsymbol: order.order1_details.tradingsymbol || order.order1_details.symbol,
-            transaction_type: order.order1_details.transaction_type,
-            quantity: order.order1_details.quantity,
-            price: order.order1_details.price,
-            product: order.order1_details.product,
-            order_type: order.order1_details.order_type,
-            validity: order.order1_details.validity,
-            exchange: order.order1_details.exchange
+            transaction_type: order.order1_details.transaction_type || 'BUY',
+            quantity: order.order1_details.quantity || '',
+            price: order.order1_details.price || '',
+            product: order.order1_details.product || 'CNC',
+            order_type: order.order1_details.order_type || 'LIMIT',
+            validity: order.order1_details.validity || 'DAY',
+            exchange: order.order1_details.exchange || 'NSE'
         });
         // Then set the editing state
         setEditingSO(order);
         // Finally open the dialog
-        setTimeout(() => {
-            setIsUpdateSODialogOpen(true);
-        }, 0);
+        setIsUpdateSODialogOpen(true);
     };
 
     // Handler for saving updated SO
@@ -291,9 +281,12 @@ export default function PairedOrdersPage() {
     const handlePlaceOrder = async (order) => {
         setPlacingOrder(true);
         try {
-            // First, get the instrument token
+            // First, get the instrument token with appropriate parameters based on order type
+            const isStockOrder = order.order1_details.exchange === 'NSE' || order.order1_details.exchange === 'BSE';
             const instrumentsResponse = await getInstruments({
-                search: order.order1_details.tradingsymbol || order.order1_details.symbol
+                search: order.order1_details.tradingsymbol || order.order1_details.symbol,
+                exchange: order.order1_details.exchange,
+                type: isStockOrder ? 'EQ' : undefined
             });
 
             if (!instrumentsResponse.success || !instrumentsResponse.data || instrumentsResponse.data.length === 0) {
@@ -302,9 +295,9 @@ export default function PairedOrdersPage() {
 
             const instrument = instrumentsResponse.data[0];
 
-            // Validate quantity against lot size
+            // Validate quantity against lot size only for F&O orders
             const quantity = parseInt(order.order1_details.quantity);
-            if (quantity % instrument.lot_size !== 0) {
+            if (!isStockOrder && quantity % instrument.lot_size !== 0) {
                 throw new Error(`Quantity must be in multiples of lot size (${instrument.lot_size})`);
             }
 
@@ -328,16 +321,13 @@ export default function PairedOrdersPage() {
                 const ordersArray = Array.isArray(allOrders) ? allOrders : [];
                 setSavedOrders(ordersArray.filter(o => o.type === 'SO'));
             } else {
-                throw new Error(response.error || 'Failed to place order');
+                throw new Error(response.message || 'Failed to place order');
             }
-        } catch (e) {
-            setSnackbar({
-                open: true,
-                message: e.message || 'Failed to place order',
-                severity: 'error'
-            });
+        } catch (error) {
+            setSnackbar({ open: true, message: error.message || 'Failed to place order', severity: 'error' });
+        } finally {
+            setPlacingOrder(false);
         }
-        setPlacingOrder(false);
     };
 
     // Handler for deleting SO
@@ -369,6 +359,45 @@ export default function PairedOrdersPage() {
             exchange: 'NSE'
         });
         setSOOrderError(null);
+    };
+
+    // Handler to save F&O Order from manual entry
+    const handleSaveFOManual = async () => {
+        // Validation
+        if (!foOrderDetails.tradingsymbol) return setFOOrderError('Trading symbol is required');
+        if (!foOrderDetails.quantity || foOrderDetails.quantity <= 0) return setFOOrderError('Valid quantity is required');
+        if (!foOrderDetails.price || foOrderDetails.price <= 0) return setFOOrderError('Valid price is required');
+        if (!foOrderDetails.exchange) return setFOOrderError('Exchange is required');
+        setFOOrderLoading(true);
+        setFOOrderError(null);
+        const payload = {
+            type: 'FO',
+            order1_id: 'MANUAL',
+            order1_details: {
+                ...foOrderDetails,
+                lastupdatedat: new Date().toISOString(),
+            },
+            order2_id: '',
+            order2_details: {},
+        };
+        try {
+            await createOrderPair(payload);
+            setSnackbar({ open: true, message: 'F&O Order saved successfully!', severity: 'success' });
+            setShowCreateFOOrderDialog(false);
+            setFOOrderDetails({
+                tradingsymbol: '',
+                transaction_type: 'BUY',
+                quantity: '',
+                price: '',
+                product: 'NRML',
+                order_type: 'LIMIT',
+                validity: 'IOC',
+                exchange: 'NFO'
+            });
+        } catch (e) {
+            setFOOrderError('Failed to save F&O order.');
+        }
+        setFOOrderLoading(false);
     };
 
     return (
@@ -424,10 +453,34 @@ export default function PairedOrdersPage() {
                                 <Button
                                     variant="contained"
                                     color="primary"
-                                    onClick={() => setShowCreateSOOrderDialog(true)}
+                                    onClick={() => {
+                                        setSOOrderDetails(prev => ({
+                                            ...prev,
+                                            exchange: 'NSE',
+                                            product: 'CNC',
+                                            order_type: 'LIMIT',
+                                            validity: 'DAY'
+                                        }));
+                                        setShowCreateSOOrderDialog(true);
+                                    }}
                                     sx={{ mr: 1 }}
                                 >
-                                    Save Order
+                                    Save Stock Order
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => {
+                                        setSOOrderDetails(prev => ({
+                                            ...prev,
+                                            exchange: 'NFO',
+                                            product: 'NRML'
+                                        }));
+                                        setShowCreateFOOrderDialog(true);
+                                    }}
+                                    sx={{ mr: 1 }}
+                                >
+                                    Save F&O Order
                                 </Button>
                                 <Button
                                     variant="contained"
@@ -482,106 +535,33 @@ export default function PairedOrdersPage() {
                 open={isOAODialogOpen}
                 onClose={() => setIsOAODialogOpen(false)}
             />
-            <SOCreateDialog
-                open={showCreateSOOrderDialog}
-                onClose={() => setShowCreateSOOrderDialog(false)}
-                soOrderDetails={soOrderDetails}
-                setSOOrderDetails={setSOOrderDetails}
-                soOrderError={soOrderError}
-                soOrderLoading={soOrderLoading}
-                handleSaveSOManual={handleSaveSOManual}
-            />
 
-            {/* Edit Saved Order Dialog */}
-            <SOCreateDialog
-                open={isUpdateSODialogOpen}
+            {/* Stock Order Dialog */}
+            <StockOrderDialog
+                open={showCreateSOOrderDialog || isUpdateSODialogOpen}
                 onClose={() => {
-                    // First close the dialog
+                    setShowCreateSOOrderDialog(false);
                     setIsUpdateSODialogOpen(false);
-                    // Then reset state after a small delay to ensure proper focus management
-                    setTimeout(() => {
-                        setEditingSO(null);
-                        resetSOForm();
-                    }, 0);
+                    resetSOForm();
                 }}
-                soOrderDetails={soOrderDetails}
-                setSOOrderDetails={setSOOrderDetails}
-                soOrderError={soOrderError}
-                soOrderLoading={soOrderLoading}
-                handleSaveSOManual={handleSaveUpdatedSO}
+                orderDetails={soOrderDetails}
+                setOrderDetails={setSOOrderDetails}
+                error={soOrderError}
+                loading={soOrderLoading}
+                onSave={isUpdateSODialogOpen ? handleSaveUpdatedSO : handleSaveSOManual}
+                isEditing={isUpdateSODialogOpen}
             />
 
-            {/* Store Cancelled Order Dialog */}
-            <Dialog
-                open={showStoreCancelledOrderDialog}
-                onClose={() => {
-                    setShowStoreCancelledOrderDialog(false);
-                    setSelectedCancelledOrder(null);
-                }}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogTitle>Store Cancelled Order</DialogTitle>
-                <DialogContent>
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Select</TableCell>
-                                    <TableCell>Order ID</TableCell>
-                                    <TableCell>Symbol</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Quantity</TableCell>
-                                    <TableCell>Price</TableCell>
-                                    <TableCell>Status</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {cancelledOrders.map((order) => (
-                                    <TableRow key={order.order_id}>
-                                        <TableCell>
-                                            <Radio
-                                                checked={selectedCancelledOrder?.order_id === order.order_id}
-                                                onChange={() => setSelectedCancelledOrder(order)}
-                                            />
-                                        </TableCell>
-                                        <TableCell>{order.order_id}</TableCell>
-                                        <TableCell>{order.tradingsymbol}</TableCell>
-                                        <TableCell>{order.transaction_type}</TableCell>
-                                        <TableCell>{order.quantity}</TableCell>
-                                        <TableCell>{order.price}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={order.status}
-                                                color="default"
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        onClick={() => {
-                            setShowStoreCancelledOrderDialog(false);
-                            setSelectedCancelledOrder(null);
-                        }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSaveSO}
-                        variant="contained"
-                        color="primary"
-                        disabled={!selectedCancelledOrder || soOrderLoading}
-                    >
-                        {soOrderLoading ? 'Saving...' : 'Save Order'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* F&O Order Dialog */}
+            <FoOrderDialog
+                open={showCreateFOOrderDialog}
+                onClose={() => setShowCreateFOOrderDialog(false)}
+                orderDetails={foOrderDetails}
+                setOrderDetails={setFOOrderDetails}
+                error={foOrderError}
+                loading={foOrderLoading}
+                onSave={handleSaveFOManual}
+            />
 
             <Snackbar
                 open={snackbar.open}
