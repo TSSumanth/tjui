@@ -178,7 +178,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
             <Box>
                 {/* Completed OCO Orders */}
                 <Box mb={4}>
-                    <Typography variant="h6" gutterBottom>
+                    {/* <Typography variant="h6" gutterBottom>
                         Completed OCO Orders
                         <IconButton
                             onClick={refreshCompletedOrders}
@@ -187,8 +187,19 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                         >
                             <Refresh />
                         </IconButton>
-                    </Typography>
+                    </Typography> */}
                     {completedTodayPairs.length > 0 ? (
+                        <Box>
+                            <Typography variant="h6" gutterBottom>
+                        Completed OCO Orders
+                        {/* <IconButton
+                            onClick={refreshCompletedOrders}
+                            size="small"
+                            sx={{ ml: 1 }}
+                        >
+                            <Refresh />
+                        </IconButton> */}
+                    </Typography> 
                         <TableContainer component={Paper}>
                             <Table>
                                 <TableHead>
@@ -227,17 +238,18 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        </Box>
                     ) : (
                         <Box>
                             <Typography variant="h6" gutterBottom>
                                 Completed OCO Orders
-                                <IconButton
+                                {/* <IconButton
                                     onClick={refreshCompletedOrders}
                                     size="small"
                                     sx={{ ml: 1 }}
                                 >
                                     <Refresh />
-                                </IconButton>
+                                </IconButton> */}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
                                 No completed OCO orders for today
@@ -298,13 +310,13 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                     <Box>
                         <Typography variant="h6" gutterBottom>
                             Completed OAO Orders
-                            <IconButton
+                            {/* <IconButton
                                 onClick={refreshCompletedOrders}
                                 size="small"
                                 sx={{ ml: 1 }}
                             >
                                 <Refresh />
-                            </IconButton>
+                            </IconButton> */}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                             No completed OAO orders for today
