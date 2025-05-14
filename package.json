@@ -37,6 +37,7 @@
     "react-quill": "^2.0.0",
     "react-router-dom": "^7.2.0",
     "react-scripts": "^5.0.1",
+    "react-window": "^1.8.11",
     "recharts": "^2.15.1",
     "reselect": "^4.1.8",
     "resolve-url-loader": "^5.0.0",
