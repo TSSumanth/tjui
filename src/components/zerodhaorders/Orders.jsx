@@ -126,6 +126,22 @@ const Orders = () => {
                 <>
                     {pendingOrders.length > 0 && (
                         <Box mb={4}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    mb: 2,
+                                    color: 'white',
+                                    backgroundColor: 'primary.main',
+                                    p: 1.5,
+                                    borderRadius: 1,
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                }}
+                            >
+                                Open Orders
+                            </Typography>
                             <OrderTable
                                 orders={pendingOrders}
                                 onCancel={handleCancelOrder}
@@ -138,6 +154,22 @@ const Orders = () => {
 
                     {completedOrders.length > 0 && (
                         <Box mb={4}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    mb: 2,
+                                    color: 'white',
+                                    backgroundColor: 'success.main',
+                                    p: 1.5,
+                                    borderRadius: 1,
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                }}
+                            >
+                                Completed Orders
+                            </Typography>
                             <OrderTable
                                 orders={completedOrders}
                                 onCancel={handleCancelOrder}
@@ -150,6 +182,22 @@ const Orders = () => {
 
                     {cancelledOrders.length > 0 && (
                         <Box mb={4}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    mb: 2,
+                                    color: 'white',
+                                    backgroundColor: 'error.main',
+                                    p: 1.5,
+                                    borderRadius: 1,
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                }}
+                            >
+                                Cancelled Orders
+                            </Typography>
                             <OrderTable
                                 orders={cancelledOrders}
                                 onCancel={handleCancelOrder}
