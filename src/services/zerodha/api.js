@@ -162,4 +162,18 @@ export const getOrderById = async (orderId) => {
     return response.data;
 };
 
+// Refresh instruments (manual trigger)
+export const refreshInstruments = async () => {
+    const response = await api.post('/api/zerodha/instruments/refresh');
+    return response.data;
+};
+
+// Get real-time LTP for an instrument
+export const getInstrumentLTP = async (exchange, tradingsymbol) => {
+    const response = await api.get('/api/zerodha/instruments/ltp', {
+        params: { exchange, tradingsymbol }
+    });
+    return response.data;
+};
+
 export default api; 
