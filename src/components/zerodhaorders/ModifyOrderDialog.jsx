@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -19,15 +19,25 @@ const ModifyOrderDialog = ({ open, order, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    useEffect(() => {
+        setPrice(order?.price || '');
+        setTriggerPrice(order?.trigger_price || '');
+        setQuantity(order?.quantity || '');
+    }, [order]);
+
     const handleSubmit = async () => {
         try {
             setLoading(true);
             setError(null);
-            await modifyZerodhaOrder(order.order_id, {
+            const data = {
                 price: parseFloat(price),
-                trigger_price: parseFloat(triggerPrice),
-                quantity: parseInt(quantity)
-            });
+                quantity: parseInt(quantity),
+                order_type: order.order_type
+            };
+            if (triggerPrice.trim() !== '') {
+                data.trigger_price = parseFloat(triggerPrice);
+            }
+            await modifyZerodhaOrder(order.order_id, data);
             onSuccess();
             onClose();
         } catch (err) {
