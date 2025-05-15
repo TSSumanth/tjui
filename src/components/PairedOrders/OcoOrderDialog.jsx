@@ -135,12 +135,13 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                 onClose={handleClose}
                 maxWidth="md"
                 fullWidth
-                disableEnforceFocus
-                disableAutoFocus
                 ref={dialogRef}
-                tabIndex={-1}
+                aria-labelledby="oco-dialog-title"
             >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <DialogTitle
+                    id="oco-dialog-title"
+                    sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                     Create One Cancels Other (OCO) Order
                     <IconButton
                         onClick={async () => {

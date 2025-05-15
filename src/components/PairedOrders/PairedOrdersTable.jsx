@@ -36,7 +36,7 @@ function isToday(dateStr) {
 }
 
 export default function PairedOrdersTable({ onChange, showCompleted = false }) {
-    const { ocoPairs, completedOcoPairs, ocoStatusMap, refreshOcoPairs, refreshCompletedOrders } = useZerodha();
+    const { activeOrderPairs, completedOrderPairs, orderPairStatusMap, refreshActiveOrderPairs, refreshCompletedOrders } = useZerodha();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [editOaoDialogOpen, setEditOaoDialogOpen] = useState(false);
@@ -46,7 +46,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
     const [selectedCancelledOrder, setSelectedCancelledOrder] = useState(null);
 
     useEffect(() => {
-        refreshOcoPairs();
+        refreshActiveOrderPairs();
         // Only on mount
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -60,7 +60,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
             } else {
                 await deleteOrderPair(id);
             }
-            await refreshOcoPairs();
+            await refreshActiveOrderPairs();
             if (onChange) onChange();
         } catch (error) {
             console.error('Error cancelling order pair:', error);
@@ -85,7 +85,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
         setError(null);
         try {
             await updateOaoOrderPair(editingOaoPair.id, order2_details);
-            await refreshOcoPairs();
+            await refreshActiveOrderPairs();
             if (onChange) onChange();
             handleEditOaoDialogClose();
         } catch (error) {
@@ -136,7 +136,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                 order2_details: {},
             };
             await createOrderPair(payload);
-            await refreshOcoPairs();
+            await refreshActiveOrderPairs();
             if (onChange) onChange();
             setShowStoreCancelledOrderDialog(false);
             setSelectedCancelledOrder(null);
@@ -147,7 +147,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
         }
     };
 
-    if (!ocoPairs.length) return null;
+    if (!activeOrderPairs.length) return null;
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -159,12 +159,12 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
     };
 
     // Split pairs into OCO and OAO
-    const ocoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OCO' && isToday(pair.created_at));
-    const oaoOnlyPairs = ocoPairs.filter(pair => pair.type === 'OAO' && isToday(pair.created_at));
+    const ocoOnlyPairs = activeOrderPairs.filter(pair => pair.type === 'OCO' && isToday(pair.created_at));
+    const oaoOnlyPairs = activeOrderPairs.filter(pair => pair.type === 'OAO' && isToday(pair.created_at));
 
     // OCO: Split into active and completed
     const activePairs = ocoOnlyPairs.filter(pair => pair.status !== 'COMPLETED');
-    const completedTodayPairs = completedOcoPairs.filter(pair =>
+    const completedTodayPairs = completedOrderPairs.filter(pair =>
         pair.type === 'OCO' &&
         isToday(pair.created_at)
     );
@@ -279,8 +279,8 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                                 </TableHead>
                                 <TableBody>
                                     {completedOaoPairs.map((pair) => {
-                                        const status1 = ocoStatusMap[pair.order1_id] || '';
-                                        const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
+                                        const status1 = orderPairStatusMap[pair.order1_id] || '';
+                                        const status2 = pair.order2_id ? (orderPairStatusMap[pair.order2_id] || '') : '';
                                         return (
                                             <TableRow key={pair.id}>
                                                 <TableCell>{pair.order1_details?.tradingsymbol || ''} <br /> <small>{pair.order1_id}</small></TableCell>
@@ -352,8 +352,8 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                                 </TableHead>
                                 <TableBody>
                                     {activePairs.map((pair) => {
-                                        const status1 = ocoStatusMap[pair.order1_id] || '';
-                                        const status2 = ocoStatusMap[pair.order2_id] || '';
+                                        const status1 = orderPairStatusMap[pair.order1_id] || '';
+                                        const status2 = orderPairStatusMap[pair.order2_id] || '';
                                         return (
                                             <TableRow key={pair.id}>
                                                 <TableCell>
@@ -421,8 +421,8 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                                     </TableHead>
                                     <TableBody>
                                         {activeOaoPairs.map((pair) => {
-                                            const status1 = ocoStatusMap[pair.order1_id] || '';
-                                            const status2 = pair.order2_id ? (ocoStatusMap[pair.order2_id] || '') : '';
+                                            const status1 = orderPairStatusMap[pair.order1_id] || '';
+                                            const status2 = pair.order2_id ? (orderPairStatusMap[pair.order2_id] || '') : '';
                                             const showRetry = pair.order2_id === 'FAILED';
                                             return (
                                                 <TableRow key={pair.id}>

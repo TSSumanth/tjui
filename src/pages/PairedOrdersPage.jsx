@@ -45,7 +45,7 @@ export default function PairedOrdersPage() {
     const [selectedCancelledOrder, setSelectedCancelledOrder] = useState(null);
     const [savedOrders, setSavedOrders] = useState([]);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const { orders, refreshOcoPairs } = useZerodha();
+    const { orders, refreshActiveOrderPairs } = useZerodha();
     const [showCreateSOOrderDialog, setShowCreateSOOrderDialog] = useState(false);
     const [showCreateFOOrderDialog, setShowCreateFOOrderDialog] = useState(false);
     const [soOrderDetails, setSOOrderDetails] = useState({
@@ -191,7 +191,7 @@ export default function PairedOrdersPage() {
                 order2_details: {},
             };
             await createOrderPair(payload);
-            await refreshOcoPairs();
+            await refreshActiveOrderPairs();
             setShowStoreCancelledOrderDialog(false);
             setSelectedCancelledOrder(null);
             setSnackbar({ open: true, message: 'Order saved successfully!', severity: 'success' });
@@ -508,7 +508,7 @@ export default function PairedOrdersPage() {
                                     variant="outlined"
                                     color="primary"
                                     onClick={async () => {
-                                        await refreshOcoPairs();
+                                        await refreshActiveOrderPairs();
                                         const allPairs = await getActivePairs();
                                         setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
                                         setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
@@ -596,7 +596,7 @@ export default function PairedOrdersPage() {
                                 variant="outlined"
                                 color="primary"
                                 onClick={async () => {
-                                    await refreshOcoPairs();
+                                    await refreshActiveOrderPairs();
                                     setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
                                 }}
                                 startIcon={<RefreshIcon />}

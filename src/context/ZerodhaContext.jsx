@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
-import { isAuthenticated, logout } from '../services/zerodha/authentication';
-import { getOrderPairs, getActivePairs, createOrderPair, updateOrderPair, deleteOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
+import { logout } from '../services/zerodha/authentication';
+import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
-import { createOaoOrderPair, updateOaoOrderPair, deleteOaoOrderPair } from '../services/pairedorders/oao';
 
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
@@ -48,9 +47,9 @@ export const ZerodhaProvider = ({ children }) => {
     const [isAutoSync, setIsAutoSync] = useState(false);
     const [error, setError] = useState(null);
     const [ltpMap, setLtpMap] = useState({});
-    const [ocoPairs, setOcoPairs] = useState([]);
-    const [completedOcoPairs, setCompletedOcoPairs] = useState([]);
-    const [ocoStatusMap, setOcoStatusMap] = useState({});
+    const [activeOrderPairs, setActiveOrderPairs] = useState([]);
+    const [completedOrderPairs, setCompletedOrderPairs] = useState([]);
+    const [orderPairStatusMap, setOrderPairStatusMap] = useState({});
 
     const isInitialLoadDone = useRef(false);
     const lastFetchTime = useRef(0);
@@ -346,13 +345,13 @@ export const ZerodhaProvider = ({ children }) => {
     useEffect(() => {
         let intervalId;
         let isUnmounted = false;
-        const fetchOrderPairStatuses = async (activeOnly = true) => {
+        const fetchOrderPairStatuses = async () => {
             try {
                 const pairsData = await getOrderPairs('active');
                 if (isUnmounted) return;
-                setOcoPairs(pairsData);
+                setActiveOrderPairs(pairsData);
                 // Process active pairs for polling
-                const statusMap = { ...ocoStatusMap };
+                const statusMap = { ...orderPairStatusMap };
                 await Promise.all(pairsData.map(async (pair) => {
                     if (pair.status !== 'completed') {
                         // Only fetch from Zerodha if not done and status is OPEN
@@ -505,7 +504,7 @@ export const ZerodhaProvider = ({ children }) => {
             if (isInitialLoadDone.current) return;
             try {
                 const completedPairs = await getCompletedOrderPairs();
-                setCompletedOcoPairs(completedPairs);
+                setCompletedOrderPairs(completedPairs);
                 isInitialLoadDone.current = true;
             } catch (error) {
                 console.error('Error loading completed orders:', error);
@@ -515,10 +514,10 @@ export const ZerodhaProvider = ({ children }) => {
     }, []);
 
     // Manual refresh for OCO pairs
-    const refreshOcoPairs = useCallback(async () => {
+    const refreshActiveOrderPairs = useCallback(async () => {
         const pairsData = await getActivePairs();
-        setOcoPairs(pairsData);
-        const statusMap = { ...ocoStatusMap };
+        setActiveOrderPairs(pairsData);
+        const statusMap = { ...orderPairStatusMap };
         // Process all pairs to get their current status
         await Promise.all(pairsData.map(async (pair) => {
             const order1StatusLocal = pair.order1_details?.orderstatus?.toUpperCase();
@@ -556,13 +555,13 @@ export const ZerodhaProvider = ({ children }) => {
                 statusMap[pair.order2_id] = 'WAITINGFORORDER1';
             }
         }));
-        setOcoStatusMap(statusMap);
-    }, [ocoStatusMap]);
+        setOrderPairStatusMap(statusMap);
+    }, [orderPairStatusMap]);
 
     // Function to refresh completed orders
     const refreshCompletedOrders = useCallback(async () => {
         const completedPairs = await getCompletedOrderPairs();
-        setCompletedOcoPairs(completedPairs);
+        setCompletedOrderPairs(completedPairs);
     }, []);
 
     const handleLogout = useCallback(async () => {
@@ -607,10 +606,10 @@ export const ZerodhaProvider = ({ children }) => {
         orders,
         fetchPositions,
         ltpMap,
-        ocoPairs,
-        completedOcoPairs,
-        ocoStatusMap,
-        refreshOcoPairs,
+        activeOrderPairs,
+        completedOrderPairs,
+        orderPairStatusMap,
+        refreshActiveOrderPairs,
         refreshCompletedOrders
     };
 
