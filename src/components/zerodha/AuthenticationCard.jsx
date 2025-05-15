@@ -7,6 +7,7 @@ import {
     Chip
 } from '@mui/material';
 import { isAuthenticated, logout, getLoginUrl, handleLoginCallback } from '../../services/zerodha/authentication';
+import { setWebSocketAccessToken } from '../../services/zerodha/webhook';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 
@@ -29,6 +30,9 @@ const AuthenticationCard = () => {
                     localStorage.setItem('zerodha_public_token', public_token);
                     setIsLoggedIn(true);
                     setIsLoading(false);
+
+                    // Set WebSocket access token
+                    await setWebSocketAccessToken(access_token);
 
                     // Handle the login callback
                     await handleLoginCallback({ request_token: access_token });

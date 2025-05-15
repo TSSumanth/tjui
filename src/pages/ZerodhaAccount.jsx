@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getLoginUrl } from '../services/zerodha/authentication';
+import { setWebSocketAccessToken } from '../services/zerodha/webhook';
 import { getAllPortfolioValues } from '../services/portfolioValue';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
@@ -74,8 +75,13 @@ const ZerodhaAccount = () => {
                 console.log('Received message:', event.data);
                 if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
                     console.log('Auth success, storing tokens');
-                    localStorage.setItem('zerodha_access_token', event.data.data.access_token);
-                    localStorage.setItem('zerodha_public_token', event.data.data.public_token);
+                    const { access_token, public_token } = event.data.data;
+                    localStorage.setItem('zerodha_access_token', access_token);
+                    localStorage.setItem('zerodha_public_token', public_token);
+                    // Set WebSocket access token
+                    setWebSocketAccessToken(access_token).catch(error => {
+                        console.error('Failed to set WebSocket access token:', error);
+                    });
                     window.removeEventListener('message', handleMessage);
                     fetchData(true);
                 } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
