@@ -20,7 +20,7 @@ const ZerodhaWebSocketSubscription = () => {
     const fetchSubscriptions = async () => {
         try {
             const res = await getWebSocketSubscriptions();
-            setSubscribed(res.subscribed || []);
+            setSubscribed(res.data || []);
         } catch (err) {
             setError('Failed to fetch subscriptions');
         }
@@ -145,8 +145,12 @@ const ZerodhaWebSocketSubscription = () => {
                                     onChange={e => setUnsubscribeToken(e.target.value)}
                                     disabled={unsubLoading || subscribed.length === 0}
                                 >
-                                    {subscribed.map(token => (
-                                        <MenuItem key={token} value={token}>{token}</MenuItem>
+                                    {subscribed.map(row => (
+                                        <MenuItem key={row.instrument_token} value={row.instrument_token}>
+                                            {row.tradingsymbol
+                                                ? `${row.tradingsymbol} (${row.instrument_token})`
+                                                : row.instrument_token}
+                                        </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
@@ -170,12 +174,22 @@ const ZerodhaWebSocketSubscription = () => {
                                 <Box component="thead" sx={{ backgroundColor: '#f5f5f5' }}>
                                     <Box component="tr">
                                         <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Token</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Symbol</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Name</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Exchange</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>LTP</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Tick Time</Box>
                                     </Box>
                                 </Box>
                                 <Box component="tbody">
-                                    {subscribed.map(token => (
-                                        <Box component="tr" key={token}>
-                                            <Box component="td" sx={{ p: 1 }}>{token}</Box>
+                                    {subscribed.map(row => (
+                                        <Box component="tr" key={row.instrument_token}>
+                                            <Box component="td" sx={{ p: 1 }}>{row.instrument_token}</Box>
+                                            <Box component="td" sx={{ p: 1 }}>{row.tradingsymbol || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1 }}>{row.name || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1 }}>{row.exchange || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1 }}>{row.ltp !== null && row.ltp !== undefined ? row.ltp : '-'}</Box>
+                                            <Box component="td" sx={{ p: 1 }}>{row.tick_time ? new Date(row.tick_time).toLocaleString() : '-'}</Box>
                                         </Box>
                                     ))}
                                 </Box>

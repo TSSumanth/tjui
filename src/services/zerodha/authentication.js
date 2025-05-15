@@ -1,5 +1,6 @@
 import { KiteConnect } from 'kiteconnect';
 import * as zerodhaApi from './api';
+import { setWebSocketAccessToken } from './webhook';
 
 // Initialize KiteConnect with API key
 const apiKey = process.env.REACT_APP_ZERODHA_API_KEY;
@@ -27,6 +28,8 @@ export const handleLoginCallback = async (params) => {
             console.log('Storing tokens in localStorage');
             localStorage.setItem('zerodha_access_token', response.access_token);
             localStorage.setItem('zerodha_public_token', response.public_token);
+            // Set websocket access token in backend
+            await setWebSocketAccessToken(response.access_token);
             window.location.reload(); // Reload to update the UI
             return response;
         } else {

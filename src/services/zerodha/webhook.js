@@ -28,4 +28,9 @@ export const getWebSocketDepth = async (instrument_token) => {
 export const getWebSocketStatus = async () => {
     const response = await api.get('/api/zerodha-ws/status');
     return response.data;
+};
+
+export const setWebSocketAccessToken = async (access_token) => {
+    const response = await api.post('/api/zerodha-ws/set-access-token', { access_token });
+    return response.data;
 }; 
