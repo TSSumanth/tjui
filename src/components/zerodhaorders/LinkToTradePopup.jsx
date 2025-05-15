@@ -24,10 +24,11 @@ import {
 } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
 import { getStockTrades, addNewStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade, updateStockTrade } from '../../services/trades';
-import { addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders, updateStockOrder } from '../../services/orders';
+import { getOrders, addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders, updateStockOrder } from '../../services/orders';
 import { getInstruments } from '../../services/zerodha/api';
 import { formatDateTime, formatPrice } from '../../utils/formatters';
 import moment from 'moment';
+import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
 
 function isOptionOrFuture(order) {
     // Check if it's from NFO exchange
@@ -82,6 +83,8 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
     const [lotSize, setLotSize] = useState('');
     const [lotSizeError, setLotSizeError] = useState('');
     const [lotSizeLoading, setLotSizeLoading] = useState(false);
+    const [showAssignStrategy, setShowAssignStrategy] = useState(false);
+    const [newlyCreatedTrade, setNewlyCreatedTrade] = useState(null);
 
     useEffect(() => {
         if (open && order) {
@@ -148,23 +151,25 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
 
     async function tagZerodhaOrderAsLinked(orderId) {
         try {
-            const response = await fetch('/api/zerodha/orders/tag', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    orderId,
-                    tag: 'linked'
-                }),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to tag order');
+            // Fetch orders with the zerodha order id as a tag
+            const orders = await getOrders({ tags: orderId });
+            if (orders && orders.length > 0) {
+                const order = orders[0];
+                // Add 'linked' to the tags if not already present
+                let tagsArr = order.tags ? order.tags.split(',') : [];
+                if (!tagsArr.includes('linked')) {
+                    tagsArr.push('linked');
+                    const updatedTags = tagsArr.join(',');
+                    if (order.lotsize !== undefined) {
+                        await updateOptionOrder({ ...order, tags: updatedTags });
+                    } else {
+                        await updateStockOrder({ ...order, tags: updatedTags });
+                    }
+                }
             }
-            return await response.json();
-        } catch (error) {
-            console.error('Error tagging order:', error);
-            throw error;
+        } catch (err) {
+            // Optionally handle error
+            console.error('Failed to tag Zerodha order as linked:', err);
         }
     }
 
@@ -551,11 +556,12 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                 };
                 await addNewStockTrade(tradePayload);
             }
-            if (onSuccess) onSuccess();
-            onClose();
+            setNewlyCreatedTrade(tradePayload);
+            setShowAssignStrategy(true);
+            setCreating(false);
+            // Do not call onSuccess/onClose yet; wait for strategy assignment popup
         } catch (err) {
             setError('Failed to create new trade.');
-        } finally {
             setCreating(false);
         }
     };
@@ -770,6 +776,25 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
             </DialogActions>
+            {showAssignStrategy && newlyCreatedTrade && (
+                <AssignTradesToStrategy
+                    title="Assign New Trade to Strategy"
+                    tradeDetails={[newlyCreatedTrade]}
+                    open={showAssignStrategy}
+                    onSubmit={() => {
+                        setShowAssignStrategy(false);
+                        setNewlyCreatedTrade(null);
+                        if (onSuccess) onSuccess();
+                        if (onClose) onClose();
+                    }}
+                    onClose={() => {
+                        setShowAssignStrategy(false);
+                        setNewlyCreatedTrade(null);
+                        if (onSuccess) onSuccess();
+                        if (onClose) onClose();
+                    }}
+                />
+            )}
         </Dialog>
     );
 };
