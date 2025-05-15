@@ -139,7 +139,7 @@ const Holdings = () => {
         return (
             <Typography variant="body1" color="text.secondary" align="center" py={4}>
                 No holdings found
-                </Typography>
+            </Typography>
         );
     }
 
@@ -178,14 +178,14 @@ const Holdings = () => {
                                         {holding.tradingsymbol}
                                     </TableCell>
                                     <TableCell align="right">{quantity}</TableCell>
-                                    <TableCell align="right">₹{formatCurrency(avgPrice)}</TableCell>
+                                    <TableCell align="right">{formatCurrency(avgPrice)}</TableCell>
                                     <TableCell align="right"
                                         sx={{
                                             fontFamily: 'monospace',
                                             transition: isUpdating ? 'color 0.3s ease' : 'none'
                                         }}
                                     >
-                                        ₹{formatCurrency(lastPrice)}
+                                        {formatCurrency(lastPrice)}
                                     </TableCell>
                                     <TableCell align="right"
                                         sx={{
@@ -193,14 +193,14 @@ const Holdings = () => {
                                             transition: isUpdating ? 'color 0.3s ease' : 'none'
                                         }}
                                     >
-                                        ₹{formatCurrency(currentValue)}
+                                        {formatCurrency(currentValue)}
                                     </TableCell>
                                     <TableCell align="right">
                                         <Typography
                                             color={pnl >= 0 ? 'success.main' : 'error.main'}
                                             sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
-                                    >
-                                            ₹{formatCurrency(pnl)}
+                                        >
+                                            {formatCurrency(pnl)}
                                             {isFinite(pnlPercentage) && pnlPercentage !== 0 ? ` (${pnlPercentage.toFixed(2)}%)` : ''}
                                         </Typography>
                                     </TableCell>
@@ -208,8 +208,8 @@ const Holdings = () => {
                                         <Typography
                                             color={dayChange >= 0 ? 'success.main' : 'error.main'}
                                             sx={{ transition: isUpdating ? 'color 0.3s ease' : 'none' }}
-                                    >
-                                            ₹{formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
+                                        >
+                                            {formatCurrency(dayChange)} ({dayChangePercentage.toFixed(2)}%)
                                         </Typography>
                                     </TableCell>
                                     <TableCell align="right">
@@ -229,7 +229,7 @@ const Holdings = () => {
                                             onClose={handleMenuClose}
                                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                                             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                    >
+                                        >
                                             <MenuItem onClick={handleExitHolding}>Exit Holdings</MenuItem>
                                             <MenuItem onClick={handleAddMore}>Add More</MenuItem>
                                         </Menu>

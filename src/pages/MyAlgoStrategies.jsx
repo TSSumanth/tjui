@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, Typography } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import ZerodhaWebSocketSubscription from '../components/zerodha/ZerodhaWebSocketSubscription';
 
@@ -9,17 +9,6 @@ const MyAlgoStrategiesPage = () => {
             <ZerodhaSubHeader />
             <Container>
                 <ZerodhaWebSocketSubscription />
-                <Box sx={{
-                    mt: 4,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: '400px'
-                }}>
-                    <Typography variant="h5" color="text.secondary">
-                        Functionality will be available soon
-                    </Typography>
-                </Box>
             </Container>
         </Box>
     );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Chip, Stack, Alert, CircularProgress, Card, CardContent, Grid, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
+import { Box, TextField, Button, Typography, Alert, CircularProgress, Paper, Grid, MenuItem, Select, FormControl, InputLabel, Stack, Snackbar } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { getInstruments } from '../../services/zerodha/api';
 import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens } from '../../services/zerodha/webhook';
@@ -16,6 +16,10 @@ const ZerodhaWebSocketSubscription = () => {
     const [unsubLoading, setUnsubLoading] = useState(false);
     const [unsubError, setUnsubError] = useState('');
     const [unsubSuccess, setUnsubSuccess] = useState('');
+    const [openSuccess, setOpenSuccess] = useState(false);
+    const [openError, setOpenError] = useState(false);
+    const [openUnsubSuccess, setOpenUnsubSuccess] = useState(false);
+    const [openUnsubError, setOpenUnsubError] = useState(false);
 
     const fetchSubscriptions = async () => {
         try {
@@ -23,12 +27,26 @@ const ZerodhaWebSocketSubscription = () => {
             setSubscribed(res.data || []);
         } catch (err) {
             setError('Failed to fetch subscriptions');
+            setOpenError(true);
         }
     };
 
     useEffect(() => {
         fetchSubscriptions();
     }, []);
+
+    useEffect(() => {
+        if (success) setOpenSuccess(true);
+    }, [success]);
+    useEffect(() => {
+        if (error) setOpenError(true);
+    }, [error]);
+    useEffect(() => {
+        if (unsubSuccess) setOpenUnsubSuccess(true);
+    }, [unsubSuccess]);
+    useEffect(() => {
+        if (unsubError) setOpenUnsubError(true);
+    }, [unsubError]);
 
     const handleInputChange = async (event, value) => {
         if (!value || value.length < 2) {
@@ -50,19 +68,21 @@ const ZerodhaWebSocketSubscription = () => {
     const handleSubscribe = async () => {
         setError('');
         setSuccess('');
-        setLoading(true);
         if (!selectedInstrument) {
             setError('Please select an instrument');
-            setLoading(false);
+            setOpenError(true);
             return;
         }
+        setLoading(true);
         try {
             await subscribeToTokens([selectedInstrument.instrument_token.toString()]);
             setSuccess('Subscribed successfully!');
+            setOpenSuccess(true);
             setSelectedInstrument(null);
             fetchSubscriptions();
         } catch (err) {
             setError('Failed to subscribe');
+            setOpenError(true);
         } finally {
             setLoading(false);
         }
@@ -71,31 +91,51 @@ const ZerodhaWebSocketSubscription = () => {
     const handleUnsubscribe = async () => {
         setUnsubError('');
         setUnsubSuccess('');
-        setUnsubLoading(true);
         if (!unsubscribeToken) {
             setUnsubError('Please select a token to unsubscribe');
-            setUnsubLoading(false);
+            setOpenUnsubError(true);
             return;
         }
+        setUnsubLoading(true);
         try {
             await unsubscribeFromTokens([unsubscribeToken]);
             setUnsubSuccess('Unsubscribed successfully!');
+            setOpenUnsubSuccess(true);
             setUnsubscribeToken('');
             fetchSubscriptions();
         } catch (err) {
             setUnsubError('Failed to unsubscribe');
+            setOpenUnsubError(true);
         } finally {
             setUnsubLoading(false);
         }
     };
 
+    // Snackbar close handlers
+    const handleCloseSuccess = () => { setOpenSuccess(false); setSuccess(''); };
+    const handleCloseError = () => { setOpenError(false); setError(''); };
+    const handleCloseUnsubSuccess = () => { setOpenUnsubSuccess(false); setUnsubSuccess(''); };
+    const handleCloseUnsubError = () => { setOpenUnsubError(false); setUnsubError(''); };
+
     return (
         <>
-            <Grid container spacing={3} justifyContent="center" sx={{ mt: 4 }}>
-                <Grid item xs={12} md={6}>
-                    <Card sx={{ p: 2, bgcolor: 'white', borderRadius: 2, boxShadow: 1 }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>Subscribe to Instrument Tokens</Typography>
+            <Snackbar open={openSuccess} autoHideDuration={3000} onClose={handleCloseSuccess} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={handleCloseSuccess} severity="success" sx={{ fontSize: 13 }}>{success}</Alert>
+            </Snackbar>
+            <Snackbar open={openError} autoHideDuration={3000} onClose={handleCloseError} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={handleCloseError} severity="error" sx={{ fontSize: 13 }}>{error}</Alert>
+            </Snackbar>
+            <Snackbar open={openUnsubSuccess} autoHideDuration={3000} onClose={handleCloseUnsubSuccess} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={handleCloseUnsubSuccess} severity="success" sx={{ fontSize: 13 }}>{unsubSuccess}</Alert>
+            </Snackbar>
+            <Snackbar open={openUnsubError} autoHideDuration={3000} onClose={handleCloseUnsubError} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={handleCloseUnsubError} severity="error" sx={{ fontSize: 13 }}>{unsubError}</Alert>
+            </Snackbar>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="flex-start" justifyContent="space-between" sx={{ mt: 4, mb: 4, width: '100%' }}>
+                <Box sx={{ flex: 1, minWidth: 320, maxWidth: '45%' }}>
+                    <Paper elevation={1} sx={{ p: 2, border: '1px solid black' }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1a237e', letterSpacing: 1, fontSize: 20 }}>Subscribe Here</Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" width="100%">
                             <Autocomplete
                                 options={options}
                                 getOptionLabel={option => `${option.tradingsymbol} (${option.name}) [${option.instrument_token}]`}
@@ -104,99 +144,97 @@ const ZerodhaWebSocketSubscription = () => {
                                 onChange={(e, value) => setSelectedInstrument(value)}
                                 value={selectedInstrument}
                                 loading={searchLoading}
+                                sx={{ width: '100%' }}
                                 renderInput={params => (
                                     <TextField
                                         {...params}
                                         label="Search Instrument"
+                                        size="small"
                                         variant="outlined"
-                                        fullWidth
-                                        InputProps={{
-                                            ...params.InputProps,
-                                            endAdornment: (
-                                                <>
-                                                    {searchLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                                    {params.InputProps.endAdornment}
-                                                </>
-                                            ),
-                                        }}
-                                        sx={{ mb: 2 }}
+                                        sx={{ width: '100%' }}
                                         disabled={loading}
                                     />
                                 )}
                             />
-                            <Button variant="contained" onClick={handleSubscribe} disabled={loading || !selectedInstrument} fullWidth>
+                            <Button
+                                variant="contained"
+                                color="success"
+                                size="small"
+                                onClick={handleSubscribe}
+                                disabled={loading || !selectedInstrument}
+                                sx={{ minWidth: 110, fontWeight: 600, fontSize: 15, boxShadow: 1, '&:hover': { backgroundColor: '#388e3c' } }}
+                            >
                                 {loading ? 'Subscribing...' : 'Subscribe'}
                             </Button>
-                            {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
-                            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                    <Card sx={{ p: 2, bgcolor: 'white', borderRadius: 2, boxShadow: 1 }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>Unsubscribe from Tokens</Typography>
-                            <FormControl fullWidth sx={{ mb: 2 }}>
-                                <InputLabel id="unsubscribe-token-label">Subscribed Token</InputLabel>
+                        </Stack>
+                    </Paper>
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 320, maxWidth: '45%' }}>
+                    <Paper elevation={1} sx={{ p: 2, border: '1px solid black' }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1a237e', letterSpacing: 1, fontSize: 20 }}>Unsubscribe Here</Typography>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" width="100%">
+                            <FormControl size="small" sx={{ width: '100%' }}>
                                 <Select
-                                    labelId="unsubscribe-token-label"
                                     value={unsubscribeToken}
-                                    label="Subscribed Token"
                                     onChange={e => setUnsubscribeToken(e.target.value)}
+                                    displayEmpty
+                                    size="small"
                                     disabled={unsubLoading || subscribed.length === 0}
                                 >
+                                    <MenuItem value="" disabled>Select Token</MenuItem>
                                     {subscribed.map(row => (
                                         <MenuItem key={row.instrument_token} value={row.instrument_token}>
-                                            {row.tradingsymbol
-                                                ? `${row.tradingsymbol} (${row.instrument_token})`
-                                                : row.instrument_token}
+                                            {row.tradingsymbol ? `${row.tradingsymbol} (${row.instrument_token})` : row.instrument_token}
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
-                            <Button variant="contained" color="error" onClick={handleUnsubscribe} disabled={unsubLoading || !unsubscribeToken} fullWidth>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                size="small"
+                                onClick={handleUnsubscribe}
+                                disabled={unsubLoading || !unsubscribeToken}
+                                sx={{ minWidth: 130, fontWeight: 600, fontSize: 15, boxShadow: 1, '&:hover': { backgroundColor: '#b71c1c' } }}
+                            >
                                 {unsubLoading ? 'Unsubscribing...' : 'Unsubscribe'}
                             </Button>
-                            {unsubSuccess && <Alert severity="success" sx={{ mt: 2 }}>{unsubSuccess}</Alert>}
-                            {unsubError && <Alert severity="error" sx={{ mt: 2 }}>{unsubError}</Alert>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-            <Box sx={{ maxWidth: 900, mx: 'auto', mt: 4 }}>
-                <Card>
-                    <CardContent>
-                        <Typography variant="h6" gutterBottom>Subscribed Tokens</Typography>
-                        {subscribed.length === 0 ? (
-                            <Typography color="text.secondary">No tokens subscribed.</Typography>
-                        ) : (
-                            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 2 }}>
-                                <Box component="thead" sx={{ backgroundColor: '#f5f5f5' }}>
-                                    <Box component="tr">
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Token</Box>
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Symbol</Box>
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Name</Box>
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Exchange</Box>
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>LTP</Box>
-                                        <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Tick Time</Box>
-                                    </Box>
-                                </Box>
-                                <Box component="tbody">
-                                    {subscribed.map(row => (
-                                        <Box component="tr" key={row.instrument_token}>
-                                            <Box component="td" sx={{ p: 1 }}>{row.instrument_token}</Box>
-                                            <Box component="td" sx={{ p: 1 }}>{row.tradingsymbol || '-'}</Box>
-                                            <Box component="td" sx={{ p: 1 }}>{row.name || '-'}</Box>
-                                            <Box component="td" sx={{ p: 1 }}>{row.exchange || '-'}</Box>
-                                            <Box component="td" sx={{ p: 1 }}>{row.ltp !== null && row.ltp !== undefined ? row.ltp : '-'}</Box>
-                                            <Box component="td" sx={{ p: 1 }}>{row.tick_time ? new Date(row.tick_time).toLocaleString() : '-'}</Box>
-                                        </Box>
-                                    ))}
+                        </Stack>
+                    </Paper>
+                </Box>
+            </Stack>
+            <Box sx={{ width: '100%', px: { xs: 1, sm: 4, md: 8 }, mt: 2 }}>
+                <Paper elevation={1} sx={{ p: 2, width: '100%', border: '1px solid black' }}>
+                    <Typography variant="h6" fontWeight={700} sx={{ color: '#1a237e', mb: 2, fontSize: 20 }}>Subscribed Tokens</Typography>
+                    {subscribed.length === 0 ? (
+                        <Typography color="text.secondary" fontSize={15}>No tokens subscribed.</Typography>
+                    ) : (
+                        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 1 }}>
+                            <Box component="thead" sx={{ backgroundColor: '#f5f5f5' }}>
+                                <Box component="tr">
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Token</Box>
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Symbol</Box>
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Name</Box>
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Exchange</Box>
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>LTP</Box>
+                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Tick Time</Box>
                                 </Box>
                             </Box>
-                        )}
-                    </CardContent>
-                </Card>
+                            <Box component="tbody">
+                                {subscribed.map(row => (
+                                    <Box component="tr" key={row.instrument_token}>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.instrument_token}</Box>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tradingsymbol || '-'}</Box>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.name || '-'}</Box>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.exchange || '-'}</Box>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.ltp !== null && row.ltp !== undefined ? row.ltp : '-'}</Box>
+                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_time ? new Date(row.tick_time).toLocaleString() : '-'}</Box>
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Box>
+                    )}
+                </Paper>
             </Box>
         </>
     );

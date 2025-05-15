@@ -70,16 +70,16 @@ const PortfolioDashboard = ({ portfolioAccounts, portfolioLoading, accountInfo }
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ color: isCurrent ? 'primary.main' : 'text.secondary', py: 2 }}>{acc.account_id}</TableCell>
                                                 <TableCell align="center" sx={{ py: 2 }}>
-                                                    <Typography fontWeight={700} color="primary.main" fontSize={17}>₹{formatCurrency(acc.equity_account_balance)}</Typography>
+                                                    <Typography fontWeight={700} color="primary.main" fontSize={17}>{formatCurrency(acc.equity_account_balance)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 2 }}>
-                                                    <Typography fontWeight={700} color="success.main" fontSize={17}>₹{formatCurrency(acc.equity_holdings_value)}</Typography>
+                                                    <Typography fontWeight={700} color="success.main" fontSize={17}>{formatCurrency(acc.equity_holdings_value)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 2 }}>
-                                                    <Typography fontWeight={700} color="warning.main" fontSize={17}>₹{formatCurrency(acc.equity_positions_value)}</Typography>
+                                                    <Typography fontWeight={700} color="warning.main" fontSize={17}>{formatCurrency(acc.equity_positions_value)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 2 }}>
-                                                    <Typography fontWeight={700} color="info.main" fontSize={18}>₹{formatCurrency(acc.total_account_value)}</Typography>
+                                                    <Typography fontWeight={700} color="info.main" fontSize={18}>{formatCurrency(acc.total_account_value)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 2 }}>
                                                     <Typography fontWeight={700} color="info.main" fontSize={17}>

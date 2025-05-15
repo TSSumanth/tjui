@@ -62,7 +62,7 @@ const EquityMargins = ({ accountInfo }) => {
                                     {item.label}
                                 </Typography>
                                 <Typography variant="h6" color={`${item.color}.main`}>
-                                    ₹{formatCurrency(item.value)}
+                                    {formatCurrency(item.value)}
                                 </Typography>
                             </Paper>
                         </Grid>

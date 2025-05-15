@@ -43,7 +43,7 @@ const MutualFunds = ({ mutualFunds }) => {
                                 Invested
                             </Typography>
                             <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
-                                ₹{formatCurrency(stats.totalInvested)}
+                                {formatCurrency(stats.totalInvested)}
                             </Typography>
                         </Paper>
                         <Paper elevation={2} sx={{ p: 0, flex: '1 1 120px', minWidth: 100, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
@@ -51,7 +51,7 @@ const MutualFunds = ({ mutualFunds }) => {
                                 Current Value
                             </Typography>
                             <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1 }}>
-                                ₹{formatCurrency(stats.currentValue)}
+                                {formatCurrency(stats.currentValue)}
                             </Typography>
                         </Paper>
                         <Paper elevation={2} sx={{ p: 0, flex: '1 1 120px', minWidth: 100, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
@@ -66,7 +66,7 @@ const MutualFunds = ({ mutualFunds }) => {
                                     lineHeight: 1
                                 }}
                             >
-                                ₹{formatCurrency(stats.totalPL)}
+                                {formatCurrency(stats.totalPL)}
                             </Typography>
                         </Paper>
                     </Box>
@@ -94,14 +94,14 @@ const MutualFunds = ({ mutualFunds }) => {
                                     <TableRow key={index}>
                                         <TableCell>{fund.scheme_name}</TableCell>
                                         <TableCell align="right">{fund.units.toFixed(2)}</TableCell>
-                                        <TableCell align="right">₹{formatCurrency(fund.average_cost)}</TableCell>
-                                        <TableCell align="right">₹{formatCurrency(fund.current_nav)}</TableCell>
-                                        <TableCell align="right">₹{formatCurrency(currentValue)}</TableCell>
+                                        <TableCell align="right">{formatCurrency(fund.average_cost)}</TableCell>
+                                        <TableCell align="right">{formatCurrency(fund.current_nav)}</TableCell>
+                                        <TableCell align="right">{formatCurrency(currentValue)}</TableCell>
                                         <TableCell align="right">
                                             <Typography
                                                 color={pnl >= 0 ? 'success.main' : 'error.main'}
                                             >
-                                                ₹{formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
+                                                {formatCurrency(pnl)} ({pnlPercentage.toFixed(2)}%)
                                             </Typography>
                                         </TableCell>
                                     </TableRow>
