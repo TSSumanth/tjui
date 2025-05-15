@@ -55,6 +55,7 @@ export const ZerodhaProvider = ({ children }) => {
     const lastFetchTime = useRef(0);
     const retryCount = useRef(0);
     const isMounted = useRef(true);
+    const isUnmounted = useRef(false);
     const sessionCheckTimeoutRef = useRef(null);
 
     // Helper function to make API calls with retry logic
@@ -236,6 +237,7 @@ export const ZerodhaProvider = ({ children }) => {
     // Initial setup effect
     useEffect(() => {
         isMounted.current = true;
+        isUnmounted.current = false;
 
         const initializeApp = async () => {
             if (isInitialLoadDone.current || !isMounted.current) return;
@@ -259,6 +261,7 @@ export const ZerodhaProvider = ({ children }) => {
 
         return () => {
             isMounted.current = false;
+            isUnmounted.current = true;
             if (sessionCheckTimeoutRef.current) {
                 clearTimeout(sessionCheckTimeoutRef.current);
             }
@@ -341,32 +344,138 @@ export const ZerodhaProvider = ({ children }) => {
         initialFetch();
     }, [checkSession, fetchOrders]);
 
-    // Global OCO monitoring effect
+    // Add these helper functions before fetchOrderPairStatuses
+    const handleOcoPairStatus = async (pair, order1Status, order2Status, statusMap) => {
+        try {
+            const normStatus1 = (order1Status || '').toUpperCase();
+            const normStatus2 = (order2Status || '').toUpperCase();
+            const isOrder1Open = normStatus1 === 'OPEN';
+            const isOrder2Open = normStatus2 === 'OPEN';
+
+            // Case 1: One order complete, other cancelled
+            if ((normStatus1 === 'COMPLETE' && normStatus2 === 'CANCELLED') ||
+                (normStatus1 === 'CANCELLED' && normStatus2 === 'COMPLETE')) {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            // Case 2: Neither order is open
+            else if (!isOrder1Open && !isOrder2Open) {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            // Case 3: Order1 complete, Order2 open
+            else if (normStatus1 === 'COMPLETE' && isOrder2Open) {
+                await cancelZerodhaOrder(pair.order2_id);
+                const newOrder2Details = { ...pair.order2_details, orderstatus: 'CANCELLED' };
+                await updateOrderPair(pair.id, {
+                    status: 'COMPLETED',
+                    order2_details: newOrder2Details
+                });
+                return true;
+            }
+            // Case 4: Order2 complete, Order1 open
+            else if (normStatus2 === 'COMPLETE' && isOrder1Open) {
+                await cancelZerodhaOrder(pair.order1_id);
+                const newOrder1Details = { ...pair.order1_details, orderstatus: 'CANCELLED' };
+                await updateOrderPair(pair.id, {
+                    status: 'COMPLETED',
+                    order1_details: newOrder1Details
+                });
+                return true;
+            }
+            // Case 5: Both orders complete
+            else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            // Case 6: Both orders cancelled
+            else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(`Error handling OCO pair ${pair.id}:`, error);
+            throw error; // Propagate error for proper handling
+        }
+    };
+
+    const handleOaoPairStatus = async (pair, order1Status, order2Status) => {
+        try {
+            // Case 1: Order1 cancelled
+            if (order1Status === 'CANCELLED') {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            // Case 2: Order1 complete and Order2 waiting
+            else if (order1Status === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
+                try {
+                    const data = await placeOrder(pair.order2_details);
+                    if (data.success && data.order_id) {
+                        await updateOrderPair(pair.id, { order2_id: data.order_id });
+                    } else {
+                        await updateOrderPair(pair.id, {
+                            order2_id: 'FAILED',
+                            order2_details: {
+                                ...pair.order2_details,
+                                orderstatus: 'FAILED',
+                                error: data.error || 'Unknown error from Zerodha'
+                            }
+                        });
+                    }
+                    return true;
+                } catch (error) {
+                    await updateOrderPair(pair.id, {
+                        order2_id: 'FAILED',
+                        order2_details: {
+                            ...pair.order2_details,
+                            orderstatus: 'FAILED',
+                            error: error.message || 'Unknown error from Zerodha'
+                        }
+                    });
+                    throw error; // Propagate error for proper handling
+                }
+            }
+            // Case 3: Both orders complete
+            else if (order1Status === 'COMPLETE' && order2Status === 'COMPLETE') {
+                await updateOrderPair(pair.id, { status: 'COMPLETED' });
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(`Error handling OAO pair ${pair.id}:`, error);
+            throw error; // Propagate error for proper handling
+        }
+    };
+
+    // Global Order Pair monitoring effect
     useEffect(() => {
         let intervalId;
-        let isUnmounted = false;
         const fetchOrderPairStatuses = async () => {
             try {
                 const pairsData = await getOrderPairs('active');
-                if (isUnmounted) return;
+                if (isUnmounted.current) return;
                 setActiveOrderPairs(pairsData);
-                // Process active pairs for polling
+
                 const statusMap = { ...orderPairStatusMap };
+                const errors = [];
+
                 await Promise.all(pairsData.map(async (pair) => {
-                    if (pair.status !== 'completed') {
-                        // Only fetch from Zerodha if not done and status is OPEN
+                    if (pair.status === 'completed') return;
+
+                    try {
+                        // Get local statuses
                         const order1StatusLocal = pair.order1_details?.orderstatus?.toUpperCase();
                         const order2StatusLocal = pair.order2_details?.orderstatus?.toUpperCase();
                         const isOrder1Open = order1StatusLocal === 'OPEN';
                         const isOrder2Open = order2StatusLocal === 'OPEN';
-                        const isOrder1Done = order1StatusLocal === 'COMPLETE' || order1StatusLocal === 'CANCELLED';
-                        const isOrder2Done = order2StatusLocal === 'COMPLETE' || order2StatusLocal === 'CANCELLED';
+
                         let order1Status = order1StatusLocal;
                         let order2Status = order2StatusLocal;
                         let order1DetailsUpdated = false;
                         let order2DetailsUpdated = false;
 
-                        // Only fetch order1 status if it's OPEN
+                        // Fetch order1 status if OPEN
                         if (isOrder1Open && pair.order1_id) {
                             try {
                                 const resp1 = await getOrderById(pair.order1_id);
@@ -377,14 +486,16 @@ export const ZerodhaProvider = ({ children }) => {
                                         order1DetailsUpdated = true;
                                     }
                                 }
-                            } catch (error) { console.log(error) }
+                            } catch (error) {
+                                console.error(`Error fetching order1 status for pair ${pair.id}:`, error);
+                                errors.push({ pairId: pair.id, orderId: pair.order1_id, error });
+                            }
                         } else {
                             statusMap[pair.order1_id] = order1StatusLocal;
                         }
 
-                        // Skip order2 status check if it's WAITINGFORORDER1
+                        // Handle order2 status
                         if (pair.order2_id && pair.order2_id !== 'WAITINGFORORDER1') {
-                            // Only fetch order2 status if it's OPEN
                             if (isOrder2Open && (pair.type !== 'OAO' || order1Status === 'COMPLETE')) {
                                 try {
                                     const resp2 = await getOrderById(pair.order2_id);
@@ -395,7 +506,10 @@ export const ZerodhaProvider = ({ children }) => {
                                             order2DetailsUpdated = true;
                                         }
                                     }
-                                } catch (error) { console.log(error) }
+                                } catch (error) {
+                                    console.error(`Error fetching order2 status for pair ${pair.id}:`, error);
+                                    errors.push({ pairId: pair.id, orderId: pair.order2_id, error });
+                                }
                             } else {
                                 statusMap[pair.order2_id] = order2StatusLocal;
                             }
@@ -403,97 +517,48 @@ export const ZerodhaProvider = ({ children }) => {
                             statusMap[pair.order2_id] = 'WAITINGFORORDER1';
                         }
 
-                        // If status changed, update backend
+                        // Update backend if status changed
                         if (order1DetailsUpdated || order2DetailsUpdated) {
-                            const newOrder1Details = order1DetailsUpdated ? { ...pair.order1_details, orderstatus: order1Status } : pair.order1_details;
-                            const newOrder2Details = order2DetailsUpdated ? { ...pair.order2_details, orderstatus: order2Status } : pair.order2_details;
-                            await updateOrderPair(pair.id, { order1_details: newOrder1Details, order2_details: newOrder2Details });
+                            const newOrder1Details = order1DetailsUpdated ?
+                                { ...pair.order1_details, orderstatus: order1Status } : pair.order1_details;
+                            const newOrder2Details = order2DetailsUpdated ?
+                                { ...pair.order2_details, orderstatus: order2Status } : pair.order2_details;
+                            await updateOrderPair(pair.id, {
+                                order1_details: newOrder1Details,
+                                order2_details: newOrder2Details
+                            });
                         }
 
-                        if (pair.type === 'OAO') {
-                            if (order1Status === 'CANCELLED') {
-                                // Order 1 is cancelled, mark the pair as completed
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            } else if (order1Status === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
-                                // Order 1 is complete, create Order 2 (only once)
-                                try {
-                                    const data = await placeOrder(pair.order2_details);
-                                    if (data.success && data.order_id) {
-                                        // PATCH backend with order2_id after first attempt
-                                        await updateOrderPair(pair.id, { order2_id: data.order_id });
-                                    } else {
-                                        // PATCH backend with a special error status and order2_details
-                                        await updateOrderPair(pair.id, {
-                                            order2_id: 'FAILED',
-                                            order2_details: {
-                                                ...pair.order2_details,
-                                                orderstatus: 'FAILED',
-                                                error: data.error || 'Unknown error from Zerodha'
-                                            }
-                                        });
-                                    }
-                                } catch (error) {
-                                    // PATCH backend with a special error status and order2_details
-                                    await updateOrderPair(pair.id, {
-                                        order2_id: 'FAILED',
-                                        order2_details: {
-                                            ...pair.order2_details,
-                                            orderstatus: 'FAILED',
-                                            error: error.message || 'Unknown error from Zerodha'
-                                        }
-                                    });
-                                }
-                            } else if (order1Status === 'COMPLETE' && order2Status === 'COMPLETE') {
-                                // Both orders are complete
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            }
-                        }
-
+                        // Handle pair type specific logic
                         if (pair.type === 'OCO') {
-                            const normStatus1 = (order1Status || '').toUpperCase();
-                            const normStatus2 = (order2Status || '').toUpperCase();
-                            const isOrder1Open = normStatus1 === 'OPEN';
-                            const isOrder2Open = normStatus2 === 'OPEN';
-
-                            // If one order is COMPLETE and the other is CANCELLED, mark as completed
-                            if ((normStatus1 === 'COMPLETE' && normStatus2 === 'CANCELLED') ||
-                                (normStatus1 === 'CANCELLED' && normStatus2 === 'COMPLETE')) {
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            }
-                            // If neither order is OPEN, mark as completed (handles legacy/inconsistent pairs)
-                            else if (!isOrder1Open && !isOrder2Open) {
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            }
-                            // If one order is COMPLETE and other is OPEN, cancel the open order
-                            else if (normStatus1 === 'COMPLETE' && isOrder2Open) {
-                                await cancelZerodhaOrder(pair.order2_id);
-                                const newOrder2Details = { ...pair.order2_details, orderstatus: 'CANCELLED' };
-                                await updateOrderPair(pair.id, { status: 'COMPLETED', order2_details: newOrder2Details });
-                            }
-                            else if (normStatus2 === 'COMPLETE' && isOrder1Open) {
-                                await cancelZerodhaOrder(pair.order1_id);
-                                const newOrder1Details = { ...pair.order1_details, orderstatus: 'CANCELLED' };
-                                await updateOrderPair(pair.id, { status: 'COMPLETED', order1_details: newOrder1Details });
-                            }
-                            // If both orders are COMPLETE, mark as completed
-                            else if (normStatus1 === 'COMPLETE' && normStatus2 === 'COMPLETE') {
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            }
-                            // If both orders are CANCELLED, mark as completed
-                            else if (normStatus1.startsWith('CANCELLED') && normStatus2.startsWith('CANCELLED')) {
-                                await updateOrderPair(pair.id, { status: 'COMPLETED' });
-                            }
+                            await handleOcoPairStatus(pair, order1Status, order2Status, statusMap);
+                        } else if (pair.type === 'OAO') {
+                            await handleOaoPairStatus(pair, order1Status, order2Status);
                         }
+                    } catch (error) {
+                        console.error(`Error processing pair ${pair.id}:`, error);
+                        errors.push({ pairId: pair.id, error });
                     }
                 }));
-            } catch { /* intentionally empty */ }
+
+                // Log any errors that occurred during processing
+                if (errors.length > 0) {
+                    console.error('Errors occurred while processing order pairs:', errors);
+                }
+
+                setOrderPairStatusMap(statusMap);
+            } catch (error) {
+                console.error('Error in fetchOrderPairStatuses:', error);
+                setError('Failed to fetch order pair statuses. Please try again.');
+            }
         };
+
         if (sessionActive && isMarketHours()) {
-            fetchOrderPairStatuses(true);
-            intervalId = setInterval(() => fetchOrderPairStatuses(true), 15000);
+            fetchOrderPairStatuses();
+            intervalId = setInterval(fetchOrderPairStatuses, 15000);
         }
+
         return () => {
-            isUnmounted = true;
             if (intervalId) clearInterval(intervalId);
         };
     }, [sessionActive, isMarketHours()]);
