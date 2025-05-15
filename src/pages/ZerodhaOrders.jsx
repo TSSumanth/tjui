@@ -30,10 +30,7 @@ const ZerodhaOrders = () => {
         <>
             <ZerodhaSubHeader />
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5">
-                        Orders
-                    </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
                     <Button
                         variant="contained"
                         color="primary"
@@ -50,7 +47,7 @@ const ZerodhaOrders = () => {
                     >
                         {loadingStates.orders ? 'Refreshing...' : 'Refresh'}
                     </Button>
-                </Stack>
+                </Box>
                 {loadingStates.orders ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                         <CircularProgress />

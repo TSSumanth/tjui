@@ -1,4 +1,5 @@
-import api from './api';
+import api from '../zerodha/api';
+import { getOrders, placeOrder, getInstruments } from '../zerodha/api';
 import { API_URLS } from '../../config/api';
 
 export const createOaoOrderPair = async ({

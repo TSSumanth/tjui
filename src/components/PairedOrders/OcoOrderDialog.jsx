@@ -20,7 +20,7 @@ import {
     Snackbar,
     IconButton
 } from '@mui/material';
-import { createOrderPair } from '../../services/zerodha/oco';
+import { createOrderPair } from '../../services/pairedorders/oco';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useZerodha } from '../../context/ZerodhaContext';
 

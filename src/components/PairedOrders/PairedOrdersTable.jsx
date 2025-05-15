@@ -17,8 +17,8 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Tooltip, Box, IconButton, Radio
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
-import { deleteOaoOrderPair, updateOaoOrderPair } from '../../services/zerodha/oao';
-import { deleteOrderPair, createOrderPair } from '../../services/zerodha/oco';
+import { deleteOaoOrderPair, updateOaoOrderPair } from '../../services/pairedorders/oao';
+import { deleteOrderPair, createOrderPair } from '../../services/pairedorders/oco';
 import { Delete, Edit, Refresh } from '@mui/icons-material';
 import { placeOrder, getOrders } from '../../services/zerodha/api';
 
@@ -190,58 +190,58 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                     </Typography> */}
                     {completedTodayPairs.length > 0 ? (
                         <Box>
-                            <Typography variant="h6" gutterBottom>
-                        Completed OCO Orders
-                        {/* <IconButton
+                            <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
+                                Completed OCO Orders
+                                {/* <IconButton
                             onClick={refreshCompletedOrders}
                             size="small"
                             sx={{ ml: 1 }}
                         >
                             <Refresh />
                         </IconButton> */}
-                    </Typography> 
-                        <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Order 1</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Order 2</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Completed At</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {completedTodayPairs.map((pair) => {
-                                        const status1 = pair.order1_details?.orderstatus || '';
-                                        const status2 = pair.order2_details?.orderstatus || '';
-                                        return (
-                                            <TableRow key={pair.id}>
-                                                <TableCell>
-                                                    {pair.order1_details?.tradingsymbol || ''} <br />
-                                                    <small>{pair.order1_id}</small>
-                                                </TableCell>
-                                                <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
-                                                <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
-                                                <TableCell>
-                                                    {pair.order2_details?.tradingsymbol || ''} <br />
-                                                    <small>{pair.order2_id}</small>
-                                                </TableCell>
-                                                <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
-                                                <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
-                                                <TableCell>{formatDate(pair.updated_at)}</TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                            </Typography>
+                            <TableContainer component={Paper}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Order 1</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Order 2</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Completed At</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {completedTodayPairs.map((pair) => {
+                                            const status1 = pair.order1_details?.orderstatus || '';
+                                            const status2 = pair.order2_details?.orderstatus || '';
+                                            return (
+                                                <TableRow key={pair.id}>
+                                                    <TableCell>
+                                                        {pair.order1_details?.tradingsymbol || ''} <br />
+                                                        <small>{pair.order1_id}</small>
+                                                    </TableCell>
+                                                    <TableCell>{pair.order1_details?.transaction_type || ''}</TableCell>
+                                                    <TableCell><Chip label={status1} color={getStatusColor(status1)} size="small" /></TableCell>
+                                                    <TableCell>
+                                                        {pair.order2_details?.tradingsymbol || ''} <br />
+                                                        <small>{pair.order2_id}</small>
+                                                    </TableCell>
+                                                    <TableCell>{pair.order2_details?.transaction_type || ''}</TableCell>
+                                                    <TableCell><Chip label={status2} color={getStatusColor(status2)} size="small" /></TableCell>
+                                                    <TableCell>{formatDate(pair.updated_at)}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
                         </Box>
                     ) : (
                         <Box>
-                            <Typography variant="h6" gutterBottom>
+                            <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                                 Completed OCO Orders
                                 {/* <IconButton
                                     onClick={refreshCompletedOrders}
@@ -261,7 +261,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                 {/* Completed OAO Orders */}
                 {completedOaoPairs.length > 0 ? (
                     <Box mb={4}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                             Completed OAO Orders
                         </Typography>
                         <TableContainer component={Paper}>
@@ -308,7 +308,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
                     </Box>
                 ) : (
                     <Box>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                             Completed OAO Orders
                             {/* <IconButton
                                 onClick={refreshCompletedOrders}
@@ -332,7 +332,7 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
             <Box>
                 {/* Active OCO Orders */}
                 <Box mb={4}>
-                    <Typography variant="h6" gutterBottom>
+                    <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                         Active OCO Orders
                     </Typography>
                     {activePairs.length > 0 ? (
@@ -397,12 +397,12 @@ export default function PairedOrdersTable({ onChange, showCompleted = false }) {
 
                 {/* Active OAO Orders */}
                 <Box mb={4}>
-                    <Typography variant="h6" gutterBottom>
+                    <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                         Active OAO Orders
                     </Typography>
                     {activeOaoPairs.length > 0 ? (
                         <Box mb={4}>
-                            <Typography variant="h6" gutterBottom>
+                            <Typography variant="h6" gutterBottom sx={{ color: '#1a237e' }}>
                                 Active OAO Orders
                             </Typography>
                             <TableContainer component={Paper}>

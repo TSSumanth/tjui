@@ -13,7 +13,7 @@ function formatDate(dateStr) {
 export default function SavedOrdersTable({ savedOrders, onEdit, onPlace, onDelete, placingOrder }) {
     return (
         <Paper sx={{ mb: 3, p: 2 }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ color: '#1a237e' }}>
                 Saved Orders (SO)
             </Typography>
             <TableContainer>

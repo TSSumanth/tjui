@@ -26,7 +26,7 @@ import {
     IconButton
 } from '@mui/material';
 import { useZerodha } from '../../context/ZerodhaContext';
-import { createOaoOrderPair } from '../../services/zerodha/oao';
+import { createOaoOrderPair } from '../../services/pairedorders/oao';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 const CreateOAOOrder = ({ open, onClose }) => {
@@ -202,7 +202,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
                     ) : (
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle1">
+                                <Typography variant="subtitle1" sx={{ color: '#1a237e' }}>
                                     First Order: {selectedOrder.tradingsymbol} ({selectedOrder.transaction_type})
                                 </Typography>
                             </Grid>

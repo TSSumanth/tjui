@@ -20,12 +20,13 @@ import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import OcoOrderDialog from '../components/PairedOrders/OcoOrderDialog';
 import CreateOAOOrder from '../components/PairedOrders/CreateOAOOrder';
 import { useZerodha } from '../context/ZerodhaContext';
-import { createOrderPair, getOrderPairs, updateOrderPair, deleteOrderPair } from '../services/zerodha/oco';
+import { createOrderPair, getOrderPairs, getActivePairs, updateOrderPair, deleteOrderPair, createOaoOrderPair, updateOaoOrderPair, deleteOaoOrderPair } from '../services/pairedorders/pairedorders';
 import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
 import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import StockOrderDialog from '../components/PairedOrders/StockOrderDialog';
 import FoOrderDialog from '../components/PairedOrders/FoOrderDialog';
+import { getCompletedOrderPairs } from '../services/pairedorders/pairedorders';
 
 function TabPanel({ children, value, index }) {
     return (
@@ -76,6 +77,7 @@ export default function PairedOrdersPage() {
     const [foOrderLoading, setFOOrderLoading] = useState(false);
     const [editingFO, setEditingFO] = useState(null);
     const [isUpdateFODialogOpen, setIsUpdateFODialogOpen] = useState(false);
+    const [completedOrders, setCompletedOrders] = useState([]);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -165,7 +167,7 @@ export default function PairedOrdersPage() {
     // Fetch all SOs (Saved Orders)
     useEffect(() => {
         const fetchSavedOrders = async () => {
-            const allPairs = await getOrderPairs();
+            const allPairs = await getActivePairs();
             setSavedOrders(allPairs.filter(pair => (pair.type === 'SO' || pair.type === 'FO') && pair.status === 'active'));
         };
         fetchSavedOrders();
@@ -296,7 +298,7 @@ export default function PairedOrdersPage() {
             setEditingSO(null);
             resetSOForm();
             // Refresh the saved orders list
-            const allPairs = await getOrderPairs();
+            const allPairs = await getActivePairs();
             setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
         } catch (e) {
             setSOOrderError('Failed to update order.');
@@ -332,7 +334,7 @@ export default function PairedOrdersPage() {
                 exchange: 'NFO'
             });
             // Refresh the saved orders list
-            const allPairs = await getOrderPairs();
+            const allPairs = await getActivePairs();
             setSavedOrders(allPairs.filter(pair => (pair.type === 'SO' || pair.type === 'FO') && pair.status === 'active'));
         } catch (e) {
             setFOOrderError('Failed to update F&O order.');
@@ -399,7 +401,7 @@ export default function PairedOrdersPage() {
             await deleteOrderPair(order.id);
             setSnackbar({ open: true, message: 'Order deleted successfully!', severity: 'success' });
             // Refresh the saved orders list
-            const allPairs = await getOrderPairs();
+            const allPairs = await getActivePairs();
             setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
         } catch (e) {
             setSnackbar({
@@ -463,11 +465,30 @@ export default function PairedOrdersPage() {
         setFOOrderLoading(false);
     };
 
+    useEffect(() => {
+        if (tabValue === 1) {
+            const fetchCompletedOrders = async () => {
+                try {
+                    const response = await getCompletedOrderPairs();
+                    setCompletedOrders(response);
+                } catch (error) {
+                    console.error('Error fetching completed orders:', error);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to fetch completed orders',
+                        severity: 'error'
+                    });
+                }
+            };
+            fetchCompletedOrders();
+        }
+    }, [tabValue]);
+
     return (
-        <Container maxWidth="xl">
+        <>
             <ZerodhaSubHeader />
-            <Box sx={{ my: 4 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
+            <Box sx={{ my: 4, p: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
+                <Typography variant="h4" component="h1" gutterBottom sx={{ color: '#1a237e' }}>
                     Paired Orders
                 </Typography>
 
@@ -488,7 +509,7 @@ export default function PairedOrdersPage() {
                                     color="primary"
                                     onClick={async () => {
                                         await refreshOcoPairs();
-                                        const allPairs = await getOrderPairs();
+                                        const allPairs = await getActivePairs();
                                         setSavedOrders(allPairs.filter(pair => pair.type === 'SO' && pair.status === 'active'));
                                         setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
                                     }}
@@ -731,6 +752,6 @@ export default function PairedOrdersPage() {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </Container>
+        </>
     );
 } 

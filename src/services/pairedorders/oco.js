@@ -1,5 +1,4 @@
-import api from './api';
-import { cancelZerodhaOrder, getOrderById } from './api';
+import api, { getOrders, placeOrder, getInstruments, cancelZerodhaOrder, getOrderById } from '../zerodha/api';
 import { addActionItem } from '../actionitems';
 
 
@@ -125,6 +124,10 @@ export const getOrderPairs = async (status = null) => {
     const url = status ? `/api/order-pairs?status=${status}` : '/api/order-pairs';
     const resp = await api.get(url);
     return resp.data;
+};
+
+export const getActivePairs = async () => {
+    return getOrderPairs('active');
 };
 
 export const getCompletedOrderPairs = async () => {

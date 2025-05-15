@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
 import { isAuthenticated, logout } from '../services/zerodha/authentication';
-import { getOrderPairs, updateOrderPairStatus, updateOrderPair, getCompletedOrderPairs } from '../services/zerodha/oco';
+import { getOrderPairs, getActivePairs, createOrderPair, updateOrderPair, deleteOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
-import { updateOaoOrderPair } from '../services/zerodha/oao';
+import { createOaoOrderPair, updateOaoOrderPair, deleteOaoOrderPair } from '../services/pairedorders/oao';
 
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
@@ -516,7 +516,7 @@ export const ZerodhaProvider = ({ children }) => {
 
     // Manual refresh for OCO pairs
     const refreshOcoPairs = useCallback(async () => {
-        const pairsData = await getOrderPairs('active');
+        const pairsData = await getActivePairs();
         setOcoPairs(pairsData);
         const statusMap = { ...ocoStatusMap };
         // Process all pairs to get their current status

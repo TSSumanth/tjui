@@ -111,42 +111,55 @@ const Orders = () => {
         order.status === 'REJECTED'
     );
 
+    const noOrders = pendingOrders.length === 0 && completedOrders.length === 0 && cancelledOrders.length === 0;
+
     return (
         <Box>
-            {pendingOrders.length > 0 && (
-                <Box mb={4}>
-                    <OrderTable
-                        orders={pendingOrders}
-                        onCancel={handleCancelOrder}
-                        onModify={handleModifyOrder}
-                        onViewDetails={handleViewDetails}
-                        onLinkToTrade={handleLinkToTrade}
-                    />
+            {noOrders ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, color: 'text.secondary' }}>
+                    <Box sx={{ fontSize: 64, mb: 2 }}>
+                        <span role="img" aria-label="No Orders">📭</span>
+                    </Box>
+                    <Typography variant="h6" color="text.secondary">No orders found.</Typography>
                 </Box>
-            )}
+            ) : (
+                <>
+                    {pendingOrders.length > 0 && (
+                        <Box mb={4}>
+                            <OrderTable
+                                orders={pendingOrders}
+                                onCancel={handleCancelOrder}
+                                onModify={handleModifyOrder}
+                                onViewDetails={handleViewDetails}
+                                onLinkToTrade={handleLinkToTrade}
+                            />
+                        </Box>
+                    )}
 
-            {completedOrders.length > 0 && (
-                <Box mb={4}>
-                    <OrderTable
-                        orders={completedOrders}
-                        onCancel={handleCancelOrder}
-                        onModify={handleModifyOrder}
-                        onViewDetails={handleViewDetails}
-                        onLinkToTrade={handleLinkToTrade}
-                    />
-                </Box>
-            )}
+                    {completedOrders.length > 0 && (
+                        <Box mb={4}>
+                            <OrderTable
+                                orders={completedOrders}
+                                onCancel={handleCancelOrder}
+                                onModify={handleModifyOrder}
+                                onViewDetails={handleViewDetails}
+                                onLinkToTrade={handleLinkToTrade}
+                            />
+                        </Box>
+                    )}
 
-            {cancelledOrders.length > 0 && (
-                <Box mb={4}>
-                    <OrderTable
-                        orders={cancelledOrders}
-                        onCancel={handleCancelOrder}
-                        onModify={handleModifyOrder}
-                        onViewDetails={handleViewDetails}
-                        onLinkToTrade={handleLinkToTrade}
-                    />
-                </Box>
+                    {cancelledOrders.length > 0 && (
+                        <Box mb={4}>
+                            <OrderTable
+                                orders={cancelledOrders}
+                                onCancel={handleCancelOrder}
+                                onModify={handleModifyOrder}
+                                onViewDetails={handleViewDetails}
+                                onLinkToTrade={handleLinkToTrade}
+                            />
+                        </Box>
+                    )}
+                </>
             )}
 
             <ModifyOrderDialog
