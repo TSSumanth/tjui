@@ -33,6 +33,8 @@ const ZerodhaWebSocketSubscription = () => {
 
     useEffect(() => {
         fetchSubscriptions();
+        const interval = setInterval(fetchSubscriptions, 2000);
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
