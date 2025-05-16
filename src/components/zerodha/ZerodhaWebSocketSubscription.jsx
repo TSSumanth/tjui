@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, TextField, Button, Typography, Alert, CircularProgress, Paper, Grid, MenuItem, Select, FormControl, InputLabel, Stack, Snackbar } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { getInstruments } from '../../services/zerodha/api';
-import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens } from '../../services/zerodha/webhook';
+import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus } from '../../services/zerodha/webhook';
 
 const ZerodhaWebSocketSubscription = () => {
     const [selectedInstrument, setSelectedInstrument] = useState(null);
@@ -20,6 +20,8 @@ const ZerodhaWebSocketSubscription = () => {
     const [openError, setOpenError] = useState(false);
     const [openUnsubSuccess, setOpenUnsubSuccess] = useState(false);
     const [openUnsubError, setOpenUnsubError] = useState(false);
+    const [webhookStatus, setWebhookStatus] = useState({ tickerConnected: false, loading: false });
+    const [statusLoading, setStatusLoading] = useState(false);
 
     const fetchSubscriptions = async () => {
         try {
@@ -119,8 +121,58 @@ const ZerodhaWebSocketSubscription = () => {
     const handleCloseUnsubSuccess = () => { setOpenUnsubSuccess(false); setUnsubSuccess(''); };
     const handleCloseUnsubError = () => { setOpenUnsubError(false); setUnsubError(''); };
 
+    // Poll status every 2 seconds
+    const fetchStatus = async () => {
+        setStatusLoading(true);
+        try {
+            const res = await getWebSocketStatus();
+            setWebhookStatus({ tickerConnected: res.tickerConnected, loading: false });
+        } catch {
+            setWebhookStatus({ tickerConnected: false, loading: false });
+        } finally {
+            setStatusLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Connect to Webhook button handler
+    const handleConnectWebhook = async () => {
+        setWebhookStatus(ws => ({ ...ws, loading: true }));
+        try {
+            // Call subscribe endpoint with empty array to trigger initTicker
+            await subscribeToTokens([]);
+            // Wait a moment for status to update
+            setTimeout(fetchStatus, 1000);
+        } catch {
+            // ignore
+        } finally {
+            setWebhookStatus(ws => ({ ...ws, loading: false }));
+        }
+    };
+
     return (
         <>
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Button
+                    variant={webhookStatus.tickerConnected ? 'contained' : 'outlined'}
+                    color={webhookStatus.tickerConnected ? 'success' : 'primary'}
+                    disabled={webhookStatus.tickerConnected || webhookStatus.loading}
+                    onClick={handleConnectWebhook}
+                    sx={{ minWidth: 220, fontWeight: 600, fontSize: 16, mt: 2 }}
+                >
+                    {webhookStatus.tickerConnected
+                        ? 'Webhook Active'
+                        : webhookStatus.loading
+                            ? 'Connecting...'
+                            : 'Connect to Webhook for Live Data'}
+                </Button>
+                {statusLoading && <CircularProgress size={22} />}
+            </Box>
             <Snackbar open={openSuccess} autoHideDuration={3000} onClose={handleCloseSuccess} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
                 <Alert onClose={handleCloseSuccess} severity="success" sx={{ fontSize: 13 }}>{success}</Alert>
             </Snackbar>

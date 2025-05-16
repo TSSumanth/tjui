@@ -168,6 +168,31 @@ const ZerodhaSubHeader = () => {
                     </Button>
                     <Button
                         component={Link}
+                        to="/zerodha/subscribe-live-data"
+                        startIcon={<ListAltIcon />}
+                        variant={isActive('/zerodha/subscribe-live-data') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
+                            }
+                        }}
+                    >
+                        Subscribe Live Data
+                    </Button>
+                    <Button
+                        component={Link}
                         to="/zerodha/trading-instruments"
                         startIcon={<ShowChartIcon />}
                         variant={isActive('/zerodha/trading-instruments') ? 'contained' : 'text'}

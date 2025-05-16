@@ -18,6 +18,7 @@ import Dashboard from './pages/DashBoardManagement';
 import TagManagement from './pages/TagManagement';
 import PairedOrdersPage from './pages/PairedOrdersPage';
 import Holidays from './pages/Holidays';
+import SubscribeLiveDataPage from './pages/SubscribeLiveData';
 
 function App() {
     return (
@@ -44,6 +45,7 @@ function App() {
                     <Route path="/zerodha/paired-orders" element={<PairedOrdersPage />} />
                     <Route path="/tags" element={<TagManagement />} />
                     <Route path="/holidays" element={<Holidays />} />
+                    <Route path="/zerodha/subscribe-live-data" element={<SubscribeLiveDataPage />} />
                     <Route path="*" element={<Home />} />
                 </Routes>
             </BrowserRouter>

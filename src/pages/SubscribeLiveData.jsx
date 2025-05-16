@@ -1,18 +1,17 @@
 import React from 'react';
 import { Box, Container, Typography } from '@mui/material';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
+import ZerodhaWebSocketSubscription from '../components/zerodha/ZerodhaWebSocketSubscription';
 
-const MyAlgoStrategiesPage = () => {
+const SubscribeLiveDataPage = () => {
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <ZerodhaSubHeader />
             <Container>
-                <Typography variant="h5" fontWeight={700} sx={{ mt: 3, mb: 2, color: '#1a237e' }}>
-                    Algo Strategies (Coming Soon)
-                </Typography>
+                <ZerodhaWebSocketSubscription />
             </Container>
         </Box>
     );
 };
 
-export default MyAlgoStrategiesPage; 
+export default SubscribeLiveDataPage; 
