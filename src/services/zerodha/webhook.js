@@ -33,4 +33,9 @@ export const getWebSocketStatus = async () => {
 export const setWebSocketAccessToken = async (access_token, public_token) => {
     const response = await api.post('/api/zerodha-ws/set-access-token', { access_token, public_token });
     return response.data;
+};
+
+export const disconnectWebSocket = async () => {
+    const res = await api.post('/api/zerodha-ws/disconnect');
+    return res.data;
 }; 

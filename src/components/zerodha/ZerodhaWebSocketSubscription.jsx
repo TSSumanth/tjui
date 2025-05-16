@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, TextField, Button, Typography, Alert, CircularProgress, Paper, Grid, MenuItem, Select, FormControl, InputLabel, Stack, Snackbar } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { getInstruments } from '../../services/zerodha/api';
-import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus } from '../../services/zerodha/webhook';
+import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
 
 const ZerodhaWebSocketSubscription = () => {
     const [selectedInstrument, setSelectedInstrument] = useState(null);
@@ -22,6 +22,7 @@ const ZerodhaWebSocketSubscription = () => {
     const [openUnsubError, setOpenUnsubError] = useState(false);
     const [webhookStatus, setWebhookStatus] = useState({ tickerConnected: false, loading: false });
     const [statusLoading, setStatusLoading] = useState(false);
+    const [disconnectSuccess, setDisconnectSuccess] = useState(false);
 
     const fetchSubscriptions = async () => {
         try {
@@ -155,6 +156,19 @@ const ZerodhaWebSocketSubscription = () => {
         }
     };
 
+    const handleDisconnectWebhook = async () => {
+        setWebhookStatus(ws => ({ ...ws, loading: true }));
+        try {
+            await disconnectWebSocket();
+            setDisconnectSuccess(true);
+            setTimeout(fetchStatus, 1000);
+        } catch {
+            // ignore
+        } finally {
+            setWebhookStatus(ws => ({ ...ws, loading: false }));
+        }
+    };
+
     return (
         <>
             <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -163,13 +177,22 @@ const ZerodhaWebSocketSubscription = () => {
                     color={webhookStatus.tickerConnected ? 'success' : 'primary'}
                     disabled={webhookStatus.tickerConnected || webhookStatus.loading}
                     onClick={handleConnectWebhook}
-                    sx={{ minWidth: 220, fontWeight: 600, fontSize: 16, mt: 2 }}
+                    sx={{ minWidth: 220, fontWeight: 600, fontSize: 16 }}
                 >
                     {webhookStatus.tickerConnected
                         ? 'Webhook Active'
                         : webhookStatus.loading
                             ? 'Connecting...'
                             : 'Connect to Webhook for Live Data'}
+                </Button>
+                <Button
+                    variant="outlined"
+                    color="error"
+                    disabled={!webhookStatus.tickerConnected || webhookStatus.loading}
+                    onClick={handleDisconnectWebhook}
+                    sx={{ minWidth: 180, fontWeight: 600, fontSize: 16 }}
+                >
+                    Disconnect Webhook
                 </Button>
                 {statusLoading && <CircularProgress size={22} />}
             </Box>
@@ -184,6 +207,9 @@ const ZerodhaWebSocketSubscription = () => {
             </Snackbar>
             <Snackbar open={openUnsubError} autoHideDuration={3000} onClose={handleCloseUnsubError} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
                 <Alert onClose={handleCloseUnsubError} severity="error" sx={{ fontSize: 13 }}>{unsubError}</Alert>
+            </Snackbar>
+            <Snackbar open={disconnectSuccess} autoHideDuration={3000} onClose={() => setDisconnectSuccess(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+                <Alert onClose={() => setDisconnectSuccess(false)} severity="info" sx={{ fontSize: 13 }}>Webhook disconnected</Alert>
             </Snackbar>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="flex-start" justifyContent="space-between" sx={{ mt: 4, mb: 4, width: '100%' }}>
                 <Box sx={{ flex: 1, minWidth: 320, maxWidth: '45%' }}>
@@ -257,34 +283,50 @@ const ZerodhaWebSocketSubscription = () => {
                     </Paper>
                 </Box>
             </Stack>
-            <Box sx={{ width: '100%', px: { xs: 1, sm: 4, md: 8 }, mt: 2 }}>
-                <Paper elevation={1} sx={{ p: 2, width: '100%', border: '1px solid black' }}>
+            <Box sx={{ width: '100%', px: 0, mt: 2 }}>
+                <Paper elevation={1} sx={{ p: 2, width: '100%', maxWidth: '100%', border: '1px solid black', overflowX: 'auto' }}>
                     <Typography variant="h6" fontWeight={700} sx={{ color: '#1a237e', mb: 2, fontSize: 20 }}>Subscribed Tokens</Typography>
                     {subscribed.length === 0 ? (
                         <Typography color="text.secondary" fontSize={15}>No tokens subscribed.</Typography>
                     ) : (
-                        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 1 }}>
-                            <Box component="thead" sx={{ backgroundColor: '#f5f5f5' }}>
-                                <Box component="tr">
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Token</Box>
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Symbol</Box>
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Name</Box>
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Exchange</Box>
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>LTP</Box>
-                                    <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Tick Time</Box>
-                                </Box>
-                            </Box>
-                            <Box component="tbody">
-                                {subscribed.map(row => (
-                                    <Box component="tr" key={row.instrument_token}>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.instrument_token}</Box>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tradingsymbol || '-'}</Box>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.name || '-'}</Box>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.exchange || '-'}</Box>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.ltp !== null && row.ltp !== undefined ? row.ltp : '-'}</Box>
-                                        <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_time ? new Date(row.tick_time).toLocaleString() : '-'}</Box>
+                        <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', mt: 1 }}>
+                                <Box component="thead" sx={{ backgroundColor: '#f5f5f5' }}>
+                                    <Box component="tr">
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Token</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Symbol</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Name</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Exchange</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>LTP</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Tick Time</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Last Traded Qty</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Bid Price</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Ask Price</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Bid Qty</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Ask Qty</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Bid Vol</Box>
+                                        <Box component="th" sx={{ textAlign: 'left', p: 1, fontSize: 15, color: '#1a237e' }}>Ask Vol</Box>
                                     </Box>
-                                ))}
+                                </Box>
+                                <Box component="tbody">
+                                    {subscribed.map(row => (
+                                        <Box component="tr" key={row.instrument_token}>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.instrument_token}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tradingsymbol || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.name || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.exchange || '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.ltp !== null && row.ltp !== undefined ? row.ltp : '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_time ? new Date(row.tick_time).toLocaleString() : '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_last_traded_quantity ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_bid_price ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_ask_price ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_bid_quantity ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_ask_quantity ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_bid_volume ?? '-'}</Box>
+                                            <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tick_current_ask_volume ?? '-'}</Box>
+                                        </Box>
+                                    ))}
+                                </Box>
                             </Box>
                         </Box>
                     )}
