@@ -203,4 +203,5 @@ const ZerodhaAccount = () => {
     );
 };
 
-export default React.memo(ZerodhaAccount); 
+// export default React.memo(ZerodhaAccount); 
+export default ZerodhaAccount;

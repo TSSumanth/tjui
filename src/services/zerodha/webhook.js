@@ -30,7 +30,7 @@ export const getWebSocketStatus = async () => {
     return response.data;
 };
 
-export const setWebSocketAccessToken = async (access_token) => {
-    const response = await api.post('/api/zerodha-ws/set-access-token', { access_token });
+export const setWebSocketAccessToken = async (access_token, public_token) => {
+    const response = await api.post('/api/zerodha-ws/set-access-token', { access_token, public_token });
     return response.data;
 }; 
