@@ -3,6 +3,7 @@ import { Box, TextField, Button, Typography, Alert, CircularProgress, Paper, Gri
 import Autocomplete from '@mui/material/Autocomplete';
 import { getInstruments } from '../../services/zerodha/api';
 import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
+import { getHolidays } from '../../services/holidays';
 
 const ZerodhaWebSocketSubscription = () => {
     const [selectedInstrument, setSelectedInstrument] = useState(null);
@@ -24,6 +25,22 @@ const ZerodhaWebSocketSubscription = () => {
     const [statusLoading, setStatusLoading] = useState(false);
     const [disconnectSuccess, setDisconnectSuccess] = useState(false);
     const [isPolling, setIsPolling] = useState(true);
+    const [holidays, setHolidays] = useState([]);
+
+    // Fetch holidays on component mount
+    useEffect(() => {
+        const fetchHolidays = async () => {
+            try {
+                const response = await getHolidays();
+                if (response.success) {
+                    setHolidays(response.data.map(holiday => holiday.date));
+                }
+            } catch (error) {
+                console.error('Failed to fetch holidays:', error);
+            }
+        };
+        fetchHolidays();
+    }, []);
 
     // Check if current time is within market hours (9:15 AM to 3:30 PM IST)
     const isMarketHours = () => {
@@ -36,27 +53,7 @@ const ZerodhaWebSocketSubscription = () => {
             return false;
         }
 
-        // Check if it's a holiday (you can expand this list)
-        const holidays = [
-            '2024-01-26', // Republic Day
-            '2024-03-08', // Mahashivratri
-            '2024-03-25', // Holi
-            '2024-03-29', // Good Friday
-            '2024-04-09', // Ram Navami
-            '2024-04-11', // Id-Ul-Fitr
-            '2024-04-17', // Mahavir Jayanti
-            '2024-05-01', // Maharashtra Day
-            '2024-05-20', // Lok Sabha Elections
-            '2024-06-17', // Bakri Id
-            '2024-07-17', // Muharram
-            '2024-08-15', // Independence Day
-            '2024-08-26', // Janmashtami
-            '2024-10-02', // Mahatma Gandhi Jayanti
-            '2024-11-01', // Diwali-Laxmi Pujan
-            '2024-11-15', // Gurunanak Jayanti
-            '2024-12-25', // Christmas
-        ];
-
+        // Check if it's a holiday
         const today = istTime.toISOString().split('T')[0];
         if (holidays.includes(today)) {
             return false;
