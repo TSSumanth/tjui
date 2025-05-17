@@ -37,9 +37,13 @@ export const getEquityMargins = async () => {
     }
 };
 
-export const updateEquityMargins = async (data) => {
+export const updateEquityMargins = async (clientId, data) => {
     try {
-        const response = await axios.post(API_URLS.ZERODHA_ACCOUNT+'/margins', data);
+        const response = await axios.post(API_URLS.ZERODHA_ACCOUNT+'/margins', 
+            {
+                client_id: clientId,
+                ...data
+            });
         return response.data;
     } catch (error) {
         console.error('Error updating equity margins:', error);
@@ -58,9 +62,13 @@ export const getMutualFunds = async () => {
     }
 };
 
-export const updateMutualFunds = async (data) => {
+export const updateMutualFunds = async (clientId, data) => {
     try {
-        const response = await axios.post(API_URLS.ZERODHA_ACCOUNT+'/mutual-funds', data);
+        const response = await axios.post(API_URLS.ZERODHA_ACCOUNT+'/mutual-funds', 
+            {
+                client_id: clientId,
+                data: data
+            });
         return response.data;
     } catch (error) {
         console.error('Error updating mutual funds:', error);

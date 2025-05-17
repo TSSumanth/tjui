@@ -20,13 +20,31 @@ import AccountSummary from '../components/AccountDetails/AccountSummary';
 import EquityMargins from '../components/AccountDetails/EquityMargins';
 import PortfolioDashboard from '../components/AccountDetails/PortfolioDashboard';
 import MutualFunds from '../components/AccountDetails/MutualFunds';
-
+import { getAccountInfo } from '../services/zerodha/api';
+import { updateAccountSummary, getAccountSummary, getEquityMargins, getMutualFunds, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
 const ZerodhaAccount = () => {
     const { isAuth, sessionActive, accountInfo, fetchData } = useZerodha();
     const [loading, setLoading] = useState(false);
     const [portfolioAccounts, setPortfolioAccounts] = useState([]);
     const [portfolioLoading, setPortfolioLoading] = useState(false);
 
+    const handleUpdateAccountDetails = async () => {
+        try {
+            setLoading(true);
+            const res = await getAccountInfo();
+            console.log(res);
+            const updateAccountSummaryRes = await updateAccountSummary(res.data.clientId, res.data.name, res.data.email);
+            console.log(updateAccountSummaryRes);
+            const updateEquityMarginsRes = await updateEquityMargins(res.data.clientId, res.data.margins.equity);
+            console.log(updateEquityMarginsRes);
+            const updateMutualFundsRes = await updateMutualFunds(res.data.clientId,res.data.mutualFunds);
+            console.log(updateMutualFundsRes);
+        } catch (error) {
+            console.error('Error updating account details:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
     const handleRefresh = useCallback(async () => {
         try {
             setLoading(true);
@@ -36,6 +54,7 @@ const ZerodhaAccount = () => {
             if (res.success) {
                 setPortfolioAccounts(res.data);
             }
+            await handleUpdateAccountDetails();
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -170,7 +189,7 @@ const ZerodhaAccount = () => {
                             onClick={handleRefresh}
                             disabled={loading}
                         >
-                            {loading ? 'Refreshing...' : 'Refresh Account Details'}
+                            {loading ? 'Updating...' : 'Update Account Details'}
                         </Button>
                     </Box>
 
