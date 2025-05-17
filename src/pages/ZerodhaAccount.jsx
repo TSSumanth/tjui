@@ -65,10 +65,9 @@ const ZerodhaAccount = () => {
             setLoading(false);
         }
     }
-
     useEffect(() => {
         fetchDetails();
-    }, [sessionActive]);
+    }, []);
 
     const handleConnect = async () => {
         try {
