@@ -23,6 +23,63 @@ const ZerodhaWebSocketSubscription = () => {
     const [webhookStatus, setWebhookStatus] = useState({ tickerConnected: false, loading: false });
     const [statusLoading, setStatusLoading] = useState(false);
     const [disconnectSuccess, setDisconnectSuccess] = useState(false);
+    const [isPolling, setIsPolling] = useState(true);
+
+    // Check if current time is within market hours (9:15 AM to 3:30 PM IST)
+    const isMarketHours = () => {
+        const now = new Date();
+        const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
+
+        // Check if it's weekend
+        const day = istTime.getDay();
+        if (day === 0 || day === 6) { // 0 is Sunday, 6 is Saturday
+            return false;
+        }
+
+        // Check if it's a holiday (you can expand this list)
+        const holidays = [
+            '2024-01-26', // Republic Day
+            '2024-03-08', // Mahashivratri
+            '2024-03-25', // Holi
+            '2024-03-29', // Good Friday
+            '2024-04-09', // Ram Navami
+            '2024-04-11', // Id-Ul-Fitr
+            '2024-04-17', // Mahavir Jayanti
+            '2024-05-01', // Maharashtra Day
+            '2024-05-20', // Lok Sabha Elections
+            '2024-06-17', // Bakri Id
+            '2024-07-17', // Muharram
+            '2024-08-15', // Independence Day
+            '2024-08-26', // Janmashtami
+            '2024-10-02', // Mahatma Gandhi Jayanti
+            '2024-11-01', // Diwali-Laxmi Pujan
+            '2024-11-15', // Gurunanak Jayanti
+            '2024-12-25', // Christmas
+        ];
+
+        const today = istTime.toISOString().split('T')[0];
+        if (holidays.includes(today)) {
+            return false;
+        }
+
+        const hours = istTime.getHours();
+        const minutes = istTime.getMinutes();
+        const currentTime = hours * 60 + minutes;
+
+        const marketStart = 9 * 60 + 15; // 9:15 AM
+        const marketEnd = 15 * 60 + 30;  // 3:30 PM
+
+        return currentTime >= marketStart && currentTime <= marketEnd;
+    };
+
+    // Add a debug log to help troubleshoot
+    useEffect(() => {
+        console.log('Market Hours Check:', {
+            isMarketHours: isMarketHours(),
+            currentTime: new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            day: new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).getDay()
+        });
+    }, []);
 
     const fetchSubscriptions = async () => {
         try {
@@ -35,10 +92,17 @@ const ZerodhaWebSocketSubscription = () => {
     };
 
     useEffect(() => {
-        fetchSubscriptions();
-        const interval = setInterval(fetchSubscriptions, 2000);
-        return () => clearInterval(interval);
-    }, []);
+        if (isPolling) {
+            fetchSubscriptions();
+            if (isMarketHours()) {
+                const interval = setInterval(fetchSubscriptions, 2000);
+                return () => clearInterval(interval);
+            }
+        } else {
+            // Fetch once when polling is stopped or during non-market hours
+            fetchSubscriptions();
+        }
+    }, [isPolling]);
 
     useEffect(() => {
         if (success) setOpenSuccess(true);
@@ -122,7 +186,7 @@ const ZerodhaWebSocketSubscription = () => {
     const handleCloseUnsubSuccess = () => { setOpenUnsubSuccess(false); setUnsubSuccess(''); };
     const handleCloseUnsubError = () => { setOpenUnsubError(false); setUnsubError(''); };
 
-    // Poll status every 2 seconds
+    // Poll status every 2 seconds during market hours
     const fetchStatus = async () => {
         setStatusLoading(true);
         try {
@@ -136,10 +200,14 @@ const ZerodhaWebSocketSubscription = () => {
     };
 
     useEffect(() => {
-        fetchStatus();
-        const interval = setInterval(fetchStatus, 2000);
-        return () => clearInterval(interval);
-    }, []);
+        if (isPolling) {
+            fetchStatus();
+            if (isMarketHours()) {
+                const interval = setInterval(fetchStatus, 2000);
+                return () => clearInterval(interval);
+            }
+        }
+    }, [isPolling]);
 
     // Connect to Webhook button handler
     const handleConnectWebhook = async () => {
@@ -195,6 +263,11 @@ const ZerodhaWebSocketSubscription = () => {
                     Disconnect Webhook
                 </Button>
                 {statusLoading && <CircularProgress size={22} />}
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                    {isMarketHours()
+                        ? '🟢 Market Hours: Data refreshes every 2 seconds'
+                        : '🔴 Non-Market Hours: Data refreshes on page load'}
+                </Typography>
             </Box>
             <Snackbar open={openSuccess} autoHideDuration={3000} onClose={handleCloseSuccess} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
                 <Alert onClose={handleCloseSuccess} severity="success" sx={{ fontSize: 13 }}>{success}</Alert>
