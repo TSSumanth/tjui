@@ -23,11 +23,13 @@ import MutualFunds from '../components/AccountDetails/MutualFunds';
 import { getAccountInfo } from '../services/zerodha/api';
 import { updateAccountSummary, getAccountSummary, getEquityMargins, getMutualFunds, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
 const ZerodhaAccount = () => {
-    const { isAuth, sessionActive, accountInfo, fetchData } = useZerodha();
+    const { isAuth, sessionActive, fetchData } = useZerodha();
     const [loading, setLoading] = useState(false);
     const [portfolioAccounts, setPortfolioAccounts] = useState([]);
     const [portfolioLoading, setPortfolioLoading] = useState(false);
-
+    const [accountInfo, setAccountInfo] = useState(null);
+    const [equityMargins, setEquityMargins] = useState(null);
+    const [mutualFunds, setMutualFunds] = useState(null);
     const handleUpdateAccountDetails = async () => {
         try {
             setLoading(true);
@@ -37,7 +39,7 @@ const ZerodhaAccount = () => {
             console.log(updateAccountSummaryRes);
             const updateEquityMarginsRes = await updateEquityMargins(res.data.clientId, res.data.margins.equity);
             console.log(updateEquityMarginsRes);
-            const updateMutualFundsRes = await updateMutualFunds(res.data.clientId,res.data.mutualFunds);
+            const updateMutualFundsRes = await updateMutualFunds(res.data.clientId, res.data.mutualFunds);
             console.log(updateMutualFundsRes);
         } catch (error) {
             console.error('Error updating account details:', error);
@@ -64,10 +66,29 @@ const ZerodhaAccount = () => {
     }, [fetchData]);
 
     useEffect(() => {
-        if (sessionActive) {
-            handleRefresh();
+        const fetchDetails = async () => {
+            setLoading(true);
+            const res = await getAccountSummary();
+            if (res.success) {
+                setAccountInfo(res.data);
+            }
+            const res1 = await getEquityMargins();
+            if (res1.success) {
+                setEquityMargins(res1.data);
+            }
+            const res2 = await getMutualFunds();
+            if (res2.success) {
+                setMutualFunds(res2.data);
+                console.log(res2.data);
+                setLoading(false);
+            }
+            const res3 = await getAllPortfolioValues();
+            if (res3.success) {
+                setPortfolioAccounts(res3.data);
+            }
         }
-    }, [sessionActive, handleRefresh]);
+        fetchDetails();
+    }, [sessionActive]);
 
     const handleConnect = async () => {
         try {
@@ -205,14 +226,14 @@ const ZerodhaAccount = () => {
                     ) : accountInfo ? (
                         <Grid container spacing={3}>
                             <AccountSummary accountInfo={accountInfo} />
-                            <EquityMargins accountInfo={accountInfo} />
+                            <EquityMargins accountInfo={equityMargins} />
                             <PortfolioDashboard
                                 portfolioAccounts={portfolioAccounts}
                                 portfolioLoading={portfolioLoading}
                                 accountInfo={accountInfo}
                             />
-                            {accountInfo.mutualFunds && accountInfo.mutualFunds.length > 0 && (
-                                <MutualFunds mutualFunds={accountInfo.mutualFunds} />
+                            {mutualFunds && mutualFunds.length > 0 && (
+                                <MutualFunds mutualFunds={mutualFunds} />
                             )}
                         </Grid>
                     ) : null}

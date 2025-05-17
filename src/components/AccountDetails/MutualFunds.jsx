@@ -93,7 +93,7 @@ const MutualFunds = ({ mutualFunds }) => {
                                 return (
                                     <TableRow key={index}>
                                         <TableCell>{fund.scheme_name}</TableCell>
-                                        <TableCell align="right">{fund.units.toFixed(2)}</TableCell>
+                                        <TableCell align="right">{Number(fund.units).toFixed(2)}</TableCell>
                                         <TableCell align="right">{formatCurrency(fund.average_cost)}</TableCell>
                                         <TableCell align="right">{formatCurrency(fund.current_nav)}</TableCell>
                                         <TableCell align="right">{formatCurrency(currentValue)}</TableCell>
@@ -115,4 +115,4 @@ const MutualFunds = ({ mutualFunds }) => {
     );
 };
 
-export default React.memo(MutualFunds); 
+export default MutualFunds; 

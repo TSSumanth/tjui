@@ -5,35 +5,35 @@ import { formatCurrency } from '../../utils/formatters';
 const getMarginItems = (accountInfo) => [
     {
         label: 'Days Opening Balance',
-        value: accountInfo?.margins?.equity?.available || 0,
+        value: accountInfo?.available || 0,
         color: 'success'
     },
     {
         label: 'Amount Utilized today',
-        value: accountInfo?.margins?.equity?.utilised || 0,
+        value: accountInfo?.utilised || 0,
         color: 'warning'
     },
     {
         label: 'Available balance',
-        value: accountInfo?.margins?.equity?.net || 0,
+        value: accountInfo?.net || 0,
         color: 'info'
     },
     {
         label: 'Exposure',
-        value: accountInfo?.margins?.equity?.exposure || 0,
+        value: accountInfo?.exposure || 0,
         color: 'error'
     },
     {
         label: 'Option Premium',
-        value: accountInfo?.margins?.equity?.optionPremium || 0,
+        value: accountInfo?.option_premium || 0,
         color: 'secondary'
     },
     {
         label: 'Total Account Value',
-        value: (accountInfo?.margins?.equity?.net || 0) +
-            (accountInfo?.margins?.equity?.utilised || 0) +
-            (accountInfo?.margins?.equity?.exposure || 0) +
-            (accountInfo?.margins?.equity?.optionPremium || 0),
+        value: (Number(accountInfo?.net) || 0) +
+            (Number(accountInfo?.utilised) || 0) +
+            (Number(accountInfo?.exposure) || 0) +
+            (Number(accountInfo?.option_premium) || 0),
         color: 'primary'
     }
 ];
@@ -73,4 +73,4 @@ const EquityMargins = ({ accountInfo }) => {
     );
 };
 
-export default React.memo(EquityMargins); 
+export default EquityMargins; 
