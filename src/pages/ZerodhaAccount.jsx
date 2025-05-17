@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Container,
@@ -23,70 +23,50 @@ import MutualFunds from '../components/AccountDetails/MutualFunds';
 import { getAccountInfo } from '../services/zerodha/api';
 import { updateAccountSummary, getAccountSummary, getEquityMargins, getMutualFunds, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
 const ZerodhaAccount = () => {
-    const { isAuth, sessionActive, fetchData } = useZerodha();
+    const { isAuth, sessionActive } = useZerodha();
     const [loading, setLoading] = useState(false);
     const [portfolioAccounts, setPortfolioAccounts] = useState([]);
-    const [portfolioLoading, setPortfolioLoading] = useState(false);
     const [accountInfo, setAccountInfo] = useState(null);
     const [equityMargins, setEquityMargins] = useState(null);
     const [mutualFunds, setMutualFunds] = useState(null);
+
+    const fetchDetails = async () => {
+        setLoading(true);
+        const res = await getAccountSummary();
+        if (res.success) {
+            setAccountInfo(res.data);
+        }
+        const res1 = await getEquityMargins();
+        if (res1.success) {
+            setEquityMargins(res1.data);
+        }
+        const res2 = await getMutualFunds();
+        if (res2.success) {
+            setMutualFunds(res2.data);
+            setLoading(false);
+        }
+        const res3 = await getAllPortfolioValues();
+        if (res3.success) {
+            setPortfolioAccounts(res3.data);
+        }
+    }
+
     const handleUpdateAccountDetails = async () => {
         try {
             setLoading(true);
             const res = await getAccountInfo();
-            console.log(res);
-            const updateAccountSummaryRes = await updateAccountSummary(res.data.clientId, res.data.name, res.data.email);
-            console.log(updateAccountSummaryRes);
-            const updateEquityMarginsRes = await updateEquityMargins(res.data.clientId, res.data.margins.equity);
-            console.log(updateEquityMarginsRes);
-            const updateMutualFundsRes = await updateMutualFunds(res.data.clientId, res.data.mutualFunds);
-            console.log(updateMutualFundsRes);
+            await updateAccountSummary(res.data.clientId, res.data.name, res.data.email);
+            await updateEquityMargins(res.data.clientId, res.data.margins.equity);
+            await updateMutualFunds(res.data.clientId, res.data.mutualFunds);
+            await fetchDetails();
         } catch (error) {
             console.error('Error updating account details:', error);
         } finally {
             setLoading(false);
         }
     }
-    const handleRefresh = useCallback(async () => {
-        try {
-            setLoading(true);
-            setPortfolioLoading(true);
-            await fetchData(true);
-            const res = await getAllPortfolioValues();
-            if (res.success) {
-                setPortfolioAccounts(res.data);
-            }
-            await handleUpdateAccountDetails();
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setLoading(false);
-            setPortfolioLoading(false);
-        }
-    }, [fetchData]);
 
     useEffect(() => {
-        const fetchDetails = async () => {
-            setLoading(true);
-            const res = await getAccountSummary();
-            if (res.success) {
-                setAccountInfo(res.data);
-            }
-            const res1 = await getEquityMargins();
-            if (res1.success) {
-                setEquityMargins(res1.data);
-            }
-            const res2 = await getMutualFunds();
-            if (res2.success) {
-                setMutualFunds(res2.data);
-                console.log(res2.data);
-                setLoading(false);
-            }
-            const res3 = await getAllPortfolioValues();
-            if (res3.success) {
-                setPortfolioAccounts(res3.data);
-            }
-        }
         fetchDetails();
     }, [sessionActive]);
 
@@ -123,7 +103,7 @@ const ZerodhaAccount = () => {
                         console.error('Failed to set WebSocket access token:', error);
                     });
                     window.removeEventListener('message', handleMessage);
-                    fetchData(true);
+                    // fetchData(true);
                 } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
                     console.error('Auth error:', event.data.error);
                     window.removeEventListener('message', handleMessage);
@@ -136,7 +116,7 @@ const ZerodhaAccount = () => {
                 if (authWindow.closed) {
                     clearInterval(checkWindow);
                     window.removeEventListener('message', handleMessage);
-                    fetchData(true);
+                    // fetchData(true);
                 }
             }, 500);
         } catch (err) {
@@ -207,7 +187,7 @@ const ZerodhaAccount = () => {
                         <Button
                             variant="outlined"
                             startIcon={<RefreshIcon />}
-                            onClick={handleRefresh}
+                            onClick={handleUpdateAccountDetails}
                             disabled={loading}
                         >
                             {loading ? 'Updating...' : 'Update Account Details'}
@@ -229,7 +209,7 @@ const ZerodhaAccount = () => {
                             <EquityMargins accountInfo={equityMargins} />
                             <PortfolioDashboard
                                 portfolioAccounts={portfolioAccounts}
-                                portfolioLoading={portfolioLoading}
+                                portfolioLoading={loading}
                                 accountInfo={accountInfo}
                             />
                             {mutualFunds && mutualFunds.length > 0 && (
