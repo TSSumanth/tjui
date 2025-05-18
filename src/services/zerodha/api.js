@@ -114,7 +114,7 @@ export const logout = () => {
 
 export const placeOrder = async (orderParams) => {
     try {
-        const response = await api.post('/api/zerodha/order', orderParams);
+        const response = await api.post('/api/zerodha/orders/regular', orderParams);
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.error || 'Failed to place order');
@@ -148,18 +148,18 @@ export const createCloseHoldingOrder = (holding) => {
 
 // Cancel an open order
 export const cancelZerodhaOrder = async (orderId) => {
-    const response = await api.post(`/api/zerodha/order/${orderId}/cancel`);
+    const response = await api.post(`/api/zerodha/orders/regular/${orderId}`);
     return response.data;
 };
 
 // Modify an open order
 export const modifyZerodhaOrder = async (orderId, data) => {
-    const response = await api.post(`/api/zerodha/order/${orderId}/modify`, data);
+    const response = await api.post(`/api/zerodha/orders/regular/${orderId}`, data);
     return response.data;
 };
 
 export const getOrderById = async (orderId) => {
-    const response = await api.get(`/api/zerodha/order/${orderId}`);
+    const response = await api.get(`/api/zerodha/orders/${orderId}`);
     return response.data;
 };
 
