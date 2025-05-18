@@ -9,7 +9,6 @@ import { isMarketHours, isTokenExpired } from '../services/zerodha/utils';
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
-const FETCH_INTERVAL = 60000; // 60 seconds
 const SESSION_CACHE_DURATION = 30000; // 30 seconds
 
 
@@ -44,7 +43,6 @@ export const ZerodhaProvider = ({ children }) => {
     const [orderPairStatusMap, setOrderPairStatusMap] = useState({});
 
     const isInitialLoadDone = useRef(false);
-    const lastFetchTime = useRef(0);
     const retryCount = useRef(0);
     const isMounted = useRef(true);
     const isUnmounted = useRef(false);
@@ -282,7 +280,6 @@ export const ZerodhaProvider = ({ children }) => {
             console.log('Initial session check result:', isSessionValid);
 
             if (isSessionValid && isMounted.current) {
-                // await fetchData(true);
                 setIsAutoSync(isMarketHours());
             }
 

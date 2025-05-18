@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Container, Stack, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getAccountInfo, getPositions, getHoldings } from '../services/zerodha/api';
@@ -42,8 +42,8 @@ const Portfolio = () => {
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState({ net: [] });
     const [localLoading, setLocalLoading] = useState(true);
-    const [isAutoSync, setIsAutoSync] = useState(true);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+    const [hasShownSessionError, setHasShownSessionError] = useState(false);
     const [portfolioSummary, setPortfolioSummary] = useState({
         holdingsPnL: 0,
         holdingsDayPnL: 0,
@@ -58,6 +58,7 @@ const Portfolio = () => {
         shortOptionsPnL: 0,
         futuresPnL: 0
     });
+    const pollIntervalRef = useRef(null);
 
     // Scroll to top when component mounts
     useScrollToTop();
@@ -171,7 +172,7 @@ const Portfolio = () => {
         setPortfolioSummary(summary);
     };
 
-    // Update initializeData to handle loading state better
+    // Update initializeData to handle session errors better
     const initializeData = async (setLoading = true) => {
         try {
             if (setLoading) {
@@ -182,6 +183,7 @@ const Portfolio = () => {
 
             if (isSessionValid) {
                 console.log('Session is valid, fetching data...');
+                setHasShownSessionError(false); // Reset error state on successful session
 
                 const holdingsRes = await getHoldings();
                 const positionsRes = await getPositions();
@@ -193,15 +195,42 @@ const Portfolio = () => {
                     setPositions(positionsRes.data);
                 }
 
-                calculatePortfolioSummary(
-                    holdingsRes?.data || holdings || [],
-                    positionsRes?.data || positions || { net: [] }
-                );
+                // Only calculate summary if we have valid data
+                if (holdingsRes?.data || positionsRes?.data) {
+                    calculatePortfolioSummary(
+                        holdingsRes?.data || [],
+                        positionsRes?.data || { net: [] }
+                    );
+                }
             } else {
                 console.log('Session is not valid');
-                    setHoldings([]);
-                    setPositions({ net: [] });
-                    calculatePortfolioSummary([], { net: [] });
+                setHoldings([]);
+                setPositions({ net: [] });
+                // Reset summary to initial state without calculating
+                setPortfolioSummary({
+                    holdingsPnL: 0,
+                    holdingsDayPnL: 0,
+                    positionsTotalPnL: 0,
+                    positionsDayPnL: 0,
+                    activePositionsCount: 0,
+                    totalPnL: 0,
+                    totalDayPnL: 0,
+                    positionsTotalValue: 0,
+                    totalEquityHoldingsValue: 0,
+                    longOptionsNotional: 0,
+                    shortOptionsPnL: 0,
+                    futuresPnL: 0
+                });
+
+                // Only show session error if we haven't shown it before and this is not the initial load
+                if (!hasShownSessionError && !setLoading) {
+                    setNotification({
+                        open: true,
+                        message: 'Session expired. Please refresh the page or reconnect.',
+                        severity: 'error'
+                    });
+                    setHasShownSessionError(true);
+                }
             }
         } catch (err) {
             console.error('Error initializing data:', err);
@@ -213,7 +242,21 @@ const Portfolio = () => {
                 });
                 setHoldings([]);
                 setPositions({ net: [] });
-                calculatePortfolioSummary([], { net: [] });
+                // Reset summary to initial state without calculating
+                setPortfolioSummary({
+                    holdingsPnL: 0,
+                    holdingsDayPnL: 0,
+                    positionsTotalPnL: 0,
+                    positionsDayPnL: 0,
+                    activePositionsCount: 0,
+                    totalPnL: 0,
+                    totalDayPnL: 0,
+                    positionsTotalValue: 0,
+                    totalEquityHoldingsValue: 0,
+                    longOptionsNotional: 0,
+                    shortOptionsPnL: 0,
+                    futuresPnL: 0
+                });
             }
         } finally {
             if (setLoading) {
@@ -222,64 +265,123 @@ const Portfolio = () => {
         }
     };
 
-    // Update polling effect to use local isAutoSync state
+    // Update polling effect to handle session validity and market hours
     useEffect(() => {
-        let pollInterval;
+        let marketHoursInterval;
 
-        const startPolling = () => {
+        const startPolling = async () => {
+            console.log('Starting polling...');
+            const isSessionValid = await checkSession();
+            if (!isSessionValid) {
+                console.log('Session invalid - stopping polling');
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                }
+                // Only show session error if we haven't shown it before
+                if (!hasShownSessionError) {
+                    setNotification({
+                        open: true,
+                        message: 'Session expired. Please refresh the page or reconnect.',
+                        severity: 'error'
+                    });
+                    setHasShownSessionError(true);
+                }
+                return;
+            }
+
+            // Clear any existing interval before starting a new one
+            if (pollIntervalRef.current) {
+                console.log('Clearing existing polling interval');
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+
+            console.log('Setting up new polling interval');
             // Set up polling interval
-            pollInterval = setInterval(() => {
+            pollIntervalRef.current = setInterval(async () => {
+                console.log('Polling interval triggered');
                 if (isMarketHours()) {
-                    setIsAutoSync(true);
                     console.log('Market hours - fetching data...');
-                    initializeData(false); // Silent update during market hours
+                    const isValid = await checkSession();
+                    if (isValid) {
+                        initializeData(false); // Silent update during market hours
+                    } else {
+                        console.log('Session invalid - stopping polling');
+                        if (pollIntervalRef.current) {
+                            clearInterval(pollIntervalRef.current);
+                            pollIntervalRef.current = null;
+                        }
+                        // Only show session error if we haven't shown it before
+                        if (!hasShownSessionError) {
+                            setNotification({
+                                open: true,
+                                message: 'Session expired. Please refresh the page or reconnect.',
+                                severity: 'error'
+                            });
+                            setHasShownSessionError(true);
+                        }
+                    }
                 } else {
-                    setIsAutoSync(false);
-                    // initializeData(false); // Silent update outside market hours
                     console.log('Outside market hours - skipping fetch');
+                    // Clear interval when market closes
+                    if (pollIntervalRef.current) {
+                        clearInterval(pollIntervalRef.current);
+                        pollIntervalRef.current = null;
+                    }
                 }
             }, 5000); // 5 seconds
+        };
+
+        const checkMarketHours = async () => {
+            const isOpen = isMarketHours();
+            console.log('Market hours check:', isOpen ? 'Market is open' : 'Market is closed');
+
+            if (isOpen) {
+                const isSessionValid = await checkSession();
+                if (isSessionValid) {
+                    console.log('Market opened and session valid - starting polling');
+                    await startPolling(); // Make sure to await startPolling
+                } else {
+                    console.log('Market opened but session invalid - not starting polling');
+                    // Don't show session error here, let initializeData handle it
+                }
+            } else {
+                console.log('Market is closed - clearing polling interval');
+                // Clear polling interval if market is closed
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                }
+            }
         };
 
         // Initial data fetch
         console.log('Initial data fetch...');
         initializeData(true); // Show loading state for initial fetch
 
-        // Start polling if auto-sync is enabled
-        if (isAutoSync) {
-            console.log('Auto-sync enabled - starting polling');
-            startPolling();
-        } else {
-            console.log('Auto-sync disabled - polling not started');
-        }
+        // Check market hours and start polling if needed
+        console.log('Initial market hours check...');
+        checkMarketHours();
+
+        // Set up market hours check interval
+        console.log('Setting up market hours check interval');
+        marketHoursInterval = setInterval(checkMarketHours, 60000);
 
         // Cleanup function
         return () => {
-            if (pollInterval) {
+            console.log('Cleaning up intervals');
+            if (pollIntervalRef.current) {
                 console.log('Cleaning up polling interval');
-                clearInterval(pollInterval);
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+            if (marketHoursInterval) {
+                console.log('Cleaning up market hours interval');
+                clearInterval(marketHoursInterval);
             }
         };
-    }, [isAutoSync]); // Add isAutoSync to dependencies
-
-    // Add effect to handle market hours changes
-    useEffect(() => {
-        const checkMarketHours = () => {
-            const isOpen = isMarketHours();
-            console.log('Market hours check:', isOpen ? 'Market is open' : 'Market is closed');
-            return isOpen;
-        };
-
-        // Check market hours every minute
-        const marketHoursInterval = setInterval(checkMarketHours, 60000);
-
-        // Initial check
-        checkMarketHours();
-
-        return () => {
-            clearInterval(marketHoursInterval);
-        };
-    }, []);
+    }, []); // Empty dependency array since we want this to run only once on mount
 
     const handleCloseNotification = () => {
         setNotification(prev => ({ ...prev, open: false }));
@@ -411,7 +513,7 @@ const Portfolio = () => {
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
             <ZerodhaSubHeader />
             <Container maxWidth={false} sx={{ mt: 4, px: { xs: 2, sm: 3, md: 4 } }}>
-                {/* Auto-sync switch and refresh buttons */}
+                {/* Auto-sync status and refresh buttons */}
                 <Box sx={{
                     display: 'flex',
                     justifyContent: 'flex-end',
@@ -419,24 +521,21 @@ const Portfolio = () => {
                     gap: 2,
                     alignItems: 'center'
                 }}>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={isAutoSync}
-                                onChange={(event) => setIsAutoSync(event.target.checked)}
-                                color="primary"
-                                size="small"
-                            />
+                    <Typography
+                        variant="body2"
+                        color={isMarketHours() ? "success.main" : "text.secondary"}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontStyle: 'italic'
+                        }}
+                    >
+                        <InfoIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+                        {isMarketHours()
+                            ? "Auto-syncing every 5 seconds during market hours"
+                            : "Auto-sync paused (outside market hours)"
                         }
-                        label={
-                            <Box display="flex" alignItems="center" sx={{ typography: 'body2' }}>
-                                Auto-sync
-                                <Tooltip title="Auto-sync updates your portfolio data every 5 seconds during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
-                                    <InfoIcon sx={{ ml: 0.5, fontSize: '1rem', color: 'text.secondary' }} />
-                                </Tooltip>
-                            </Box>
-                        }
-                    />
+                    </Typography>
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}

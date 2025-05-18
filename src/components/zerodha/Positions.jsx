@@ -34,7 +34,6 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import TodayIcon from '@mui/icons-material/Today';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 import { isMarketHours } from '../../services/zerodha/utils';
 
@@ -177,6 +176,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [manualPlError, setManualPlError] = React.useState('');
     const [strategyId, setStrategyId] = useState(null);
     const [strategyLoading, setStrategyLoading] = useState(false);
+    const initialFetchDone = React.useRef(false);
 
     // Log positions data on mount and updates
     useEffect(() => {
@@ -214,21 +214,12 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }
     }, [positions]);
 
-    // Poll for LTP updates
+    // Fetch LTPs when positions change
     useEffect(() => {
-        const pollLTPs = () => {
-            if (positions?.length) {
-                console.log('Polling LTPs for positions:', positions);
-                fetchPositionLTPs();
-            }
-        };
-
-        // Initial fetch
-        pollLTPs();
-
-        // Set up polling every 5 seconds during market hours, 30 seconds outside market hours
-        const interval = setInterval(pollLTPs, isMarketHours() ? 5000 : 30000);
-        return () => clearInterval(interval);
+        if (positions?.length) {
+            console.log('Positions data changed - fetching LTPs');
+            fetchPositionLTPs();
+        }
     }, [positions, fetchPositionLTPs]);
 
     // Calculate P&L values
@@ -765,21 +756,25 @@ const Positions = ({ positions }) => {
     const [quantity, setQuantity] = React.useState('');
     const [price, setPrice] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [isDataReady, setIsDataReady] = React.useState(false);
     const { ltpMap } = useZerodha();
 
-    // Track initial load
+    // Track initial load and data readiness
     React.useEffect(() => {
         if (positions && positions.net && positions.net.length > 0) {
             setIsInitialLoad(false);
+            setIsDataReady(true);
+        } else if (positions && (!positions.net || positions.net.length === 0)) {
+            setIsDataReady(true); // Data is ready but empty
         }
     }, [positions]);
 
     // Update previous positions when positions change
     React.useEffect(() => {
-        if (positions) {
+        if (positions && isDataReady) {
             setPrevPositions(positions);
         }
-    }, [positions]);
+    }, [positions, isDataReady]);
 
     const getTransactionType = (position, isAdding, isStopLoss) => {
         const isShortPosition = position.quantity < 0;
@@ -885,7 +880,7 @@ const Positions = ({ positions }) => {
         );
     }
 
-    if (!positions || !positions.net || positions.net.length === 0) {
+    if (!isDataReady || !positions || !positions.net || positions.net.length === 0) {
         return (
             <Typography variant="body1" color="text.secondary" align="center" py={4}>
                 No positions found
