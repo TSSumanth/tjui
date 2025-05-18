@@ -205,7 +205,7 @@ export const ZerodhaProvider = ({ children }) => {
     // Fetch data
     const fetchData = useCallback(async (force = false) => {
         if (!isMounted.current) return;
-
+        console.log('fetchData: fetching holdings and Postions: force - ', force);
         const now = Date.now();
         if (!force && now - lastFetchTime.current < FETCH_INTERVAL) {
             return;
@@ -291,7 +291,6 @@ export const ZerodhaProvider = ({ children }) => {
             console.log('Initial session check result:', isSessionValid);
 
             if (isSessionValid && isMounted.current) {
-                await fetchData(true);
                 setIsAutoSync(isMarketHours());
             }
 
