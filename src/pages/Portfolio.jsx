@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Container, Stack, Chip, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { Box, Typography, Container, Stack, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
+import { getAccountInfo, getPositions, getHoldings } from '../services/zerodha/api';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -37,170 +38,203 @@ const getPositionType = (tradingsymbol) => {
 
 const Portfolio = () => {
     const theme = useTheme();
-    const { holdings, positions, fetchData, loading, isAuth, isAutoSync, setIsAutoSync, handleLogout, sessionActive, checkSession, accountInfo } = useZerodha();
+    const { loading, isAuth, isAutoSync, setIsAutoSync, sessionActive, checkSession } = useZerodha();
+    const [holdings, setHoldings] = useState([]);
+    const [positions, setPositions] = useState({ net: [] });
     const [localLoading, setLocalLoading] = useState(true);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+    const [portfolioSummary, setPortfolioSummary] = useState({
+        holdingsPnL: 0,
+        holdingsDayPnL: 0,
+        positionsTotalPnL: 0,
+        positionsDayPnL: 0,
+        activePositionsCount: 0,
+        totalPnL: 0,
+        totalDayPnL: 0,
+        positionsTotalValue: 0,
+        totalEquityHoldingsValue: 0,
+        longOptionsNotional: 0,
+        shortOptionsPnL: 0,
+        futuresPnL: 0
+    });
 
     // Scroll to top when component mounts
     useScrollToTop();
 
-    useEffect(() => {
-        const initializeData = async () => {
-            try {
-                setLocalLoading(true);
-                const isSessionValid = await checkSession();
-                // Only fetch data if session is valid and we don't have data yet
-                if (isSessionValid && (!holdings?.length || !positions?.net?.length)) {
-                    await fetchData();
-                }
-            } catch (err) {
-                console.error('Error initializing data:', err);
-            } finally {
-                setLocalLoading(false);
-            }
-        };
-
-        // Only initialize if we have auth and no data
-        if (isAuth && (!holdings?.length || !positions?.net?.length)) {
-            initializeData();
-        } else {
-            setLocalLoading(false);
+    const calculatePortfolioSummary = (holdingsData, positionsData) => {
+        if (!holdingsData || !positionsData) {
+            console.log('No data available for calculation:', { holdingsData, positionsData });
+            return;
         }
-        // Remove holdings.length and positions.length from dependencies to prevent continuous fetching
-    }, [isAuth, checkSession, fetchData]);
 
-    // Process positions data
-    const processedPositions = React.useMemo(() => {
-        if (!positions || !positions.net) return [];
-        const allPositions = positions.net || [];
-        // Filter out duplicates based on tradingsymbol
-        return allPositions.filter((position, index, self) =>
+        console.log('Calculating portfolio summary with:', { holdingsData, positionsData });
+
+        // Process positions data
+        const processedPositions = positionsData.net || [];
+        const uniquePositions = processedPositions.filter((position, index, self) =>
             index === self.findIndex((p) => p.tradingsymbol === position.tradingsymbol)
         );
-    }, [positions]);
 
-    // Calculate P&L for positions
-    const { positionsTotalPnL, positionsDayPnL, activePositionsCount } = React.useMemo(() => {
-        let totalPnL = 0;
-        let dayPnL = 0;
-        let activeCount = 0;
+        console.log('Processed positions:', uniquePositions);
 
-        processedPositions.forEach((position) => {
+        // Calculate positions P&L
+        let positionsTotalPnL = 0;
+        let positionsDayPnL = 0;
+        let activePositionsCount = 0;
+        let positionsTotalValue = 0;
+        let longOptionsNotional = 0;
+        let shortOptionsPnL = 0;
+        let futuresPnL = 0;
+
+        uniquePositions.forEach((position) => {
             const posType = getPositionType(position.tradingsymbol);
             if (posType === 'Future' || posType === 'Option') {
                 if (position.quantity !== 0) {
-                    activeCount++;
+                    activePositionsCount++;
                 }
-                totalPnL += Number(position.pnl) || 0;
-                dayPnL += Number(position.m2m) || 0;
+                positionsTotalPnL += Number(position.pnl) || 0;
+                positionsDayPnL += Number(position.m2m) || 0;
+
+                if (posType === 'Option' && position.quantity > 0) {
+                    const notionalValue = Number(position.quantity) * Number(position.last_price || 0);
+                    longOptionsNotional += notionalValue;
+                    positionsTotalValue += notionalValue;
+                } else if (posType === 'Option' && position.quantity < 0) {
+                    const pnl = Number(position.pnl) || 0;
+                    shortOptionsPnL += pnl;
+                    positionsTotalValue += pnl;
+                } else if (posType === 'Future') {
+                    const pnl = Number(position.pnl) || 0;
+                    futuresPnL += pnl;
+                    positionsTotalValue += pnl;
+                }
             }
         });
 
-        return { positionsTotalPnL: totalPnL, positionsDayPnL: dayPnL, activePositionsCount: activeCount };
-    }, [processedPositions]);
+        console.log('Positions calculations:', {
+            positionsTotalPnL,
+            positionsDayPnL,
+            activePositionsCount,
+            positionsTotalValue,
+            longOptionsNotional,
+            shortOptionsPnL,
+            futuresPnL
+        });
 
-    // Calculate holdings P&L
-    const { holdingsPnL, holdingsDayPnL } = React.useMemo(() => {
-        let totalPnL = 0;
-        let dayPnL = 0;
+        // Calculate holdings P&L
+        let holdingsPnL = 0;
+        let holdingsDayPnL = 0;
+        let totalEquityHoldingsValue = 0;
 
-        holdings?.forEach(holding => {
+        holdingsData.forEach(holding => {
             const quantity = Number(holding.quantity) || 0;
             const lastPrice = Number(holding.last_price) || 0;
             const closePrice = Number(holding.close_price) || lastPrice;
             const avgPrice = Number(holding.average_price) || 0;
 
-            dayPnL += (lastPrice - closePrice) * quantity;
-            totalPnL += (lastPrice - avgPrice) * quantity;
+            const dayPnL = (lastPrice - closePrice) * quantity;
+            const totalPnL = (lastPrice - avgPrice) * quantity;
+            const value = quantity * lastPrice;
+
+            holdingsDayPnL += dayPnL;
+            holdingsPnL += totalPnL;
+            totalEquityHoldingsValue += value;
         });
 
-        return {
-            holdingsPnL: totalPnL,
-            holdingsDayPnL: dayPnL
+        console.log('Holdings calculations:', {
+            holdingsPnL,
+            holdingsDayPnL,
+            totalEquityHoldingsValue
+        });
+
+        // Calculate total portfolio P&L
+        const totalPnL = holdingsPnL + positionsTotalPnL;
+        const totalDayPnL = holdingsDayPnL + positionsDayPnL;
+
+        const summary = {
+            holdingsPnL,
+            holdingsDayPnL,
+            positionsTotalPnL,
+            positionsDayPnL,
+            activePositionsCount,
+            totalPnL,
+            totalDayPnL,
+            positionsTotalValue,
+            totalEquityHoldingsValue,
+            longOptionsNotional,
+            shortOptionsPnL,
+            futuresPnL
         };
-    }, [holdings]);
 
-    // Calculate total portfolio P&L
-    const { totalPnL, totalDayPnL } = React.useMemo(() => ({
-        totalPnL: holdingsPnL + positionsTotalPnL,
-        totalDayPnL: holdingsDayPnL + positionsDayPnL
-    }), [holdingsPnL, positionsTotalPnL, holdingsDayPnL, positionsDayPnL]);
+        console.log('Final portfolio summary:', summary);
+        setPortfolioSummary(summary);
+    };
 
-    // Calculate F&O Positions Total Value
-    const positionsTotalValue = React.useMemo(() => {
-        if (!positions || !positions.net) return 0;
-        const allPositions = positions.net || [];
-        let totalValue = 0;
-        allPositions.forEach((position) => {
-            const posType = getPositionType(position.tradingsymbol);
-            if ((posType === 'Future' || posType === 'Option') && position.quantity !== 0) {
-                if (posType === 'Option' && position.quantity > 0) {
-                    // Long Option: use notional value
-                    totalValue += Number(position.quantity) * Number(position.last_price || 0);
-                } else {
-                    // Futures (any direction) and short Options: use PnL
-                    totalValue += Number(position.pnl) || 0;
-                }
+    const initializeData = async () => {
+        try {
+            setLocalLoading(true);
+            const isSessionValid = await checkSession();
+            console.log('Session validation result:', isSessionValid);
+            console.log('Session is valid, fetching data...');
+            // Always fetch data if session is valid
+            if (isSessionValid) {
+                console.log('Session is valid, fetching data...');
+
+                const holdingsRes = await getHoldings();
+                const positionsRes = await getPositions()
+
+                setHoldings(holdingsRes.data);
+                setPositions(positionsRes.data);
+                calculatePortfolioSummary(holdingsRes.data || [], positionsRes.data || { net: [] } );
             }
-        });
-        return totalValue;
-    }, [positions]);
 
-    // Calculate Total Equity Holdings Value
-    const totalEquityHoldingsValue = React.useMemo(() => {
-        if (!holdings) return 0;
-        return holdings.reduce((sum, holding) => {
-            const quantity = Number(holding.quantity) || 0;
-            const lastPrice = Number(holding.last_price) || 0;
-            return sum + (quantity * lastPrice);
-        }, 0);
-    }, [holdings]);
+        } catch (err) {
+            console.error('Error initializing data:', err);
+            setNotification({
+                open: true,
+                message: 'Failed to fetch portfolio data. Please try again.',
+                severity: 'error'
+            });
+            setHoldings([]);
+            setPositions({ net: [] });
+            calculatePortfolioSummary([], { net: [] });
+        } finally {
+            setLocalLoading(false);
+        }
+    };
 
-    // Add breakdown for F&O summary card
-    const { longOptionsNotional, shortOptionsPnL, futuresPnL } = React.useMemo(() => {
-        if (!positions || !positions.net) return { longOptionsNotional: 0, shortOptionsPnL: 0, futuresPnL: 0 };
-        const allPositions = positions.net || [];
-        let longOptionsNotional = 0;
-        let shortOptionsPnL = 0;
-        let futuresPnL = 0;
-        allPositions.forEach((position) => {
-            const posType = getPositionType(position.tradingsymbol);
-            if (position.quantity !== 0) {
-                if (posType === 'Option' && position.quantity > 0) {
-                    longOptionsNotional += Number(position.quantity) * Number(position.last_price || 0);
-                } else if (posType === 'Option' && position.quantity < 0) {
-                    console.log('Short Option Detected:', position);
-                    shortOptionsPnL += Number(position.pnl) || 0;
-                } else if (posType === 'Future') {
-                    futuresPnL += Number(position.pnl) || 0;
-                }
-            }
-        });
-        return { longOptionsNotional, shortOptionsPnL, futuresPnL };
-    }, [positions]);
+    useEffect(() => {
+        initializeData();
+    }, []);
+
+    const handleCloseNotification = () => {
+        setNotification(prev => ({ ...prev, open: false }));
+    };
 
     // Manual refresh handler for portfolio value
     const handlePortfolioValueRefresh = async () => {
+        console.log('handlePortfolioValueRefresh');
+        let accountInfo = await getAccountInfo();
         if (
-            accountInfo &&
-            accountInfo.clientId &&
-            accountInfo.name &&
-            accountInfo.margins?.equity?.net !== undefined &&
-            totalEquityHoldingsValue !== undefined &&
-            positionsTotalValue !== undefined
+            accountInfo.data &&
+            accountInfo.data.clientId &&
+            accountInfo.data.name &&
+            accountInfo.data.margins?.equity?.net !== undefined &&
+            portfolioSummary.totalEquityHoldingsValue !== undefined &&
+            portfolioSummary.positionsTotalValue !== undefined
         ) {
-            const equity_account_balance = Number(accountInfo.margins.equity.net) || 0;
-            const equity_holdings_value = Number(totalEquityHoldingsValue) || 0;
-            const equity_positions_value = Number(positionsTotalValue) || 0;
+            const equity_account_balance = Number(accountInfo.data.margins.equity.net) || 0;
+            const equity_holdings_value = Number(portfolioSummary.totalEquityHoldingsValue) || 0;
+            const equity_positions_value = Number(portfolioSummary.positionsTotalValue) || 0;
             const total_account_value = equity_account_balance + equity_holdings_value + equity_positions_value;
 
             try {
-                const res = await getPortfolioValue({ account_id: accountInfo.clientId });
+                const res = await getPortfolioValue({ account_id: accountInfo.data.clientId });
                 if (res.success && res.data) {
                     await updatePortfolioValue({
                         id: res.data.id,
-                        account_id: accountInfo.clientId,
-                        account_member_name: accountInfo.name,
+                        account_id: accountInfo.data.clientId,
+                        account_member_name: accountInfo.data.name,
                         equity_account_balance,
                         equity_holdings_value,
                         equity_positions_value,
@@ -213,8 +247,8 @@ const Portfolio = () => {
                     });
                 } else {
                     await createPortfolioValue({
-                        account_member_name: accountInfo.name,
-                        account_id: accountInfo.clientId,
+                        account_member_name: accountInfo.data.name,
+                        account_id: accountInfo.data.clientId,
                         equity_account_balance,
                         equity_holdings_value,
                         equity_positions_value,
@@ -241,10 +275,6 @@ const Portfolio = () => {
                 severity: 'error'
             });
         }
-    };
-
-    const handleCloseNotification = () => {
-        setNotification(prev => ({ ...prev, open: false }));
     };
 
     // Show loading state while initializing
@@ -336,7 +366,7 @@ const Portfolio = () => {
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
-                        onClick={fetchData}
+                        onClick={initializeData}
                         disabled={loading}
                         size="small"
                         sx={{
@@ -409,7 +439,7 @@ const Portfolio = () => {
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(totalEquityHoldingsValue)}
+                                            {formatCurrency(portfolioSummary.totalEquityHoldingsValue)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -417,11 +447,11 @@ const Portfolio = () => {
                                             Today's Change
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: holdingsDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.holdingsDayPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(holdingsDayPnL)}
+                                            {formatCurrency(portfolioSummary.holdingsDayPnL)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -429,11 +459,11 @@ const Portfolio = () => {
                                             Overall P&L
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: holdingsPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.holdingsPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(holdingsPnL)}
+                                            {formatCurrency(portfolioSummary.holdingsPnL)}
                                         </Typography>
                                     </Box>
                                 </Stack>
@@ -471,7 +501,7 @@ const Portfolio = () => {
                                     fontWeight: 600,
                                     mb: 1.5
                                 }}>
-                                    {activePositionsCount} Positions
+                                    {portfolioSummary.activePositionsCount} Positions
                                 </Typography>
                                 <Stack direction="row" spacing={2}>
                                     <Box sx={{ flex: 1 }}>
@@ -486,7 +516,7 @@ const Portfolio = () => {
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(positionsTotalValue)}
+                                            {formatCurrency(portfolioSummary.positionsTotalValue)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -494,11 +524,11 @@ const Portfolio = () => {
                                             Today's Change
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: positionsDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.positionsDayPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(positionsDayPnL)}
+                                            {formatCurrency(portfolioSummary.positionsDayPnL)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -506,11 +536,11 @@ const Portfolio = () => {
                                             Overall P&L
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: positionsTotalPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.positionsTotalPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(positionsTotalPnL)}
+                                            {formatCurrency(portfolioSummary.positionsTotalPnL)}
                                         </Typography>
                                     </Box>
                                 </Stack>
@@ -563,7 +593,7 @@ const Portfolio = () => {
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(totalEquityHoldingsValue + positionsTotalValue)}
+                                            {formatCurrency(portfolioSummary.totalEquityHoldingsValue + portfolioSummary.positionsTotalValue)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -571,11 +601,11 @@ const Portfolio = () => {
                                             Today's Change
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: totalDayPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.totalDayPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(totalDayPnL)}
+                                            {formatCurrency(portfolioSummary.totalDayPnL)}
                                         </Typography>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
@@ -583,11 +613,11 @@ const Portfolio = () => {
                                             Overall P&L
                                         </Typography>
                                         <Typography variant="body1" sx={{
-                                            color: totalPnL >= 0 ? 'success.main' : 'error.main',
+                                            color: portfolioSummary.totalPnL >= 0 ? 'success.main' : 'error.main',
                                             fontWeight: 500,
                                             fontFamily: 'monospace'
                                         }}>
-                                            {formatCurrency(totalPnL)}
+                                            {formatCurrency(portfolioSummary.totalPnL)}
                                         </Typography>
                                     </Box>
                                 </Stack>
@@ -618,19 +648,19 @@ const Portfolio = () => {
                                     <Tooltip title="Calculated using open quantity and LTP">
                                         <span>Long Options Notional Value:</span>
                                     </Tooltip>
-                                    <span style={{ fontFamily: 'monospace', color: longOptionsNotional >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(longOptionsNotional)}</span>
+                                    <span style={{ fontFamily: 'monospace', color: portfolioSummary.longOptionsNotional >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(portfolioSummary.longOptionsNotional)}</span>
                                 </Typography>
                                 <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <Tooltip title="Shows Overall P/L of short options">
                                         <span>Short Opt. P/L:</span>
                                     </Tooltip>
-                                    <span style={{ fontFamily: 'monospace', color: shortOptionsPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(shortOptionsPnL)}</span>
+                                    <span style={{ fontFamily: 'monospace', color: portfolioSummary.shortOptionsPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(portfolioSummary.shortOptionsPnL)}</span>
                                 </Typography>
                                 <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <Tooltip title="Shows Overall P/L of Futures">
                                         <span>Futures P/L:</span>
                                     </Tooltip>
-                                    <span style={{ fontFamily: 'monospace', color: futuresPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(futuresPnL)}</span>
+                                    <span style={{ fontFamily: 'monospace', color: portfolioSummary.futuresPnL >= 0 ? '#388e3c' : '#d32f2f' }}>{formatCurrency(portfolioSummary.futuresPnL)}</span>
                                 </Typography>
                             </Stack>
                         </Box>

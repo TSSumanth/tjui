@@ -275,7 +275,7 @@ export const ZerodhaProvider = ({ children }) => {
         isInitialLoadDone.current = false; // Reset on mount
 
         const initializeApp = async () => {
-            if (isInitialLoadDone.current || !isMounted.current) return;
+            if (!isMounted.current) return;  // Remove isInitialLoadDone check
 
             setLoading(true);
             const isSessionValid = await checkSession(true);
