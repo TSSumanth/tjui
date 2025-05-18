@@ -197,54 +197,54 @@ export const ZerodhaProvider = ({ children }) => {
     }, []);
 
     // Fetch data
-    const fetchData = useCallback(async (force = false) => {
-        if (!isMounted.current) return;
-        console.log('fetchData: fetching holdings and Postions: force - ', force);
-        const now = Date.now();
-        if (!force && now - lastFetchTime.current < FETCH_INTERVAL) {
-            return;
-        }
+    // const fetchData = useCallback(async (force = false) => {
+    //     if (!isMounted.current) return;
+    //     console.log('fetchData: fetching holdings and Postions: force - ', force);
+    //     const now = Date.now();
+    //     if (!force && now - lastFetchTime.current < FETCH_INTERVAL) {
+    //         return;
+    //     }
 
-        try {
-            if (force) {
-                setLoading(true);
-            }
-            setError(null);
+    //     try {
+    //         if (force) {
+    //             setLoading(true);
+    //         }
+    //         setError(null);
 
-            // Only fetch if we have a valid session
-            if (await checkSession()) {
+    //         // Only fetch if we have a valid session
+    //         if (await checkSession()) {
 
-                // Set individual loading states
-                setLoadingStates(prev => ({
-                    holdings: true,
-                    positions: true,
-                    orders: false
-                }));
+    //             // Set individual loading states
+    //             setLoadingStates(prev => ({
+    //                 holdings: true,
+    //                 positions: true,
+    //                 orders: false
+    //             }));
 
-                try {
-                    await fetchHoldings();
-                    await fetchPositions();
-                } catch (err) {
-                    console.error('Error fetching data:', err);
-                } finally {
-                    if (isMounted.current) {
-                        setLoadingStates(prev => ({ ...prev, holdings: false }));
-                    }
-                }
-            }
+    //             try {
+    //                 await fetchHoldings();
+    //                 await fetchPositions();
+    //             } catch (err) {
+    //                 console.error('Error fetching data:', err);
+    //             } finally {
+    //                 if (isMounted.current) {
+    //                     setLoadingStates(prev => ({ ...prev, holdings: false }));
+    //                 }
+    //             }
+    //         }
 
-            lastFetchTime.current = now;
-        } catch (err) {
-            console.error('Error fetching data:', err);
-            if (isMounted.current) {
-                setError(err.message);
-            }
-        } finally {
-            if (isMounted.current && force) {
-                setLoading(false);
-            }
-        }
-    }, [checkSession, fetchPositions]);
+    //         lastFetchTime.current = now;
+    //     } catch (err) {
+    //         console.error('Error fetching data:', err);
+    //         if (isMounted.current) {
+    //             setError(err.message);
+    //         }
+    //     } finally {
+    //         if (isMounted.current && force) {
+    //             setLoading(false);
+    //         }
+    //     }
+    // }, [checkSession, fetchPositions]);
 
     // Fetch orders separately
     const fetchOrders = useCallback(async () => {
@@ -282,7 +282,7 @@ export const ZerodhaProvider = ({ children }) => {
             console.log('Initial session check result:', isSessionValid);
 
             if (isSessionValid && isMounted.current) {
-                await fetchData(true);
+                // await fetchData(true);
                 setIsAutoSync(isMarketHours());
             }
 
@@ -302,37 +302,37 @@ export const ZerodhaProvider = ({ children }) => {
                 clearTimeout(sessionCheckTimeoutRef.current);
             }
         };
-    }, [checkSession, fetchData]);
+    }, [checkSession]);
 
     // Auto-sync effect - single interval for holdings which triggers positions
-    useEffect(() => {
-        if (!isAutoSync || !isMarketHours()) return;
+    // useEffect(() => {
+    //     if (!isAutoSync || !isMarketHours()) return;
 
-        const syncInterval = setInterval(fetchData, FETCH_INTERVAL);
+    //     const syncInterval = setInterval(fetchData, FETCH_INTERVAL);
 
-        return () => {
-            clearInterval(syncInterval);
-        };
-    }, [isAutoSync, fetchData]);
+    //     return () => {
+    //         clearInterval(syncInterval);
+    //     };
+    // }, [isAutoSync, fetchData]);
 
     // Market hours check effect
-    useEffect(() => {
-        if (!sessionActive) return;
+    // useEffect(() => {
+    //     if (!sessionActive) return;
 
-        const checkMarketHours = () => {
-            const shouldAutoSync = isMarketHours();
-            if (shouldAutoSync !== isAutoSync) {
-                setIsAutoSync(shouldAutoSync);
-            }
-        };
+    //     const checkMarketHours = () => {
+    //         const shouldAutoSync = isMarketHours();
+    //         if (shouldAutoSync !== isAutoSync) {
+    //             setIsAutoSync(shouldAutoSync);
+    //         }
+    //     };
 
-        // Check immediately
-        checkMarketHours();
+    //     // Check immediately
+    //     checkMarketHours();
 
-        // Check every minute
-        const intervalId = setInterval(checkMarketHours, 60000);
-        return () => clearInterval(intervalId);
-    }, [sessionActive, isAutoSync]);
+    //     // Check every minute
+    //     const intervalId = setInterval(checkMarketHours, 60000);
+    //     return () => clearInterval(intervalId);
+    // }, [sessionActive, isAutoSync]);
 
     // Update ltpMap whenever holdings or positions change
     useEffect(() => {
@@ -757,7 +757,7 @@ export const ZerodhaProvider = ({ children }) => {
         loadingStates,
         error,
         checkSession,
-        fetchData,
+        // fetchData,
         fetchOrders,
         handleLogout,
         handleLoginSuccess,

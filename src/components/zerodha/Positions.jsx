@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     Table,
     TableBody,
@@ -25,7 +25,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
-import { placeOrder, getInstruments } from '../../services/zerodha/api';
+import { placeOrder, fetchLTPs } from '../../services/zerodha/api';
 import OrderPopup from './OrderPopup';
 import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
 import { getStrategies } from '../../services/strategies';
@@ -36,6 +36,8 @@ import TodayIcon from '@mui/icons-material/Today';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
+import { isMarketHours } from '../../services/zerodha/utils';
+
 
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
@@ -162,12 +164,12 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
 );
 
 const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions }) => {
-    // Initialize expanded state to true by default
     const [expanded, setExpanded] = useState(true);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
-    const { ltpMap } = useZerodha();
+    const [ltpMap, setLtpMap] = useState({});
+    const [isLtpLoading, setIsLtpLoading] = useState(false);
     const [manualPl, setManualPl] = React.useState('');
     const [manualPlId, setManualPlId] = React.useState(null);
     const [manualPlLoading, setManualPlLoading] = React.useState(false);
@@ -175,6 +177,59 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [manualPlError, setManualPlError] = React.useState('');
     const [strategyId, setStrategyId] = useState(null);
     const [strategyLoading, setStrategyLoading] = useState(false);
+
+    // Log positions data on mount and updates
+    useEffect(() => {
+        console.log('PositionTable positions:', positions);
+        console.log('Underlying:', underlying);
+    }, [positions, underlying]);
+
+    // Fetch LTPs for positions
+    const fetchPositionLTPs = useCallback(async () => {
+        if (!positions?.length) return;
+
+        setIsLtpLoading(true);
+        try {
+            // Get unique underlying symbols
+            const underlyingSymbols = [...new Set(positions.map(position => {
+                const symbol = getUnderlyingSymbol(position.tradingsymbol);
+                return symbol;
+            }))];
+
+            console.log('Fetching LTPs for underlying symbols:', underlyingSymbols);
+
+            // Create instruments array for LTP fetch
+            const instruments = underlyingSymbols.map(symbol => ({
+                exchange: 'NSE',  // Assuming all underlying stocks are on NSE
+                tradingsymbol: symbol
+            }));
+
+            const newLtpMap = await fetchLTPs(instruments);
+            console.log('Received LTP map:', newLtpMap);
+            setLtpMap(newLtpMap);
+        } catch (error) {
+            console.error('Error fetching LTPs:', error);
+        } finally {
+            setIsLtpLoading(false);
+        }
+    }, [positions]);
+
+    // Poll for LTP updates
+    useEffect(() => {
+        const pollLTPs = () => {
+            if (positions?.length) {
+                console.log('Polling LTPs for positions:', positions);
+                fetchPositionLTPs();
+            }
+        };
+
+        // Initial fetch
+        pollLTPs();
+
+        // Set up polling every 5 seconds during market hours, 30 seconds outside market hours
+        const interval = setInterval(pollLTPs, isMarketHours() ? 5000 : 30000);
+        return () => clearInterval(interval);
+    }, [positions, fetchPositionLTPs]);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -546,7 +601,11 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                             <Box sx={{ display: 'inline-flex', alignItems: 'center', ml: 2 }}>
                                 <TrendingUpIcon color="primary" fontSize="small" />
                                 <Typography variant="body1" sx={{ fontWeight: 600, ml: 1 }}>
-                                    LTP: {ltpMap && ltpMap[underlying] !== undefined ? formatCurrency(ltpMap[underlying]) : '-'}
+                                    LTP: {isLtpLoading ? (
+                                        <CircularProgress size={16} sx={{ ml: 1 }} />
+                                    ) : (
+                                        ltpMap[underlying] !== undefined ? formatCurrency(ltpMap[underlying]) : '-'
+                                    )}
                                 </Typography>
                             </Box>
                         </Box>
@@ -706,7 +765,7 @@ const Positions = ({ positions }) => {
     const [quantity, setQuantity] = React.useState('');
     const [price, setPrice] = React.useState('');
     const [loading, setLoading] = React.useState(false);
-    const { ltpMap } = useZerodha(); // Keep only ltpMap from context
+    const { ltpMap } = useZerodha();
 
     // Track initial load
     React.useEffect(() => {

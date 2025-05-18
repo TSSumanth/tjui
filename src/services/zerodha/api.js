@@ -177,4 +177,88 @@ export const getInstrumentLTP = async (exchange, tradingsymbol) => {
     return response.data;
 };
 
+// Get real-time LTPs for multiple instruments
+export const fetchLTPs = async (instruments) => {
+    try {
+        console.log('Instruments received for LTP fetch:', instruments);
+
+        // Group instruments by exchange to minimize API calls
+        const exchangeGroups = instruments.reduce((acc, instrument) => {
+            const { exchange, tradingsymbol } = instrument;
+            if (!acc[exchange]) {
+                acc[exchange] = [];
+            }
+            acc[exchange].push(tradingsymbol);
+            return acc;
+        }, {});
+
+        console.log('Grouped by exchange:', exchangeGroups);
+
+        // Fetch LTPs for each exchange group
+        const ltpPromises = Object.entries(exchangeGroups).map(async ([exchange, tradingsymbols]) => {
+            console.log(`Fetching LTPs for ${exchange}:`, tradingsymbols);
+            const response = await api.get('/api/zerodha/instruments/ltp', {
+                params: {
+                    exchange,
+                    tradingsymbol: tradingsymbols.join(',')
+                }
+            });
+            console.log(`Raw LTP response for ${exchange}:`, response.data);
+
+            // Handle the response data
+            if (!response.data || typeof response.data !== 'object') {
+                console.error('Invalid response format:', response.data);
+                return {};
+            }
+
+            // If the response is empty, try to get individual LTPs
+            if (Object.keys(response.data).length === 0) {
+                console.log('Empty response, trying individual LTPs');
+                const individualPromises = tradingsymbols.map(async (symbol) => {
+                    try {
+                        const individualResponse = await api.get('/api/zerodha/instruments/ltp', {
+                            params: {
+                                exchange,
+                                tradingsymbol: symbol
+                            }
+                        });
+                        return individualResponse.data;
+                    } catch (error) {
+                        console.error(`Error fetching LTP for ${symbol}:`, error);
+                        return {};
+                    }
+                });
+
+                const individualResults = await Promise.all(individualPromises);
+                return individualResults.reduce((acc, result) => ({ ...acc, ...result }), {});
+            }
+
+            return response.data;
+        });
+
+        // Wait for all LTP fetches to complete
+        const results = await Promise.all(ltpPromises);
+        console.log('All LTP results:', results);
+
+        // Combine all results into a single LTP map
+        const ltpMap = {};
+        results.forEach(result => {
+            if (result && typeof result === 'object') {
+                Object.entries(result).forEach(([key, value]) => {
+                    if (value && value.last_price !== undefined) {
+                        const tradingsymbol = key.split(':')[1]; // Remove exchange prefix
+                        ltpMap[tradingsymbol] = value.last_price;
+                    }
+                });
+            }
+        });
+
+        console.log('Final LTP map:', ltpMap);
+        return ltpMap;
+    } catch (error) {
+        console.error('Error fetching LTPs:', error);
+        throw error;
+    }
+};
+
 export default api; 
