@@ -33,7 +33,6 @@ const ZerodhaSubHeader = () => {
 
     const handleDisconnect = () => {
         handleLogout();
-        window.location.href = '/';
     };
 
     return (

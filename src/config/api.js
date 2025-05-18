@@ -1,6 +1,7 @@
 const BASE_URL = "http://localhost:5003/api";
 
 export const API_URLS = {
+    BASE_URL: 'http://127.0.0.1:5003',
     STRATEGIES: `${BASE_URL}/strategies`,
     STRATEGY_NOTES: `${BASE_URL}/strategy-notes`,
     TRADES: `${BASE_URL}/trades`,

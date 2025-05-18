@@ -25,7 +25,6 @@ const ZerodhaAccount = () => {
 
     const handleLogoutClick = () => {
         handleLogout();
-        navigate('/zerodha/login');
     };
 
     if (loading) {

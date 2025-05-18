@@ -1,6 +1,6 @@
 import { KiteConnect } from 'kiteconnect';
 import * as zerodhaApi from './api';
-import { setWebSocketAccessToken } from './webhook';
+import { setWebSocketAccessToken, disconnectWebSocket } from './webhook';
 
 // Initialize KiteConnect with API key
 const apiKey = process.env.REACT_APP_ZERODHA_API_KEY;
@@ -52,10 +52,25 @@ export const isAuthenticated = () => {
 };
 
 // Function to logout
-export const logout = () => {
-    localStorage.removeItem('zerodha_access_token');
-    localStorage.removeItem('zerodha_public_token');
-    window.location.reload(); // Reload to update the UI
+export const logout = async () => {
+    try {
+        // Clear tokens
+        localStorage.removeItem('zerodha_access_token');
+        localStorage.removeItem('zerodha_public_token');
+
+        // Disconnect websocket if needed
+        try {
+            await disconnectWebSocket();
+        } catch (error) {
+            console.error('Error disconnecting websocket:', error);
+        }
+
+        // Redirect to login page
+        window.location.href = '/zerodha/login';
+    } catch (error) {
+        console.error('Error during logout:', error);
+        throw error;
+    }
 };
 
 // Function to initialize KiteConnect with stored access token

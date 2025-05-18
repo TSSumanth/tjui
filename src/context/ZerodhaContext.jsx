@@ -3,6 +3,8 @@ import { getHoldings, getPositions, getOrders, getAccountInfo } from '../service
 import { logout } from '../services/zerodha/authentication';
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
+import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
+import { disconnectWebSocket } from '../services/zerodha/webhook';
 
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
@@ -57,6 +59,7 @@ export const ZerodhaProvider = ({ children }) => {
     const isMounted = useRef(true);
     const isUnmounted = useRef(false);
     const sessionCheckTimeoutRef = useRef(null);
+    const sessionCheckInterval = useRef(null);
 
     // Helper function to make API calls with retry logic
     const makeApiCallWithRetry = async (apiCall, errorMessage) => {
@@ -78,11 +81,6 @@ export const ZerodhaProvider = ({ children }) => {
     const checkSession = useCallback(async (force = false) => {
         if (!isMounted.current) return false;
 
-        const now = Date.now();
-        if (!force && now - lastChecked < SESSION_CHECK_INTERVAL) {
-            return Boolean(sessionActive);
-        }
-
         try {
             // Check if we have a valid token
             const token = localStorage.getItem('zerodha_access_token');
@@ -90,7 +88,7 @@ export const ZerodhaProvider = ({ children }) => {
                 if (isMounted.current) {
                     setSessionActive(false);
                     setIsAuth(false);
-                    setLastChecked(now);
+                    setLastChecked(Date.now());
                 }
                 return false;
             }
@@ -103,7 +101,7 @@ export const ZerodhaProvider = ({ children }) => {
                 if (isMounted.current) {
                     setSessionActive(isValid);
                     setIsAuth(isValid);
-                    setLastChecked(now);
+                    setLastChecked(Date.now());
                     if (isValid && accountRes.data) {
                         setAccountInfo(accountRes.data);
                     }
@@ -114,7 +112,7 @@ export const ZerodhaProvider = ({ children }) => {
                 if (isMounted.current) {
                     setSessionActive(false);
                     setIsAuth(false);
-                    setLastChecked(now);
+                    setLastChecked(Date.now());
                 }
                 return false;
             }
@@ -123,11 +121,11 @@ export const ZerodhaProvider = ({ children }) => {
             if (isMounted.current) {
                 setSessionActive(false);
                 setIsAuth(false);
-                setLastChecked(now);
+                setLastChecked(Date.now());
             }
             return false;
         }
-    }, [sessionActive, lastChecked]);
+    }, []);
 
     // Fetch positions separately
     const fetchPositions = useCallback(async () => {
@@ -631,9 +629,6 @@ export const ZerodhaProvider = ({ children }) => {
 
     const handleLogout = useCallback(async () => {
         try {
-            await logout();
-            localStorage.removeItem('zerodha_access_token');
-            localStorage.removeItem('zerodha_public_token');
             if (isMounted.current) {
                 setIsAuth(false);
                 setSessionActive(false);
@@ -645,6 +640,20 @@ export const ZerodhaProvider = ({ children }) => {
                 setIsAutoSync(false);
                 isInitialLoadDone.current = false;
             }
+
+            // Clear tokens and redirect
+            localStorage.removeItem('zerodha_access_token');
+            localStorage.removeItem('zerodha_public_token');
+
+            // Disconnect websocket if needed
+            try {
+                await disconnectWebSocket();
+            } catch (error) {
+                console.error('Error disconnecting websocket:', error);
+            }
+
+            // Redirect to login page
+            window.location.href = '/zerodha/login';
         } catch (err) {
             console.error('Error during logout:', err);
             if (isMounted.current) {
@@ -652,6 +661,54 @@ export const ZerodhaProvider = ({ children }) => {
             }
         }
     }, []);
+
+    const handleUpdateAccountDetails = async () => {
+        try {
+            const res = await makeApiCallWithRetry(() => getAccountInfo(), 'Failed to get Account Info');
+            console.log('Account Info:', res);
+            if (!res.success) {
+                console.error('Failed to get Account Info after login, please login again');
+                return false;
+            }
+            await updateAccountSummary(res.data.clientId, res.data.name, res.data.email);
+            await updateEquityMargins(res.data.clientId, res.data.margins.equity);
+            await updateMutualFunds(res.data.clientId, res.data.mutualFunds);
+            return true;
+        } catch (error) {
+            console.error('Error updating account details:', error);
+            return false;
+        }
+    }
+
+    const handleLoginSuccess = (async (data) => {
+        if (data.access_token && data.public_token) {
+            // Set tokens in localStorage
+            localStorage.setItem('zerodha_access_token', data.access_token);
+            localStorage.setItem('zerodha_public_token', data.public_token);
+
+            // Update account details
+            let res = await handleUpdateAccountDetails();
+            if (!res) {
+                console.error('Failed to update account details, please try again');
+                return false;
+            } else {
+                console.log('Account details updated successfully');
+                // Update context state
+                setSessionActive(true);
+                setIsAuth(true);
+                setLastChecked(Date.now());
+
+                // Navigate to account page
+                window.location.href = '/zerodha/account';
+            }
+
+            // Clear any existing intervals
+            if (sessionCheckInterval.current) {
+                clearInterval(sessionCheckInterval.current);
+                sessionCheckInterval.current = null;
+            }
+        }
+    });
 
     const value = {
         isAuth,
@@ -664,6 +721,7 @@ export const ZerodhaProvider = ({ children }) => {
         fetchData,
         fetchOrders,
         handleLogout,
+        handleLoginSuccess,
         isAutoSync,
         setIsAutoSync,
         holdings,

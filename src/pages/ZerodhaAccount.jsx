@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Container,
@@ -23,12 +23,33 @@ import MutualFunds from '../components/AccountDetails/MutualFunds';
 import { getAccountInfo } from '../services/zerodha/api';
 import { updateAccountSummary, getAccountSummary, getEquityMargins, getMutualFunds, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
 const ZerodhaAccount = () => {
-    const { isAuth, sessionActive } = useZerodha();
-    const [loading, setLoading] = useState(false);
-    const [portfolioAccounts, setPortfolioAccounts] = useState([]);
+    const { isAuth, sessionActive, handleLoginSuccess } = useZerodha();
+    const [loading, setLoading] = useState(true);
     const [accountInfo, setAccountInfo] = useState(null);
     const [equityMargins, setEquityMargins] = useState(null);
-    const [mutualFunds, setMutualFunds] = useState(null);
+    const [mutualFunds, setMutualFunds] = useState([]);
+    const [portfolioAccounts, setPortfolioAccounts] = useState([]);
+    const [error, setError] = useState(null);
+    // const [activeTab, setActiveTab] = useState('overview');
+    // const [isRefreshing, setIsRefreshing] = useState(false);
+    // const [lastUpdated, setLastUpdated] = useState(null);
+
+    // Handle login success message
+    const handleMessage = useCallback((event) => {
+        if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
+            handleLoginSuccess(event.data.data);
+        } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
+            setError(event.data.error);
+        }
+    }, [handleLoginSuccess]);
+
+    // Add event listener for login success
+    useEffect(() => {
+        window.addEventListener('message', handleMessage);
+        return () => {
+            window.removeEventListener('message', handleMessage);
+        };
+    }, [handleMessage]);
 
     const fetchDetails = async () => {
         setLoading(true);
@@ -89,32 +110,9 @@ const ZerodhaAccount = () => {
                 throw new Error('Please allow popups for this site to proceed with authentication');
             }
 
-            // Add message listener for login callback
-            const handleMessage = (event) => {
-                console.log('Received message:', event.data);
-                if (event.data.type === 'ZERODHA_AUTH_SUCCESS') {
-                    console.log('Auth success, storing tokens');
-                    const { access_token, public_token } = event.data.data;
-                    localStorage.setItem('zerodha_access_token', access_token);
-                    localStorage.setItem('zerodha_public_token', public_token);
-                    // Set WebSocket access token
-                    setWebSocketAccessToken(access_token).catch(error => {
-                        console.error('Failed to set WebSocket access token:', error);
-                    });
-                    window.removeEventListener('message', handleMessage);
-                    // fetchData(true);
-                } else if (event.data.type === 'ZERODHA_AUTH_ERROR') {
-                    console.error('Auth error:', event.data.error);
-                    window.removeEventListener('message', handleMessage);
-                }
-            };
-
-            window.addEventListener('message', handleMessage);
-
             const checkWindow = setInterval(() => {
                 if (authWindow.closed) {
                     clearInterval(checkWindow);
-                    window.removeEventListener('message', handleMessage);
                     // fetchData(true);
                 }
             }, 500);
