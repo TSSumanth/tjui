@@ -71,7 +71,7 @@ export default function SavedOrdersTable({ savedOrders, onEdit, onPlace, onDelet
                                             <EditIcon />
                                         </IconButton>
                                         <IconButton
-                                            onClick={() => onPlace(order)}
+                                            onClick={() => onPlace(order.order1_details)}
                                             color="success"
                                             disabled={placingOrder}
                                         >

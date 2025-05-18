@@ -80,7 +80,7 @@ export default function PairedOrdersPage() {
     const [foOrderLoading, setFOOrderLoading] = useState(false);
     const [editingFO, setEditingFO] = useState(null);
     const [isUpdateFODialogOpen, setIsUpdateFODialogOpen] = useState(false);
-    const [completedOrders, setCompletedOrders] = useState([]);
+    // const [completedOrders, setCompletedOrders] = useState([]);
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
@@ -354,8 +354,19 @@ export default function PairedOrdersPage() {
 
     // Handler for placing order
     const handlePlaceOrder = async (orderParams) => {
-        const response = await placeRegularOrder(orderParams);
-        return response;
+        setPlacingOrder(true);
+        try {
+            const response = await placeRegularOrder(orderParams);
+            setPlacingOrder(false);
+            if (response.status === 'success') {
+                setSnackbar({ open: true, message: 'Order placed successfully!', severity: 'success' });
+            } else {
+                setSnackbar({ open: true, message: 'Failed to place order! ' + response.error, severity: 'error' });
+            }
+        } catch (e) {
+            setSnackbar({ open: true, message: 'Failed to place order! ' + e.message, severity: 'error' });
+        }
+        setPlacingOrder(false);
     };
 
     // Handler for deleting SO
@@ -428,24 +439,24 @@ export default function PairedOrdersPage() {
         setFOOrderLoading(false);
     };
 
-    useEffect(() => {
-        if (tabValue === 1) {
-            const fetchCompletedOrders = async () => {
-                try {
-                    const response = await getCompletedOrderPairs();
-                    setCompletedOrders(response);
-                } catch (error) {
-                    console.error('Error fetching completed orders:', error);
-                    setSnackbar({
-                        open: true,
-                        message: 'Failed to fetch completed orders',
-                        severity: 'error'
-                    });
-                }
-            };
-            fetchCompletedOrders();
-        }
-    }, [tabValue]);
+    // useEffect(() => {
+    //     if (tabValue === 1) {
+    //         const fetchCompletedOrders = async () => {
+    //             try {
+    //                 const response = await getCompletedOrderPairs();
+    //                 setCompletedOrders(response);
+    //             } catch (error) {
+    //                 console.error('Error fetching completed orders:', error);
+    //                 setSnackbar({
+    //                     open: true,
+    //                     message: 'Failed to fetch completed orders',
+    //                     severity: 'error'
+    //                 });
+    //             }
+    //         };
+    //         fetchCompletedOrders();
+    //     }
+    // }, [tabValue]);
 
     return (
         <>
