@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Container,
     Typography,
     Box,
     Button,
@@ -20,8 +19,11 @@ import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import OcoOrderDialog from '../components/PairedOrders/OcoOrderDialog';
 import CreateOAOOrder from '../components/PairedOrders/CreateOAOOrder';
 import { useZerodha } from '../context/ZerodhaContext';
-import { createOrderPair, getOrderPairs, getActivePairs, updateOrderPair, deleteOrderPair, createOaoOrderPair, updateOaoOrderPair, deleteOaoOrderPair } from '../services/pairedorders/pairedorders';
-import { getOrders, placeOrder, getInstruments } from '../services/zerodha/api';
+import { createOrderPair, getActivePairs, updateOrderPair, deleteOrderPair, createOaoOrderPair, updateOaoOrderPair, deleteOaoOrderPair } from '../services/pairedorders/pairedorders';
+import {
+    getOrders,
+    placeRegularOrder,
+} from '../services/zerodha/api';
 import SavedOrdersTable from '../components/PairedOrders/SavedOrdersTable';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import StockOrderDialog from '../components/PairedOrders/StockOrderDialog';
@@ -343,56 +345,9 @@ export default function PairedOrdersPage() {
     };
 
     // Handler for placing order
-    const handlePlaceOrder = async (order) => {
-        setPlacingOrder(true);
-        try {
-            // First, get the instrument token with appropriate parameters based on order type
-            const isStockOrder = order.order1_details.exchange === 'NSE' || order.order1_details.exchange === 'BSE';
-            const instrumentsResponse = await getInstruments({
-                search: order.order1_details.tradingsymbol || order.order1_details.symbol,
-                exchange: order.order1_details.exchange,
-                type: isStockOrder ? 'EQ' : undefined
-            });
-
-            if (!instrumentsResponse.success || !instrumentsResponse.data || instrumentsResponse.data.length === 0) {
-                throw new Error('Could not find instrument details');
-            }
-
-            const instrument = instrumentsResponse.data[0];
-
-            // Validate quantity against lot size only for F&O orders
-            const quantity = parseInt(order.order1_details.quantity);
-            if (!isStockOrder && quantity % instrument.lot_size !== 0) {
-                throw new Error(`Quantity must be in multiples of lot size (${instrument.lot_size})`);
-            }
-
-            const orderPayload = {
-                tradingsymbol: instrument.tradingsymbol, // Use the exact tradingsymbol from instrument
-                transaction_type: order.order1_details.transaction_type,
-                quantity: quantity,
-                price: order.order1_details.price,
-                product: order.order1_details.product,
-                order_type: order.order1_details.order_type,
-                validity: order.order1_details.validity,
-                exchange: instrument.segment.split('-')[0], // Use NFO from segment
-                instrument_token: instrument.instrument_token
-            };
-
-            const response = await placeOrder(orderPayload);
-            if (response.success) {
-                setSnackbar({ open: true, message: 'Order placed successfully!', severity: 'success' });
-                // Refresh the orders list
-                const allOrders = await getOrders();
-                const ordersArray = Array.isArray(allOrders) ? allOrders : [];
-                setSavedOrders(ordersArray.filter(o => o.type === 'SO'));
-            } else {
-                throw new Error(response.message || 'Failed to place order');
-            }
-        } catch (error) {
-            setSnackbar({ open: true, message: error.message || 'Failed to place order', severity: 'error' });
-        } finally {
-            setPlacingOrder(false);
-        }
+    const handlePlaceOrder = async (orderParams) => {
+        const response = await placeRegularOrder(orderParams);
+        return response;
     };
 
     // Handler for deleting SO

@@ -112,12 +112,59 @@ export const logout = () => {
     localStorage.removeItem('zerodha_public_token');
 };
 
-export const placeOrder = async (orderParams) => {
+// Regular Order APIs
+export const placeRegularOrder = async (orderParams) => {
     try {
         const response = await api.post('/api/zerodha/orders/regular', orderParams);
         return response.data;
     } catch (error) {
-        throw new Error(error.response?.data?.error || 'Failed to place order');
+        throw new Error(error.response?.data?.error || 'Failed to place regular order');
+    }
+};
+
+export const cancelRegularOrder = async (orderId) => {
+    try {
+        const response = await api.delete(`/api/zerodha/orders/regular/${orderId}`);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to cancel regular order');
+    }
+};
+
+export const modifyRegularOrder = async (orderId, data) => {
+    try {
+        const response = await api.put(`/api/zerodha/orders/regular/${orderId}`, data);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to modify regular order');
+    }
+};
+
+// AMO Order APIs
+export const placeAmoOrder = async (orderParams) => {
+    try {
+        const response = await api.post('/api/zerodha/orders/amo', orderParams);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to place AMO order');
+    }
+};
+
+export const cancelAmoOrder = async (orderId) => {
+    try {
+        const response = await api.delete(`/api/zerodha/orders/amo/${orderId}`);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to cancel AMO order');
+    }
+};
+
+export const modifyAmoOrder = async (orderId, data) => {
+    try {
+        const response = await api.put(`/api/zerodha/orders/amo/${orderId}`, data);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || 'Failed to modify AMO order');
     }
 };
 

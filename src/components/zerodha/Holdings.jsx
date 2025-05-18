@@ -17,8 +17,12 @@ import {
 } from '@mui/material';
 import { formatCurrency } from '../../utils/formatters';
 import { MoreVert } from '@mui/icons-material';
-import OrderPopup from './OrderPopup';
-import { placeOrder } from '../../services/zerodha/api';
+import OrderPopup from '../ZerodhaOrders/OrderPopup';
+import {
+    getHoldings,
+    placeRegularOrder,
+    createCloseHoldingOrder
+} from '../../services/zerodha/api';
 
 const Holdings = ({ holdings, isSilentUpdate = false }) => {
     const [prevHoldings, setPrevHoldings] = React.useState(null);
@@ -101,7 +105,7 @@ const Holdings = ({ holdings, isSilentUpdate = false }) => {
                 price: parseFloat(price),
                 product: selectedOrderHolding.product,
             };
-            await placeOrder(order);
+            await placeRegularOrder(order);
             handleCloseOrderDialog();
         } catch (error) {
             alert(error.message || 'Failed to place order');
@@ -117,6 +121,7 @@ const Holdings = ({ holdings, isSilentUpdate = false }) => {
         handleOpenOrderDialog(menuAnchorEl, selectedHolding, true);
         handleMenuClose();
     };
+
 
     // Only show loading state on initial load and not during silent updates
     if (isInitialLoad && !isSilentUpdate) {

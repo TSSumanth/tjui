@@ -24,8 +24,12 @@ import {
 import SaveIcon from '@mui/icons-material/Save';
 import { ExpandLess, ExpandMore, MoreVert } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
-import { placeOrder, fetchLTPs } from '../../services/zerodha/api';
-import OrderPopup from './OrderPopup';
+import {
+    placeRegularOrder,
+    createClosePositionOrder,
+    fetchLTPs
+} from '../../services/zerodha/api';
+import OrderPopup from '../ZerodhaOrders/OrderPopup';
 import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
 import { getStrategies } from '../../services/strategies';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -335,7 +339,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         if (!selectedPosition) {
             return;
         }
-
         onOpenOrderDialog(menuAnchorEl, selectedPosition, underlying, false, false);
         handleMenuClose();
     };
@@ -429,10 +432,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const intrinsicValue = isOption ? calculateIntrinsicValue(position, ltpMap) : '';
         const timeValue = isOption ? calculateTimeValue(position, ltpMap) : '';
 
-        // Check if it's a stock option (not index)
-        const isStockOption = isOption && !['NIFTY', 'BANKNIFTY'].includes(getUnderlyingSymbol(position.tradingsymbol));
-        // Check if it's a buy position
-        const isBuyPosition = quantity > 0;
 
         return (
             <TableRow
@@ -851,7 +850,7 @@ const Positions = ({ positions }) => {
                 trigger_price: triggerPrice ? parseFloat(triggerPrice) : undefined
             };
 
-            await placeOrder(order);
+            await placeRegularOrder(order);
             handleCloseOrderDialog();
         } catch (error) {
             alert(error.message || 'Failed to place order');

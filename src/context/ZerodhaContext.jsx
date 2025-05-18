@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getOrders, getAccountInfo } from '../services/zerodha/api';
+import { getOrders, getAccountInfo, getHoldings, getPositions, placeRegularOrder, cancelRegularOrder, modifyRegularOrder } from '../services/zerodha/api';
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
-import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
+import { getOrderById, cancelZerodhaOrder } from '../services/zerodha/api';
 import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
 import { disconnectWebSocket, setWebSocketAccessToken } from '../services/zerodha/webhook';
 import { isMarketHours, isTokenExpired } from '../services/zerodha/utils';
@@ -281,7 +281,7 @@ export const ZerodhaProvider = ({ children }) => {
             // Case 2: Order1 complete and Order2 waiting
             else if (order1Status === 'COMPLETE' && pair.order2_id === 'WAITINGFORORDER1') {
                 try {
-                    const data = await placeOrder(pair.order2_details);
+                    const data = await placeRegularOrder(pair.order2_details);
                     if (data.success && data.order_id) {
                         await updateOrderPair(pair.id, { order2_id: data.order_id });
                     } else {
