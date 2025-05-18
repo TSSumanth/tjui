@@ -18,11 +18,11 @@ import {
     CircularProgress,
     Alert,
     Snackbar,
-    IconButton
+    IconButton,
+    Chip
 } from '@mui/material';
 import { createOrderPair } from '../../services/pairedorders/oco';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useZerodha } from '../../context/ZerodhaContext';
 
 function formatOrderTime(timestamp) {
     if (!timestamp) return '';
@@ -33,13 +33,11 @@ function formatOrderTime(timestamp) {
     }
 }
 
-export default function OcoOrderDialog({ open, onClose, orders }) {
+export default function OcoOrderDialog({ open, onClose, orders, fetchOrders }) {
     const [selectedOrders, setSelectedOrders] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const { fetchOrders } = useZerodha();
     const dialogRef = useRef(null);
 
     // Reset selected orders when dialog opens/closes
@@ -58,7 +56,6 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
 
     const handleClose = () => {
         setSelectedOrders([]);
-        setError('');
         setShowSuccess(false);
         onClose();
     };
@@ -75,7 +72,6 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
         if (selectedOrders.length !== 2) return;
 
         setLoading(true);
-        setError('');
 
         try {
             const [order1, order2] = selectedOrders;
@@ -109,7 +105,7 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
             onClose();
         } catch (err) {
             console.error('Error creating OCO pair:', err);
-            setError(err.message || 'Failed to create OCO pair');
+            setSnackbar({ open: true, message: err.message || 'Failed to create OCO pair', severity: 'error' });
         } finally {
             setLoading(false);
         }
@@ -169,6 +165,7 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                                             <TableCell>Type</TableCell>
                                             <TableCell>Price</TableCell>
                                             <TableCell>Status</TableCell>
+                                            <TableCell>Order Time</TableCell>
                                             <TableCell>Action</TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -179,7 +176,10 @@ export default function OcoOrderDialog({ open, onClose, orders }) {
                                                 <TableCell>{order.tradingsymbol}</TableCell>
                                                 <TableCell>{order.order_type}</TableCell>
                                                 <TableCell>{order.price}</TableCell>
-                                                <TableCell>{order.status}</TableCell>
+                                                <TableCell>
+                                                    <Chip label={order.status} color={getStatusColor(order.status)} size="small" />
+                                                </TableCell>
+                                                <TableCell>{formatOrderTime(order.order_timestamp)}</TableCell>
                                                 <TableCell>
                                                     <Button
                                                         size="small"

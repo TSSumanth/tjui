@@ -28,12 +28,18 @@ const OrderActions = ({
                 <MoreVertIcon />
             </IconButton>
             <Menu
-                anchorEl={menuAnchorEl}
+                anchorEl={menuAnchorEl} 
                 open={Boolean(menuAnchorEl)}
                 onClose={handleMenuClose}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
+                <MenuItem onClick={() => {
+                    onViewDetails(order);
+                    handleMenuClose();
+                }}>
+                    View Details
+                </MenuItem>
                 {order.status === 'TRIGGER PENDING' && (
                     <MenuItem onClick={() => {
                         onCancel(order);
@@ -42,7 +48,7 @@ const OrderActions = ({
                         Cancel
                     </MenuItem>
                 )}
-                {['OPEN', 'AMO REQ RECEIVED'].includes(order.status) && (
+                {['OPEN', 'AMO REQ RECEIVED', 'MODIFY AMO REQ RECEIVED'].includes(order.status) && (
                     <>
                         <MenuItem onClick={() => {
                             onCancel(order);
@@ -58,12 +64,6 @@ const OrderActions = ({
                         </MenuItem>
                     </>
                 )}
-                <MenuItem onClick={() => {
-                    onViewDetails(order);
-                    handleMenuClose();
-                }}>
-                    View Details
-                </MenuItem>
                 {order.status === 'COMPLETE' && (
                     <MenuItem onClick={() => {
                         onLinkToTrade(order);

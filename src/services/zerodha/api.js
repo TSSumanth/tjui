@@ -199,11 +199,6 @@ export const cancelZerodhaOrder = async (orderId) => {
     return response.data;
 };
 
-// Modify an open order
-export const modifyZerodhaOrder = async (orderId, data) => {
-    const response = await api.post(`/api/zerodha/orders/regular/${orderId}`, data);
-    return response.data;
-};
 
 export const getOrderById = async (orderId) => {
     const response = await api.get(`/api/zerodha/orders/${orderId}`);

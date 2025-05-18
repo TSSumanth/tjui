@@ -40,6 +40,7 @@ function TabPanel({ children, value, index }) {
 
 export default function PairedOrdersPage() {
     const [tabValue, setTabValue] = useState(0);
+    const [orders, setOrders] = useState([]);
     const [isOCODialogOpen, setIsOCODialogOpen] = useState(false);
     const [isOAODialogOpen, setIsOAODialogOpen] = useState(false);
     const [showStoreCancelledOrderDialog, setShowStoreCancelledOrderDialog] = useState(false);
@@ -47,7 +48,7 @@ export default function PairedOrdersPage() {
     const [selectedCancelledOrder, setSelectedCancelledOrder] = useState(null);
     const [savedOrders, setSavedOrders] = useState([]);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const { orders, refreshActiveOrderPairs } = useZerodha();
+    const { refreshActiveOrderPairs } = useZerodha();
     const [showCreateSOOrderDialog, setShowCreateSOOrderDialog] = useState(false);
     const [showCreateFOOrderDialog, setShowCreateFOOrderDialog] = useState(false);
     const [soOrderDetails, setSOOrderDetails] = useState({
@@ -113,6 +114,13 @@ export default function PairedOrdersPage() {
             setCancelledOrders([]);
         }
     };
+    useEffect(() => {
+        const fetchOrders = async () => {
+            const response = await getOrders();
+            setOrders(response.data);
+        };
+        fetchOrders();
+    }, []);
 
     // Fetch today's cancelled orders when dialog opens
     useEffect(() => {
@@ -569,6 +577,7 @@ export default function PairedOrdersPage() {
                 open={isOCODialogOpen}
                 onClose={() => setIsOCODialogOpen(false)}
                 orders={orders ? orders.filter(order => order.status === 'OPEN') : []}
+                fetchOrders={getOrders}
             />
             <CreateOAOOrder
                 open={isOAODialogOpen}

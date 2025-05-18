@@ -11,7 +11,7 @@ import {
     Snackbar,
     Alert
 } from '@mui/material';
-import { cancelZerodhaOrder, modifyZerodhaOrder } from '../../services/zerodha/api';
+import { cancelZerodhaOrder, modifyAmoOrder, modifyRegularOrder } from '../../services/zerodha/api';
 import LinkToTradePopup from './LinkToTradePopup';
 import OcoOrderDialog from '../PairedOrders/OcoOrderDialog';
 import OrderTable from './OrderTable';
@@ -53,7 +53,11 @@ const Orders = ({ orders = [], onRefresh }) => {
         if (!modifyOrder) return;
         setModifyLoading(true);
         try {
-            await modifyZerodhaOrder(modifyOrder.order_id, fields);
+            if (modifyOrder.is_amo) {
+                await modifyAmoOrder(modifyOrder.order_id, fields);
+            } else {
+                await modifyRegularOrder(modifyOrder.order_id, fields);
+            }
             onRefresh();
             setModifyOrder(null);
         } catch (error) {
@@ -106,7 +110,8 @@ const Orders = ({ orders = [], onRefresh }) => {
     const pendingOrders = orders?.filter(order =>
         order.status === 'OPEN' ||
         order.status === 'TRIGGER PENDING' ||
-        order.status === 'AMO REQ RECEIVED'
+        order.status === 'AMO REQ RECEIVED' ||
+        order.status === 'MODIFY AMO REQ RECEIVED'
     ) || [];
 
     const completedOrders = orders?.filter(order =>
@@ -154,7 +159,7 @@ const Orders = ({ orders = [], onRefresh }) => {
                                 onCancel={handleCancelOrder}
                                 onModify={handleModifyOrder}
                                 onViewDetails={handleViewDetails}
-                                onLinkToTrade={handleLinkToTrade}
+                                isOpenOrders={true}
                             />
                         </Box>
                     )}
@@ -179,10 +184,9 @@ const Orders = ({ orders = [], onRefresh }) => {
                             </Typography>
                             <OrderTable
                                 orders={completedOrders}
-                                onCancel={handleCancelOrder}
-                                onModify={handleModifyOrder}
                                 onViewDetails={handleViewDetails}
                                 onLinkToTrade={handleLinkToTrade}
+                                isCompletedOrders={true}
                             />
                         </Box>
                     )}
@@ -207,10 +211,8 @@ const Orders = ({ orders = [], onRefresh }) => {
                             </Typography>
                             <OrderTable
                                 orders={cancelledOrders}
-                                onCancel={handleCancelOrder}
-                                onModify={handleModifyOrder}
                                 onViewDetails={handleViewDetails}
-                                onLinkToTrade={handleLinkToTrade}
+                                isCancelledOrders={true}
                             />
                         </Box>
                     )}
@@ -236,6 +238,7 @@ const Orders = ({ orders = [], onRefresh }) => {
                 open={showOcoDialog}
                 onClose={() => setShowOcoDialog(false)}
                 orders={pendingOrders}
+                fetchOrders={onRefresh}
             />
 
             <Dialog open={showDetails} onClose={handleCloseDetails} maxWidth="md" fullWidth>
