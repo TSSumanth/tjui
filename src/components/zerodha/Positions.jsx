@@ -22,7 +22,6 @@ import {
     Tooltip
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import { useZerodha } from '../../context/ZerodhaContext';
 import { ExpandLess, ExpandMore, MoreVert } from '@mui/icons-material';
 import { formatCurrency } from '../../utils/formatters';
 import { placeOrder, fetchLTPs } from '../../services/zerodha/api';
@@ -35,7 +34,6 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import TodayIcon from '@mui/icons-material/Today';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
-import { isMarketHours } from '../../services/zerodha/utils';
 
 
 // Utility functions
@@ -176,7 +174,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     const [manualPlError, setManualPlError] = React.useState('');
     const [strategyId, setStrategyId] = useState(null);
     const [strategyLoading, setStrategyLoading] = useState(false);
-    const initialFetchDone = React.useRef(false);
 
     // Log positions data on mount and updates
     useEffect(() => {
@@ -185,7 +182,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     }, [positions, underlying]);
 
     // Fetch LTPs for positions
-    const fetchPositionLTPs = useCallback(async () => {
+    const fetchPositionLTPs = async () => {
         if (!positions?.length) return;
 
         setIsLtpLoading(true);
@@ -212,7 +209,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         } finally {
             setIsLtpLoading(false);
         }
-    }, [positions]);
+    };
 
     // Fetch LTPs when positions change
     useEffect(() => {
@@ -220,7 +217,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             console.log('Positions data changed - fetching LTPs');
             fetchPositionLTPs();
         }
-    }, [positions, fetchPositionLTPs]);
+    }, [positions]);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
@@ -757,7 +754,6 @@ const Positions = ({ positions }) => {
     const [price, setPrice] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const [isDataReady, setIsDataReady] = React.useState(false);
-    const { ltpMap } = useZerodha();
 
     // Track initial load and data readiness
     React.useEffect(() => {
