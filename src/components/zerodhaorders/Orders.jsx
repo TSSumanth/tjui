@@ -1,42 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Box,
-    LinearProgress,
-    Skeleton,
     Button,
-    Stack,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     Typography,
-    Grid
+    Grid,
+    Snackbar,
+    Alert
 } from '@mui/material';
-import { useZerodha } from '../../context/ZerodhaContext';
-import { cancelZerodhaOrder, modifyZerodhaOrder, getOrders } from '../../services/zerodha/api';
+import { cancelZerodhaOrder, modifyZerodhaOrder } from '../../services/zerodha/api';
 import LinkToTradePopup from './LinkToTradePopup';
 import OcoOrderDialog from '../PairedOrders/OcoOrderDialog';
 import OrderTable from './OrderTable';
 import ModifyOrderDialog from './ModifyOrderDialog';
-import { Link } from '@mui/icons-material';
 import { formatDateTime, formatPrice } from '../../utils/formatters';
 
-const Orders = () => {
-    const { orders, loadingStates, fetchOrders } = useZerodha();
-    const isLoading = loadingStates.orders;
+const Orders = ({ orders = [], onRefresh }) => {
     const [modifyOrder, setModifyOrder] = useState(null);
     const [modifyLoading, setModifyLoading] = useState(false);
     const [linkToTradeOrder, setLinkToTradeOrder] = useState(null);
     const [showOcoDialog, setShowOcoDialog] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showDetails, setShowDetails] = useState(false);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'error'
+    });
 
     const handleCancelOrder = async (order) => {
         try {
             await cancelZerodhaOrder(order.order_id);
-            fetchOrders();
+            onRefresh();
         } catch (error) {
             console.error('Error cancelling order:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to cancel order. Please try again.',
+                severity: 'error'
+            });
         }
     };
 
@@ -49,10 +54,15 @@ const Orders = () => {
         setModifyLoading(true);
         try {
             await modifyZerodhaOrder(modifyOrder.order_id, fields);
-            fetchOrders();
+            onRefresh();
             setModifyOrder(null);
         } catch (error) {
             console.error('Error modifying order:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to modify order. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setModifyLoading(false);
         }
@@ -71,7 +81,7 @@ const Orders = () => {
     };
 
     const handleLinkToTradeSuccess = async () => {
-        await fetchOrders();
+        onRefresh();
         setLinkToTradeOrder(null);
     };
 
@@ -85,31 +95,28 @@ const Orders = () => {
         setSelectedOrder(null);
     };
 
-    if (isLoading) {
-        return (
-            <Box sx={{ width: '100%' }}>
-                <LinearProgress />
-                <Box sx={{ p: 2 }}>
-                    <Skeleton variant="rectangular" height={400} />
-                </Box>
-            </Box>
-        );
-    }
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar(prev => ({ ...prev, open: false }));
+    };
 
-    const pendingOrders = orders.filter(order =>
+    // Only filter orders if we have them
+    const pendingOrders = orders?.filter(order =>
         order.status === 'OPEN' ||
         order.status === 'TRIGGER PENDING' ||
         order.status === 'AMO REQ RECEIVED'
-    );
+    ) || [];
 
-    const completedOrders = orders.filter(order =>
+    const completedOrders = orders?.filter(order =>
         order.status === 'COMPLETE'
-    );
+    ) || [];
 
-    const cancelledOrders = orders.filter(order =>
+    const cancelledOrders = orders?.filter(order =>
         order.status === 'CANCELLED' ||
         order.status === 'REJECTED'
-    );
+    ) || [];
 
     const noOrders = pendingOrders.length === 0 && completedOrders.length === 0 && cancelledOrders.length === 0;
 
@@ -215,6 +222,7 @@ const Orders = () => {
                 order={modifyOrder}
                 onClose={handleModifyClose}
                 onSuccess={handleModifySubmit}
+                loading={modifyLoading}
             />
 
             <LinkToTradePopup
@@ -282,6 +290,22 @@ const Orders = () => {
                     <Button onClick={handleCloseDetails}>Close</Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={3000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -23,21 +23,22 @@ import {
     Alert,
     Snackbar,
     Tooltip,
-    IconButton
+    IconButton,
+    Box
 } from '@mui/material';
-import { useZerodha } from '../../context/ZerodhaContext';
 import { createOaoOrderPair } from '../../services/pairedorders/oao';
+import { getOrders } from '../../services/zerodha/api';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 const CreateOAOOrder = ({ open, onClose }) => {
-    const { orders, fetchOrders } = useZerodha();
-    const [step, setStep] = useState(1);
-    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const [showValidation, setShowValidation] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [step, setStep] = useState(1);
+    const [selectedOrder, setSelectedOrder] = useState(null);
     const [order2Details, setOrder2Details] = useState({
         tradingsymbol: '',
         transaction_type: 'BUY',
@@ -49,11 +50,31 @@ const CreateOAOOrder = ({ open, onClose }) => {
         exchange: 'NSE'
     });
 
-    // Filter open orders
-    const openOrders = orders.filter(order =>
-        order.status === 'OPEN' &&
-        order.order_type === 'LIMIT'
-    );
+    // Fetch open orders when component mounts or dialog opens
+    useEffect(() => {
+        if (open) {
+            fetchOpenOrders();
+        }
+    }, [open]);
+
+    const fetchOpenOrders = async () => {
+        try {
+            setLoading(true);
+            const response = await getOrders();
+            const allOrders = response.data || [];
+            // Filter only open and LIMIT orders
+            const openOrders = allOrders.filter(order =>
+                order.status === 'OPEN' &&
+                order.order_type === 'LIMIT'
+            );
+            setOrders(openOrders);
+        } catch (err) {
+            console.error('Error fetching orders:', err);
+            setError('Failed to fetch orders. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleOrderSelect = (order) => {
         setSelectedOrder(order);
@@ -157,10 +178,7 @@ const CreateOAOOrder = ({ open, onClose }) => {
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {step === 1 ? 'Select First Order' : 'Specify Second Order Details'}
                     <IconButton
-                        onClick={async () => {
-                            await fetchOrders();
-                            setSnackbar({ open: true, message: 'Orders refreshed successfully!', severity: 'success' });
-                        }}
+                        onClick={fetchOpenOrders}
                         size="small"
                     >
                         <RefreshIcon />
@@ -168,37 +186,47 @@ const CreateOAOOrder = ({ open, onClose }) => {
                 </DialogTitle>
                 <DialogContent>
                     {step === 1 ? (
-                        <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Symbol</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Quantity</TableCell>
-                                        <TableCell>Price</TableCell>
-                                        <TableCell>Action</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {openOrders.map((order) => (
-                                        <TableRow key={order.order_id}>
-                                            <TableCell>{order.tradingsymbol}</TableCell>
-                                            <TableCell>{order.transaction_type}</TableCell>
-                                            <TableCell>{order.quantity}</TableCell>
-                                            <TableCell>{order.price}</TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="contained"
-                                                    onClick={() => handleOrderSelect(order)}
-                                                >
-                                                    Select
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <>
+                            {loading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : error ? (
+                                <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
+                            ) : (
+                                <TableContainer component={Paper}>
+                                    <Table>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Symbol</TableCell>
+                                                <TableCell>Type</TableCell>
+                                                <TableCell>Quantity</TableCell>
+                                                <TableCell>Price</TableCell>
+                                                <TableCell>Action</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {orders.map((order) => (
+                                                <TableRow key={order.order_id}>
+                                                    <TableCell>{order.tradingsymbol}</TableCell>
+                                                    <TableCell>{order.transaction_type}</TableCell>
+                                                    <TableCell>{order.quantity}</TableCell>
+                                                    <TableCell>{order.price}</TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="contained"
+                                                            onClick={() => handleOrderSelect(order)}
+                                                        >
+                                                            Select
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )}
+                        </>
                     ) : (
                         <Grid container spacing={2}>
                             <Grid item xs={12}>

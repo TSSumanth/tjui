@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
+import { getOrders, getAccountInfo } from '../services/zerodha/api';
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
 import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
@@ -24,20 +24,13 @@ export const useZerodha = () => {
 export const ZerodhaProvider = ({ children }) => {
     const [isAuth, setIsAuth] = useState(false);
     const [sessionActive, setSessionActive] = useState(false);
-    const [accountInfo, setAccountInfo] = useState(null);
-    const [lastChecked, setLastChecked] = useState(0);
     const [loading, setLoading] = useState(false);
     const [loadingStates, setLoadingStates] = useState({
-        holdings: false,
-        positions: false,
         orders: false
     });
-    const [holdings, setHoldings] = useState([]);
-    const [positions, setPositions] = useState([]);
     const [orders, setOrders] = useState([]);
     const [isAutoSync, setIsAutoSync] = useState(false);
     const [error, setError] = useState(null);
-    const [ltpMap, setLtpMap] = useState({});
     const [activeOrderPairs, setActiveOrderPairs] = useState([]);
     const [completedOrderPairs, setCompletedOrderPairs] = useState([]);
     const [orderPairStatusMap, setOrderPairStatusMap] = useState({});
@@ -94,7 +87,6 @@ export const ZerodhaProvider = ({ children }) => {
                     if (isMounted.current) {
                         setSessionActive(false);
                         setIsAuth(false);
-                        setLastChecked(now);
                     }
                     return false;
                 }
@@ -119,10 +111,6 @@ export const ZerodhaProvider = ({ children }) => {
                     if (isMounted.current) {
                         setSessionActive(false);
                         setIsAuth(false);
-                        setLastChecked(now);
-                        setAccountInfo(null);
-                        setHoldings([]);
-                        setPositions([]);
                         setOrders([]);
                         setError('Session expired. Please login again.');
                         setIsAutoSync(false);
@@ -136,7 +124,6 @@ export const ZerodhaProvider = ({ children }) => {
                 if (isMounted.current) {
                     setSessionActive(isValid);
                     setIsAuth(isValid);
-                    setLastChecked(now);
                 }
                 return isValid;
             } catch (err) {
@@ -144,7 +131,6 @@ export const ZerodhaProvider = ({ children }) => {
                 if (isMounted.current) {
                     setSessionActive(false);
                     setIsAuth(false);
-                    setLastChecked(now);
                 }
                 return false;
             } finally {
@@ -155,94 +141,6 @@ export const ZerodhaProvider = ({ children }) => {
 
         return sessionCheckPromise.current;
     }, [sessionActive]);
-
-    // Fetch positions separately
-    const fetchPositions = useCallback(async () => {
-        console.log('fetchPositions');
-        if (!isMounted.current) return;
-        try {
-            setLoadingStates(prev => ({ ...prev, positions: true }));
-            const positionsRes = await makeApiCallWithRetry(() => getPositions(), 'Failed to fetch positions');
-            if (positionsRes && isMounted.current) {
-                setPositions(positionsRes.data || []);
-            }
-        } catch (err) {
-            console.error('Error fetching positions:', err);
-        } finally {
-            if (isMounted.current) {
-                setLoadingStates(prev => ({ ...prev, positions: false }));
-            }
-        }
-    }, []);
-
-    // Fetch positions separately
-    const fetchHoldings = useCallback(async () => {
-        console.log('fetchHoldings');
-        if (!isMounted.current) return;
-        try {
-            setLoadingStates(prev => ({ ...prev, holdings: true }));
-            const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
-            if (holdingsRes && isMounted.current) {
-                setHoldings(holdingsRes.data || []);
-            }
-        } catch (err) {
-            console.error('Error fetching holdings:', err);
-        } finally {
-            if (isMounted.current) {
-                setLoadingStates(prev => ({ ...prev, holdings: false }));
-            }
-        }
-    }, []);
-
-    // Fetch data
-    // const fetchData = useCallback(async (force = false) => {
-    //     if (!isMounted.current) return;
-    //     console.log('fetchData: fetching holdings and Postions: force - ', force);
-    //     const now = Date.now();
-    //     if (!force && now - lastFetchTime.current < FETCH_INTERVAL) {
-    //         return;
-    //     }
-
-    //     try {
-    //         if (force) {
-    //             setLoading(true);
-    //         }
-    //         setError(null);
-
-    //         // Only fetch if we have a valid session
-    //         if (await checkSession()) {
-
-    //             // Set individual loading states
-    //             setLoadingStates(prev => ({
-    //                 holdings: true,
-    //                 positions: true,
-    //                 orders: false
-    //             }));
-
-    //             try {
-    //                 await fetchHoldings();
-    //                 await fetchPositions();
-    //             } catch (err) {
-    //                 console.error('Error fetching data:', err);
-    //             } finally {
-    //                 if (isMounted.current) {
-    //                     setLoadingStates(prev => ({ ...prev, holdings: false }));
-    //                 }
-    //             }
-    //         }
-
-    //         lastFetchTime.current = now;
-    //     } catch (err) {
-    //         console.error('Error fetching data:', err);
-    //         if (isMounted.current) {
-    //             setError(err.message);
-    //         }
-    //     } finally {
-    //         if (isMounted.current && force) {
-    //             setLoading(false);
-    //         }
-    //     }
-    // }, [checkSession, fetchPositions]);
 
     // Fetch orders separately
     const fetchOrders = useCallback(async () => {
@@ -301,66 +199,6 @@ export const ZerodhaProvider = ({ children }) => {
         };
     }, [checkSession]);
 
-    // Auto-sync effect - single interval for holdings which triggers positions
-    // useEffect(() => {
-    //     if (!isAutoSync || !isMarketHours()) return;
-
-    //     const syncInterval = setInterval(fetchData, FETCH_INTERVAL);
-
-    //     return () => {
-    //         clearInterval(syncInterval);
-    //     };
-    // }, [isAutoSync, fetchData]);
-
-    // Market hours check effect
-    // useEffect(() => {
-    //     if (!sessionActive) return;
-
-    //     const checkMarketHours = () => {
-    //         const shouldAutoSync = isMarketHours();
-    //         if (shouldAutoSync !== isAutoSync) {
-    //             setIsAutoSync(shouldAutoSync);
-    //         }
-    //     };
-
-    //     // Check immediately
-    //     checkMarketHours();
-
-    //     // Check every minute
-    //     const intervalId = setInterval(checkMarketHours, 60000);
-    //     return () => clearInterval(intervalId);
-    // }, [sessionActive, isAutoSync]);
-
-    // Update ltpMap whenever holdings or positions change
-    useEffect(() => {
-        const newLtpMap = {};
-        (holdings || []).forEach(h => {
-            if (h.tradingsymbol && h.last_price !== undefined) {
-                newLtpMap[h.tradingsymbol] = h.last_price;
-            }
-        });
-        // If positions is an array
-        if (Array.isArray(positions)) {
-            positions.forEach(p => {
-                if (p.tradingsymbol && p.last_price !== undefined) {
-                    newLtpMap[p.tradingsymbol] = p.last_price;
-                }
-            });
-        }
-        // If positions is an object with arrays (e.g., { net: [], day: [] })
-        else if (positions && typeof positions === 'object') {
-            Object.values(positions).forEach(arr => {
-                if (Array.isArray(arr)) {
-                    arr.forEach(p => {
-                        if (p.tradingsymbol && p.last_price !== undefined) {
-                            newLtpMap[p.tradingsymbol] = p.last_price;
-                        }
-                    });
-                }
-            });
-        }
-        setLtpMap(newLtpMap);
-    }, [holdings, positions]);
 
     // Remove any automatic polling for orders
     useEffect(() => {
@@ -378,7 +216,7 @@ export const ZerodhaProvider = ({ children }) => {
     }, [checkSession, fetchOrders]);
 
     // Add these helper functions before fetchOrderPairStatuses
-    const handleOcoPairStatus = async (pair, order1Status, order2Status, statusMap) => {
+    const handleOcoPairStatus = async (pair, order1Status, order2Status) => {
         try {
             const normStatus1 = (order1Status || '').toUpperCase();
             const normStatus2 = (order2Status || '').toUpperCase();
@@ -667,9 +505,6 @@ export const ZerodhaProvider = ({ children }) => {
             if (isMounted.current) {
                 setIsAuth(false);
                 setSessionActive(false);
-                setAccountInfo(null);
-                setHoldings([]);
-                setPositions([]);
                 setOrders([]);
                 setError(null);
                 setIsAutoSync(false);
@@ -732,7 +567,6 @@ export const ZerodhaProvider = ({ children }) => {
                 // Update context state
                 setSessionActive(true);
                 setIsAuth(true);
-                setLastChecked(Date.now());
 
                 // Navigate to account page
                 window.location.href = '/zerodha/account';
@@ -749,22 +583,14 @@ export const ZerodhaProvider = ({ children }) => {
     const value = {
         isAuth,
         sessionActive: Boolean(sessionActive),
-        accountInfo,
         loading,
         loadingStates,
         error,
         checkSession,
-        // fetchData,
-        fetchOrders,
         handleLogout,
         handleLoginSuccess,
         isAutoSync,
         setIsAutoSync,
-        holdings,
-        positions,
-        orders,
-        fetchPositions,
-        ltpMap,
         activeOrderPairs,
         completedOrderPairs,
         orderPairStatusMap,

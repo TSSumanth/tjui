@@ -1,29 +1,57 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
-    Container,
-    Typography,
-    Paper,
     CircularProgress,
     Button,
-    Stack,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import Orders from '../components/zerodhaorders/Orders';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
-import { useZerodha } from '../context/ZerodhaContext';
+import { getOrders } from '../services/zerodha/api';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 const ZerodhaOrders = () => {
-    const { fetchOrders, loadingStates } = useZerodha();
+    const [isLoading, setIsLoading] = useState(true);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'error'
+    });
+    const [orders, setOrders] = useState([]);
+
+    const fetchOrders = async () => {
+        try {
+            setIsLoading(true);
+            const response = await getOrders();
+            setOrders(response.data || []);
+            throw new Error('test');
+        } catch (err) {
+            console.error('Error fetching orders:', err);
+            setSnackbar({
+                open: true,
+                message: 'Failed to fetch orders. Please try again.',
+                severity: 'error'
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Only fetch orders on initial mount
     useEffect(() => {
         fetchOrders();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleRefresh = () => {
         fetchOrders();
+    };
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar(prev => ({ ...prev, open: false }));
     };
 
     return (
@@ -36,7 +64,7 @@ const ZerodhaOrders = () => {
                         color="primary"
                         startIcon={<RefreshIcon />}
                         onClick={handleRefresh}
-                        disabled={loadingStates.orders}
+                        disabled={isLoading}
                         size="small"
                         sx={{
                             borderRadius: 1.5,
@@ -45,16 +73,31 @@ const ZerodhaOrders = () => {
                             py: 0.5
                         }}
                     >
-                        {loadingStates.orders ? 'Refreshing...' : 'Refresh'}
+                        {isLoading ? 'Refreshing...' : 'Refresh'}
                     </Button>
                 </Box>
-                {loadingStates.orders ? (
+                {isLoading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                         <CircularProgress />
                     </Box>
                 ) : (
-                    <Orders />
+                    <Orders orders={orders} onRefresh={fetchOrders} />
                 )}
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={3000}
+                    onClose={handleCloseSnackbar}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                    <Alert
+                        onClose={handleCloseSnackbar}
+                        severity={snackbar.severity}
+                        sx={{ width: '100%' }}
+                        variant="filled"
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
             </Box>
         </>
     );
