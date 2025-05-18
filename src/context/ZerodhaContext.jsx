@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { getHoldings, getPositions, getOrders, getAccountInfo } from '../services/zerodha/api';
-import { logout } from '../services/zerodha/authentication';
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
 import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
@@ -9,8 +8,8 @@ import { disconnectWebSocket } from '../services/zerodha/webhook';
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
-const SESSION_CHECK_INTERVAL = 2000; // 2 seconds
 const FETCH_INTERVAL = 60000; // 60 seconds
+const SESSION_CACHE_DURATION = 30000; // 30 seconds
 
 // Function to check if current time is within market hours (extended 30 mins after close)
 const isMarketHours = () => {
@@ -22,6 +21,23 @@ const isMarketHours = () => {
 
     // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 4:00 PM
     return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1600;
+};
+
+// Add this helper function at the top with other constants
+const isTokenExpired = (tokenTimestamp) => {
+    const now = new Date();
+    const tokenDate = new Date(tokenTimestamp);
+    const tomorrow6AM = new Date();
+    tomorrow6AM.setDate(tomorrow6AM.getDate() + 1);
+    tomorrow6AM.setHours(6, 0, 0, 0);
+
+    // If token was created today, it's valid until 6 AM tomorrow
+    if (tokenDate.toDateString() === now.toDateString()) {
+        return now > tomorrow6AM;
+    }
+
+    // If token was created before today, it's expired
+    return true;
 };
 
 export const useZerodha = () => {
@@ -60,6 +76,8 @@ export const ZerodhaProvider = ({ children }) => {
     const isUnmounted = useRef(false);
     const sessionCheckTimeoutRef = useRef(null);
     const sessionCheckInterval = useRef(null);
+    const lastSessionCheck = useRef(0);
+    const sessionCheckPromise = useRef(null);
 
     // Helper function to make API calls with retry logic
     const makeApiCallWithRetry = async (apiCall, errorMessage) => {
@@ -77,55 +95,94 @@ export const ZerodhaProvider = ({ children }) => {
         }
     };
 
-    // Check session status
+    // Check session status with caching and debouncing
     const checkSession = useCallback(async (force = false) => {
         if (!isMounted.current) return false;
 
-        try {
-            // Check if we have a valid token
-            const token = localStorage.getItem('zerodha_access_token');
-            if (!token) {
-                if (isMounted.current) {
-                    setSessionActive(false);
-                    setIsAuth(false);
-                    setLastChecked(Date.now());
-                }
-                return false;
-            }
+        const now = Date.now();
 
-            // Try to fetch account info to validate token
+        // If not forced and we've checked recently, return cached result
+        if (!force && now - lastSessionCheck.current < SESSION_CACHE_DURATION) {
+            return Boolean(sessionActive);
+        }
+
+        // If there's an ongoing check, return its promise
+        if (sessionCheckPromise.current) {
+            return sessionCheckPromise.current;
+        }
+
+        // Create new check promise
+        sessionCheckPromise.current = (async () => {
             try {
-                const accountRes = await getAccountInfo();
-                const isValid = accountRes && accountRes.success;
+                // Check if we have a valid token
+                const token = localStorage.getItem('zerodha_access_token');
+                const tokenTimestamp = localStorage.getItem('zerodha_token_timestamp');
+
+                if (!token) {
+                    if (isMounted.current) {
+                        setSessionActive(false);
+                        setIsAuth(false);
+                        setLastChecked(now);
+                    }
+                    return false;
+                }
+
+                // Check if token is expired based on Zerodha's rules
+                const isValid = !isTokenExpired(parseInt(tokenTimestamp));
+
+                if (!isValid) {
+                    // Token is expired, clean up
+                    localStorage.removeItem('zerodha_access_token');
+                    localStorage.removeItem('zerodha_public_token');
+                    localStorage.removeItem('zerodha_token_timestamp');
+
+                    // Disconnect websocket if needed
+                    try {
+                        await disconnectWebSocket();
+                    } catch (error) {
+                        console.error('Error disconnecting websocket:', error);
+                    }
+
+                    // Reset context state
+                    if (isMounted.current) {
+                        setSessionActive(false);
+                        setIsAuth(false);
+                        setLastChecked(now);
+                        setAccountInfo(null);
+                        setHoldings([]);
+                        setPositions([]);
+                        setOrders([]);
+                        setError('Session expired. Please login again.');
+                        setIsAutoSync(false);
+                    }
+
+                    // Redirect to login page
+                    window.location.href = '/zerodha/login';
+                    return false;
+                }
 
                 if (isMounted.current) {
                     setSessionActive(isValid);
                     setIsAuth(isValid);
-                    setLastChecked(Date.now());
-                    if (isValid && accountRes.data) {
-                        setAccountInfo(accountRes.data);
-                    }
+                    setLastChecked(now);
                 }
                 return isValid;
             } catch (err) {
-                console.error('Error validating session:', err);
+                console.error('Error checking session:', err);
                 if (isMounted.current) {
                     setSessionActive(false);
                     setIsAuth(false);
-                    setLastChecked(Date.now());
+                    setLastChecked(now);
                 }
                 return false;
+            } finally {
+                lastSessionCheck.current = now;
+                sessionCheckPromise.current = null;
             }
-        } catch (err) {
-            console.error('Error checking session:', err);
-            if (isMounted.current) {
-                setSessionActive(false);
-                setIsAuth(false);
-                setLastChecked(Date.now());
-            }
-            return false;
-        }
-    }, []);
+        })();
+
+        return sessionCheckPromise.current;
+    }, [sessionActive]);
 
     // Fetch positions separately
     const fetchPositions = useCallback(async () => {
@@ -162,17 +219,6 @@ export const ZerodhaProvider = ({ children }) => {
 
             // Only fetch if we have a valid session
             if (await checkSession()) {
-                // If force is true, also fetch account info
-                if (force) {
-                    try {
-                        const accountRes = await makeApiCallWithRetry(() => getAccountInfo(), 'Failed to fetch account info');
-                        if (accountRes && accountRes.success) {
-                            setAccountInfo(accountRes.data);
-                        }
-                    } catch (err) {
-                        console.error('Error fetching account info:', err);
-                    }
-                }
 
                 // Set individual loading states
                 setLoadingStates(prev => ({
@@ -685,6 +731,7 @@ export const ZerodhaProvider = ({ children }) => {
             // Set tokens in localStorage
             localStorage.setItem('zerodha_access_token', data.access_token);
             localStorage.setItem('zerodha_public_token', data.public_token);
+            localStorage.setItem('zerodha_token_timestamp', Date.now().toString());
 
             // Update account details
             let res = await handleUpdateAccountDetails();
