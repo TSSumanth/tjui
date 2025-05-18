@@ -60,6 +60,7 @@ import { useZerodha } from '../../context/ZerodhaContext';
 import SyncIcon from '@mui/icons-material/Sync';
 import EditIcon from '@mui/icons-material/Edit';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
+import { fetchLTPs } from '../../services/zerodha/api';
 
 const TABLE_STYLES = {
     container: {
@@ -550,150 +551,105 @@ function UpdateStrategy({ id }) {
             const totalTrades = openStockTrades.length + openOptionTrades.length;
             setSyncProgress(prev => ({ ...prev, total: totalTrades }));
 
-            const hasOptionOrFutureTrades = openOptionTrades.some(trade =>
-                trade.asset.includes('FUT') || trade.asset.includes('CE') || trade.asset.includes('PE')
-            );
-
-            if (hasOptionOrFutureTrades && (!positions ||
-                (Array.isArray(positions) && positions.length === 0) &&
-                (!positions.net || positions.net.length === 0) &&
-                (!positions.day || positions.day.length === 0))) {
-                setSnackbar({
-                    open: true,
-                    message: 'Unable to sync option/future trades: No positions data available from Zerodha. Please ensure you have open positions in Zerodha.',
-                    severity: 'warning'
-                });
-                return;
-            }
-
-            const zerodhaLTPMap = new Map();
-
-            if (holdings && holdings.length > 0) {
-                holdings.forEach(holding => {
-                    if (holding.tradingsymbol && holding.last_price) {
-                        zerodhaLTPMap.set(holding.tradingsymbol, holding.last_price);
-                    }
-                });
-            }
-
-            if (Array.isArray(positions)) {
-                positions.forEach(position => {
-                    if (position.tradingsymbol && position.last_price) {
-                        zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
-                    }
-                });
-            } else if (positions && typeof positions === 'object') {
-                if (positions.net && Array.isArray(positions.net)) {
-                    positions.net.forEach(position => {
-                        if (position.tradingsymbol && position.last_price) {
-                            zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
-                        }
-                    });
-                }
-
-                if (positions.day && Array.isArray(positions.day)) {
-                    positions.day.forEach(position => {
-                        if (position.tradingsymbol && position.last_price) {
-                            zerodhaLTPMap.set(position.tradingsymbol, position.last_price);
-                        }
-                    });
-                }
-            }
-
-            // --- NEW: Update symbol_ltp for the strategy if symbol exists in LTP map ---
-            if (strategy?.symbol) {
-                const symbolLTP = zerodhaLTPMap.get(strategy.symbol);
-                if (symbolLTP !== undefined) {
-                    setStrategy(prev => ({
-                        ...prev,
-                        symbol_ltp: symbolLTP
-                    }));
-                    setSnackbar({
-                        open: true,
-                        message: `Fetched LTP ₹${symbolLTP} for ${strategy.symbol}`,
-                        severity: 'success'
-                    });
-                    // Immediately update the strategy in the backend
-                    try {
-                        await updateStrategy({ ...strategy, symbol_ltp: symbolLTP });
-                        // Refresh strategy state from backend
-                        const refreshedStrategy = await getStrategies({ id: strategy.id });
-                        const strategyData = Array.isArray(refreshedStrategy) ? refreshedStrategy[0] : refreshedStrategy;
-                        if (strategyData) setStrategy(strategyData);
-                        setSnackbar({
-                            open: true,
-                            message: `Strategy updated with LTP ₹${symbolLTP}`,
-                            severity: 'success'
-                        });
-                    } catch (err) {
-                        setSnackbar({
-                            open: true,
-                            message: 'Failed to update strategy with new LTP',
-                            severity: 'error'
-                        });
-                    }
-                } else {
-                    setSnackbar({
-                        open: true,
-                        message: `No LTP found for symbol ${strategy.symbol} in holdings/positions.`,
-                        severity: 'warning'
-                    });
-                }
-            }
-            // --- END NEW ---
-
+            // Create instruments array for LTP fetch
+            const instruments = [];
             const updatedStockTrades = [];
             const updatedOptionTrades = [];
 
+            // Process stock trades one by one
             for (const trade of openStockTrades) {
-                const ltp = zerodhaLTPMap.get(trade.symbol);
-                if (ltp) {
-                    const updatedTrade = {
-                        ...trade,
-                        ltp: ltp.toString()
+                if (trade.symbol) {
+                    const instrument = {
+                        exchange: 'NSE',
+                        tradingsymbol: trade.symbol
                     };
-                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-                    updatedTrade.unrealizedpl = unrealizedPL;
-                    updatedStockTrades.push(updatedTrade);
-                }
-                setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
-            }
+                    console.log('Fetching LTP for stock:', instrument);
 
-            for (const trade of openOptionTrades) {
-                const isFuture = trade.asset.includes('FUT');
-                const optionSymbol = isFuture
-                    ? trade.asset
-                    : `${trade.asset}${trade.strikeprize}${trade.asset.endsWith('CE') ? 'CE' : 'PE'}`;
+                    try {
+                        const ltpMap = await fetchLTPs([instrument]);
+                        console.log('Received LTP for stock:', ltpMap);
 
-                let matchedLTP = null;
-                for (const [symbol, ltp] of zerodhaLTPMap.entries()) {
-                    if (isFuture) {
-                        if (symbol === optionSymbol) {
-                            matchedLTP = ltp;
-                            break;
+                        const ltp = ltpMap[trade.symbol];
+                        if (ltp) {
+                            const updatedTrade = {
+                                ...trade,
+                                ltp: ltp.toString()
+                            };
+                            const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                            updatedTrade.unrealizedpl = unrealizedPL;
+                            updatedStockTrades.push(updatedTrade);
                         }
-                    } else {
-                        if (symbol.includes(trade.asset) &&
-                            symbol.includes(trade.strikeprize) &&
-                            symbol.endsWith(trade.asset.endsWith('CE') ? 'CE' : 'PE')) {
-                            matchedLTP = ltp;
-                            break;
-                        }
+                    } catch (err) {
+                        console.error('Error fetching LTP for stock:', trade.symbol, err);
                     }
                 }
+                setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
+            }
 
-                if (matchedLTP) {
-                    const updatedTrade = {
-                        ...trade,
-                        ltp: matchedLTP.toString()
-                    };
-                    const unrealizedPL = calculateUnrealizedPL(updatedTrade);
-                    updatedTrade.unrealizedpl = unrealizedPL;
-                    updatedOptionTrades.push(updatedTrade);
+            // Process option trades one by one
+            for (const trade of openOptionTrades) {
+                const instrument = {
+                    exchange: 'NFO',
+                    tradingsymbol: trade.asset
+                };
+                console.log('Fetching LTP for option:', instrument);
+
+                try {
+                    const ltpMap = await fetchLTPs([instrument]);
+                    console.log('Received LTP for option:', ltpMap);
+
+                    const ltp = ltpMap[trade.asset];
+                    if (ltp) {
+                        const updatedTrade = {
+                            ...trade,
+                            ltp: ltp.toString()
+                        };
+                        const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                        updatedTrade.unrealizedpl = unrealizedPL;
+                        updatedOptionTrades.push(updatedTrade);
+                    }
+                } catch (err) {
+                    console.error('Error fetching LTP for option:', trade.asset, err);
                 }
                 setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
             }
 
+            // Update symbol LTP if strategy has a symbol
+            if (strategy?.symbol) {
+                try {
+                    const symbolInstrument = {
+                        exchange: 'NSE',
+                        tradingsymbol: strategy.symbol
+                    };
+                    console.log('Fetching LTP for strategy symbol:', symbolInstrument);
+
+                    const symbolLtpMap = await fetchLTPs([symbolInstrument]);
+                    console.log('Received LTP for strategy symbol:', symbolLtpMap);
+
+                    const symbolLTP = symbolLtpMap[strategy.symbol];
+                    if (symbolLTP !== undefined) {
+                        // Update strategy with new symbol LTP
+                        const updatedStrategy = {
+                            ...strategy,
+                            symbol_ltp: symbolLTP.toString()
+                        };
+                        await updateStrategy(updatedStrategy);
+
+                        // Update local state
+                        setStrategy(updatedStrategy);
+
+                        setSnackbar({
+                            open: true,
+                            message: `Fetched LTP ₹${symbolLTP} for ${strategy.symbol}`,
+                            severity: 'success'
+                        });
+                    }
+                } catch (err) {
+                    console.error('Error fetching LTP for strategy symbol:', strategy.symbol, err);
+                }
+            }
+
+            // Update all trades in database
             await Promise.all([
                 ...updatedStockTrades.map(trade => updateStockTrade(trade)),
                 ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
@@ -705,10 +661,10 @@ function UpdateStrategy({ id }) {
             const totalUpdated = updatedStockTrades.length + updatedOptionTrades.length;
             const totalOpen = openStockTrades.length + openOptionTrades.length;
 
-            if (totalUpdated === 0 && hasOptionOrFutureTrades) {
+            if (totalUpdated === 0) {
                 setSnackbar({
                     open: true,
-                    message: 'No matching trades found in Zerodha positions. Please ensure your positions are open in Zerodha.',
+                    message: 'Unable to get LPT from Zerodha for the Open Trades',
                     severity: 'warning'
                 });
             } else {
@@ -716,7 +672,7 @@ function UpdateStrategy({ id }) {
                     open: true,
                     message: totalUpdated > 0
                         ? `Successfully synced LTP from Zerodha for ${totalUpdated} out of ${totalOpen} open trades`
-                        : 'No matching trades found in Zerodha positions/holdings',
+                        : 'Unable to get LPT from Zerodha',
                     severity: totalUpdated > 0 ? 'success' : 'info'
                 });
             }
@@ -977,22 +933,22 @@ function UpdateStrategy({ id }) {
                                     Break-even Points (using Symbol LTP and Realized P/L)
                                 </Typography>
                                 <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mt: 1 }}>
-                                        <Box>
-                                            <Typography variant="caption" color="text.secondary">
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
                                             Lower Break-even
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                             ₹{breakEvenPoints.lower}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="caption" color="text.secondary">
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
                                             Upper Break-even
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
                                             ₹{breakEvenPoints.upper}
-                                            </Typography>
-                                        </Box>
+                                        </Typography>
+                                    </Box>
                                 </Box>
                             </Grid>
                         )}
