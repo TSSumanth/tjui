@@ -160,6 +160,7 @@ export const ZerodhaProvider = ({ children }) => {
 
     // Fetch positions separately
     const fetchPositions = useCallback(async () => {
+        console.log('fetchPositions');
         if (!isMounted.current) return;
         try {
             setLoadingStates(prev => ({ ...prev, positions: true }));
@@ -172,6 +173,25 @@ export const ZerodhaProvider = ({ children }) => {
         } finally {
             if (isMounted.current) {
                 setLoadingStates(prev => ({ ...prev, positions: false }));
+            }
+        }
+    }, []);
+
+    // Fetch positions separately
+    const fetchHoldings = useCallback(async () => {
+        console.log('fetchHoldings');
+        if (!isMounted.current) return;
+        try {
+            setLoadingStates(prev => ({ ...prev, holdings: true }));
+            const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
+            if (holdingsRes && isMounted.current) {
+                setHoldings(holdingsRes.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching holdings:', err);
+        } finally {
+            if (isMounted.current) {
+                setLoadingStates(prev => ({ ...prev, holdings: false }));
             }
         }
     }, []);
@@ -202,14 +222,10 @@ export const ZerodhaProvider = ({ children }) => {
                 }));
 
                 try {
-                    const holdingsRes = await makeApiCallWithRetry(() => getHoldings(), 'Failed to fetch holdings');
-                    if (holdingsRes && isMounted.current) {
-                        setHoldings((holdingsRes.data || []).map(h => ({ ...h })));
-                        // After holdings are fetched successfully, fetch positions
-                        await fetchPositions();
-                    }
+                    await fetchHoldings();
+                    await fetchPositions();
                 } catch (err) {
-                    console.error('Error fetching holdings:', err);
+                    console.error('Error fetching data:', err);
                 } finally {
                     if (isMounted.current) {
                         setLoadingStates(prev => ({ ...prev, holdings: false }));
@@ -256,6 +272,7 @@ export const ZerodhaProvider = ({ children }) => {
     useEffect(() => {
         isMounted.current = true;
         isUnmounted.current = false;
+        isInitialLoadDone.current = false; // Reset on mount
 
         const initializeApp = async () => {
             if (isInitialLoadDone.current || !isMounted.current) return;
@@ -265,6 +282,7 @@ export const ZerodhaProvider = ({ children }) => {
             console.log('Initial session check result:', isSessionValid);
 
             if (isSessionValid && isMounted.current) {
+                await fetchData(true);
                 setIsAutoSync(isMarketHours());
             }
 
@@ -279,6 +297,7 @@ export const ZerodhaProvider = ({ children }) => {
         return () => {
             isMounted.current = false;
             isUnmounted.current = true;
+            isInitialLoadDone.current = false; // Reset on unmount
             if (sessionCheckTimeoutRef.current) {
                 clearTimeout(sessionCheckTimeoutRef.current);
             }
