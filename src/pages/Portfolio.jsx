@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import LinkIcon from '@mui/icons-material/Link';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import { getPortfolioValue, createPortfolioValue, updatePortfolioValue } from '../services/portfolioValue';
-
+import { isMarketHours } from '../services/zerodha/utils';
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
         return '₹0.00';
@@ -38,10 +38,11 @@ const getPositionType = (tradingsymbol) => {
 
 const Portfolio = () => {
     const theme = useTheme();
-    const { loading, isAuth, isAutoSync, setIsAutoSync, sessionActive, checkSession } = useZerodha();
+    const { loading, isAuth, sessionActive, checkSession } = useZerodha();
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState({ net: [] });
     const [localLoading, setLocalLoading] = useState(true);
+    const [isAutoSync, setIsAutoSync] = useState(true);
     const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
     const [portfolioSummary, setPortfolioSummary] = useState({
         holdingsPnL: 0,
@@ -170,41 +171,114 @@ const Portfolio = () => {
         setPortfolioSummary(summary);
     };
 
-    const initializeData = async () => {
+    // Update initializeData to handle loading state better
+    const initializeData = async (setLoading = true) => {
         try {
-            setLocalLoading(true);
+            if (setLoading) {
+                setLocalLoading(true);
+            }
             const isSessionValid = await checkSession();
             console.log('Session validation result:', isSessionValid);
-            console.log('Session is valid, fetching data...');
-            // Always fetch data if session is valid
+
             if (isSessionValid) {
                 console.log('Session is valid, fetching data...');
 
                 const holdingsRes = await getHoldings();
-                const positionsRes = await getPositions()
+                const positionsRes = await getPositions();
 
-                setHoldings(holdingsRes.data);
-                setPositions(positionsRes.data);
-                calculatePortfolioSummary(holdingsRes.data || [], positionsRes.data || { net: [] } );
+                if (holdingsRes?.data) {
+                    setHoldings(holdingsRes.data);
+                }
+                if (positionsRes?.data) {
+                    setPositions(positionsRes.data);
+                }
+
+                calculatePortfolioSummary(
+                    holdingsRes?.data || holdings || [],
+                    positionsRes?.data || positions || { net: [] }
+                );
+            } else {
+                console.log('Session is not valid');
+                    setHoldings([]);
+                    setPositions({ net: [] });
+                    calculatePortfolioSummary([], { net: [] });
             }
-
         } catch (err) {
             console.error('Error initializing data:', err);
-            setNotification({
-                open: true,
-                message: 'Failed to fetch portfolio data. Please try again.',
-                severity: 'error'
-            });
-            setHoldings([]);
-            setPositions({ net: [] });
-            calculatePortfolioSummary([], { net: [] });
+            if (setLoading) {
+                setNotification({
+                    open: true,
+                    message: 'Failed to fetch portfolio data. Please try again.',
+                    severity: 'error'
+                });
+                setHoldings([]);
+                setPositions({ net: [] });
+                calculatePortfolioSummary([], { net: [] });
+            }
         } finally {
-            setLocalLoading(false);
+            if (setLoading) {
+                setLocalLoading(false);
+            }
         }
     };
 
+    // Update polling effect to use local isAutoSync state
     useEffect(() => {
-        initializeData();
+        let pollInterval;
+
+        const startPolling = () => {
+            // Set up polling interval
+            pollInterval = setInterval(() => {
+                if (isMarketHours()) {
+                    setIsAutoSync(true);
+                    console.log('Market hours - fetching data...');
+                    initializeData(false); // Silent update during market hours
+                } else {
+                    setIsAutoSync(false);
+                    // initializeData(false); // Silent update outside market hours
+                    console.log('Outside market hours - skipping fetch');
+                }
+            }, 5000); // 5 seconds
+        };
+
+        // Initial data fetch
+        console.log('Initial data fetch...');
+        initializeData(true); // Show loading state for initial fetch
+
+        // Start polling if auto-sync is enabled
+        if (isAutoSync) {
+            console.log('Auto-sync enabled - starting polling');
+            startPolling();
+        } else {
+            console.log('Auto-sync disabled - polling not started');
+        }
+
+        // Cleanup function
+        return () => {
+            if (pollInterval) {
+                console.log('Cleaning up polling interval');
+                clearInterval(pollInterval);
+            }
+        };
+    }, [isAutoSync]); // Add isAutoSync to dependencies
+
+    // Add effect to handle market hours changes
+    useEffect(() => {
+        const checkMarketHours = () => {
+            const isOpen = isMarketHours();
+            console.log('Market hours check:', isOpen ? 'Market is open' : 'Market is closed');
+            return isOpen;
+        };
+
+        // Check market hours every minute
+        const marketHoursInterval = setInterval(checkMarketHours, 60000);
+
+        // Initial check
+        checkMarketHours();
+
+        return () => {
+            clearInterval(marketHoursInterval);
+        };
     }, []);
 
     const handleCloseNotification = () => {
@@ -357,7 +431,7 @@ const Portfolio = () => {
                         label={
                             <Box display="flex" alignItems="center" sx={{ typography: 'body2' }}>
                                 Auto-sync
-                                <Tooltip title="Auto-sync updates your portfolio data every minute during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
+                                <Tooltip title="Auto-sync updates your portfolio data every 5 seconds during market hours (9:15 AM - 3:30 PM, Mon-Fri)">
                                     <InfoIcon sx={{ ml: 0.5, fontSize: '1rem', color: 'text.secondary' }} />
                                 </Tooltip>
                             </Box>
@@ -366,7 +440,7 @@ const Portfolio = () => {
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
-                        onClick={initializeData}
+                        onClick={() => initializeData(true)}
                         disabled={loading}
                         size="small"
                         sx={{
@@ -632,7 +706,7 @@ const Portfolio = () => {
                         <Typography variant="h5" gutterBottom color="text.primary" sx={{ mb: 3 }}>
                             Holdings
                         </Typography>
-                        <Holdings />
+                        <Holdings holdings={holdings} isSilentUpdate={!localLoading} />
                     </Paper>
                 </Box>
 
@@ -664,7 +738,7 @@ const Portfolio = () => {
                                 </Typography>
                             </Stack>
                         </Box>
-                        <Positions />
+                        <Positions positions={positions} isSilentUpdate={!localLoading} />
                     </Paper>
                 </Box>
             </Container>

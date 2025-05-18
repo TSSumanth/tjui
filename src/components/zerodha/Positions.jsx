@@ -695,8 +695,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     );
 };
 
-const Positions = () => {
-    const { positions, loadingStates } = useZerodha();
+const Positions = ({ positions }) => {
     const [prevPositions, setPrevPositions] = React.useState(null);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const [orderDialogAnchorEl, setOrderDialogAnchorEl] = React.useState(null);
@@ -707,6 +706,7 @@ const Positions = () => {
     const [quantity, setQuantity] = React.useState('');
     const [price, setPrice] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const { ltpMap } = useZerodha(); // Keep only ltpMap from context
 
     // Track initial load
     React.useEffect(() => {
@@ -811,7 +811,7 @@ const Positions = () => {
     };
 
     // Only show loading state on initial load
-    if (isInitialLoad && loadingStates.positions) {
+    if (isInitialLoad) {
         return (
             <Box>
                 <Box sx={{ width: '100%', mb: 2 }}>

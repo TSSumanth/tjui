@@ -15,14 +15,12 @@ import {
     Menu,
     MenuItem
 } from '@mui/material';
-import { useZerodha } from '../../context/ZerodhaContext';
 import { formatCurrency } from '../../utils/formatters';
 import { MoreVert } from '@mui/icons-material';
 import OrderPopup from './OrderPopup';
 import { placeOrder } from '../../services/zerodha/api';
 
-const Holdings = () => {
-    const { holdings, loadingStates } = useZerodha();
+const Holdings = ({ holdings, isSilentUpdate = false }) => {
     const [prevHoldings, setPrevHoldings] = React.useState(null);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const [isUpdating, setIsUpdating] = React.useState(false);
@@ -120,7 +118,8 @@ const Holdings = () => {
         handleMenuClose();
     };
 
-    if (isInitialLoad && loadingStates.holdings) {
+    // Only show loading state on initial load and not during silent updates
+    if (isInitialLoad && !isSilentUpdate) {
         return (
             <Box>
                 <Box sx={{ width: '100%', mb: 2 }}>
