@@ -29,7 +29,7 @@ import {
     createClosePositionOrder,
     fetchLTPs
 } from '../../services/zerodha/api';
-import OrderPopup from '../ZerodhaOrders/OrderPopup';
+import OrderPopup from '../zerodhaorders/OrderPopup';
 import { getManualPl, createManualPl, updateManualPl } from '../../services/manualPl';
 import { getStrategies } from '../../services/strategies';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';

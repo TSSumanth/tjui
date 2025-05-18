@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { formatCurrency } from '../../utils/formatters';
 import { MoreVert } from '@mui/icons-material';
-import OrderPopup from '../ZerodhaOrders/OrderPopup';
+import OrderPopup from '../../components/zerodhaorders/OrderPopup';
 import {
     getHoldings,
     placeRegularOrder,

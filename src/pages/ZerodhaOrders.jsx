@@ -25,7 +25,6 @@ const ZerodhaOrders = () => {
             setIsLoading(true);
             const response = await getOrders();
             setOrders(response.data || []);
-            throw new Error('test');
         } catch (err) {
             console.error('Error fetching orders:', err);
             setSnackbar({
