@@ -217,7 +217,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             console.log('Positions data changed - fetching LTPs');
             fetchPositionLTPs();
         }
-    }, [positions]);
+    }, []);
 
     // Calculate P&L values
     const { dayPnL, totalPnL } = React.useMemo(() => {
