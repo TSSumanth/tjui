@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getLoginUrl } from '../services/zerodha/authentication';
-import { setWebSocketAccessToken } from '../services/zerodha/webhook';
+
 import { getAllPortfolioValues } from '../services/portfolioValue';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
@@ -30,9 +30,6 @@ const ZerodhaAccount = () => {
     const [mutualFunds, setMutualFunds] = useState([]);
     const [portfolioAccounts, setPortfolioAccounts] = useState([]);
     const [error, setError] = useState(null);
-    // const [activeTab, setActiveTab] = useState('overview');
-    // const [isRefreshing, setIsRefreshing] = useState(false);
-    // const [lastUpdated, setLastUpdated] = useState(null);
 
     // Handle login success message
     const handleMessage = useCallback((event) => {
@@ -113,7 +110,6 @@ const ZerodhaAccount = () => {
             const checkWindow = setInterval(() => {
                 if (authWindow.closed) {
                     clearInterval(checkWindow);
-                    // fetchData(true);
                 }
             }, 500);
         } catch (err) {

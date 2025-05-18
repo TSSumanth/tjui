@@ -3,7 +3,7 @@ import { getHoldings, getPositions, getOrders, getAccountInfo } from '../service
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder, placeOrder } from '../services/zerodha/api';
 import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';
-import { disconnectWebSocket } from '../services/zerodha/webhook';
+import { disconnectWebSocket, setWebSocketAccessToken } from '../services/zerodha/webhook';
 
 const ZerodhaContext = createContext();
 const MAX_RETRIES = 3;
@@ -731,7 +731,7 @@ export const ZerodhaProvider = ({ children }) => {
             localStorage.setItem('zerodha_access_token', data.access_token);
             localStorage.setItem('zerodha_public_token', data.public_token);
             localStorage.setItem('zerodha_token_timestamp', Date.now().toString());
-
+            setWebSocketAccessToken(data.access_token, data.public_token);
             // Update account details
             let res = await handleUpdateAccountDetails();
             if (!res) {
