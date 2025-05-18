@@ -171,6 +171,7 @@ export const refreshInstruments = async () => {
 
 // Get real-time LTP for an instrument
 export const getInstrumentLTP = async (exchange, tradingsymbol) => {
+    console.log('getInstrumentLTP', exchange, tradingsymbol);
     const response = await api.get('/api/zerodha/instruments/ltp', {
         params: { exchange, tradingsymbol }
     });
@@ -179,6 +180,7 @@ export const getInstrumentLTP = async (exchange, tradingsymbol) => {
 
 // Get real-time LTPs for multiple instruments
 export const fetchLTPs = async (instruments) => {
+    console.log('fetchLTPs', instruments);
     try {
         console.log('Instruments received for LTP fetch:', instruments);
 
@@ -209,28 +211,6 @@ export const fetchLTPs = async (instruments) => {
             if (!response.data || typeof response.data !== 'object') {
                 console.error('Invalid response format:', response.data);
                 return {};
-            }
-
-            // If the response is empty, try to get individual LTPs
-            if (Object.keys(response.data).length === 0) {
-                console.log('Empty response, trying individual LTPs');
-                const individualPromises = tradingsymbols.map(async (symbol) => {
-                    try {
-                        const individualResponse = await api.get('/api/zerodha/instruments/ltp', {
-                            params: {
-                                exchange,
-                                tradingsymbol: symbol
-                            }
-                        });
-                        return individualResponse.data;
-                    } catch (error) {
-                        console.error(`Error fetching LTP for ${symbol}:`, error);
-                        return {};
-                    }
-                });
-
-                const individualResults = await Promise.all(individualPromises);
-                return individualResults.reduce((acc, result) => ({ ...acc, ...result }), {});
             }
 
             return response.data;
