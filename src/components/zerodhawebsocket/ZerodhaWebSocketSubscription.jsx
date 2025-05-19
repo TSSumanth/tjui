@@ -1,81 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Alert, CircularProgress, Paper, Grid, MenuItem, Select, FormControl, InputLabel, Stack, Snackbar } from '@mui/material';
-import Autocomplete from '@mui/material/Autocomplete';
-import { getInstruments } from '../../services/zerodha/api';
-import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
-import { getHolidays } from '../../services/holidays';
+import { Box, Button, Typography, Alert, CircularProgress, Paper, Stack, Snackbar } from '@mui/material';
 import { isMarketHours } from '../../services/zerodha/utils';
-import marketHoursService from '../../services/zerodha/marketHours';
 import Subscribe from './Subscribe';
 import Unsubscribe from './Unsubscribe';
+import { useWebSocketConnection } from './useWebSocketConnection';
 
 const ZerodhaWebSocketSubscription = ({ children }) => {
-    const [isConnected, setIsConnected] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState(null);
-    const [options, setOptions] = useState([]);
-    const [searchLoading, setSearchLoading] = useState(false);
-    const [subscribed, setSubscribed] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const {
+        webhookStatus,
+        statusLoading,
+        handleConnectWebhook,
+        handleDisconnectWebhook,
+        subscribedTokens,
+        fetchSubscriptions
+    } = useWebSocketConnection();
+
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [unsubscribeToken, setUnsubscribeToken] = useState('');
-    const [unsubLoading, setUnsubLoading] = useState(false);
     const [unsubError, setUnsubError] = useState('');
     const [unsubSuccess, setUnsubSuccess] = useState('');
     const [openSuccess, setOpenSuccess] = useState(false);
     const [openError, setOpenError] = useState(false);
     const [openUnsubSuccess, setOpenUnsubSuccess] = useState(false);
     const [openUnsubError, setOpenUnsubError] = useState(false);
-    const [webhookStatus, setWebhookStatus] = useState({ tickerConnected: false, loading: false });
-    const [statusLoading, setStatusLoading] = useState(false);
     const [disconnectSuccess, setDisconnectSuccess] = useState(false);
-    const [isPolling, setIsPolling] = useState(true);
-    const [isMarketOpen, setIsMarketOpen] = useState(false);
-
-
-
-    // Subscribe to market hours updates
-    useEffect(() => {
-        const unsubscribe = marketHoursService.subscribe((marketHours) => {
-            setIsMarketOpen(marketHours);
-
-            // Handle WebSocket connection based on market hours
-            if (marketHours && !isConnected) {
-                handleConnectWebhook();
-            } else if (!marketHours && isConnected) {
-                handleDisconnectWebhook();
-            }
-
-            // Fetch subscriptions and status when market hours change
-            if (isPolling) {
-                fetchSubscriptions();
-                fetchStatus();
-            }
-        });
-
-        return () => unsubscribe();
-    }, [isConnected, isPolling]);
-
-    // Poll for subscriptions and status during market hours
-    useEffect(() => {
-        if (isPolling && isMarketOpen) {
-            const interval = setInterval(() => {
-                fetchSubscriptions();
-                fetchStatus();
-            }, 2000);
-            return () => clearInterval(interval);
-        }
-    }, [isPolling, isMarketOpen]);
-
-    const fetchSubscriptions = async () => {
-        try {
-            const res = await getWebSocketSubscriptions();
-            setSubscribed(res.data || []);
-        } catch (err) {
-            setError('Failed to fetch subscriptions');
-            setOpenError(true);
-        }
-    };
 
     useEffect(() => {
         if (success) setOpenSuccess(true);
@@ -90,53 +38,16 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         if (unsubError) setOpenUnsubError(true);
     }, [unsubError]);
 
-    
     // Snackbar close handlers
     const handleCloseSuccess = () => { setOpenSuccess(false); setSuccess(''); };
     const handleCloseError = () => { setOpenError(false); setError(''); };
     const handleCloseUnsubSuccess = () => { setOpenUnsubSuccess(false); setUnsubSuccess(''); };
     const handleCloseUnsubError = () => { setOpenUnsubError(false); setUnsubError(''); };
 
-    // Poll status every 2 seconds during market hours
-    const fetchStatus = async () => {
-        setStatusLoading(true);
-        try {
-            const res = await getWebSocketStatus();
-            setWebhookStatus({ tickerConnected: res.tickerConnected, loading: false });
-            setIsConnected(res.tickerConnected);
-        } catch {
-            setWebhookStatus({ tickerConnected: false, loading: false });
-            setIsConnected(false);
-        } finally {
-            setStatusLoading(false);
-        }
-    };
-
-    // Connect to Webhook button handler
-    const handleConnectWebhook = async () => {
-        setWebhookStatus(ws => ({ ...ws, loading: true }));
-        try {
-            await subscribeToTokens([]);
-            setIsConnected(true);
-            setTimeout(fetchStatus, 1000);
-        } catch {
-            setIsConnected(false);
-        } finally {
-            setWebhookStatus(ws => ({ ...ws, loading: false }));
-        }
-    };
-
-    const handleDisconnectWebhook = async () => {
-        setWebhookStatus(ws => ({ ...ws, loading: true }));
-        try {
-            await disconnectWebSocket();
-            setIsConnected(false);
+    const handleDisconnect = async () => {
+        const success = await handleDisconnectWebhook();
+        if (success) {
             setDisconnectSuccess(true);
-            setTimeout(fetchStatus, 1000);
-        } catch {
-            // ignore
-        } finally {
-            setWebhookStatus(ws => ({ ...ws, loading: false }));
         }
     };
 
@@ -160,7 +71,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
                     variant="outlined"
                     color="error"
                     disabled={!webhookStatus.tickerConnected || webhookStatus.loading}
-                    onClick={handleDisconnectWebhook}
+                    onClick={handleDisconnect}
                     sx={{ minWidth: 180, fontWeight: 600, fontSize: 16 }}
                 >
                     Disconnect Webhook
@@ -189,12 +100,12 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
             </Snackbar>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="flex-start" justifyContent="space-between" sx={{ mt: 4, mb: 4, width: '100%' }}>
                 <Subscribe onSubscribeSuccess={fetchSubscriptions} />
-                <Unsubscribe subscribed={subscribed} onUnsubscribeSuccess={fetchSubscriptions} />
+                <Unsubscribe subscribed={subscribedTokens} onUnsubscribeSuccess={fetchSubscriptions} />
             </Stack>
             <Box sx={{ width: '100%', px: 0, mt: 2 }}>
                 <Paper elevation={1} sx={{ p: 2, width: '100%', maxWidth: '100%', border: '1px solid black', overflowX: 'auto' }}>
                     <Typography variant="h6" fontWeight={700} sx={{ color: '#1a237e', mb: 2, fontSize: 20 }}>Subscribed Tokens</Typography>
-                    {subscribed.length === 0 ? (
+                    {subscribedTokens.length === 0 ? (
                         <Typography color="text.secondary" fontSize={15}>No tokens subscribed.</Typography>
                     ) : (
                         <Box sx={{ width: '100%', overflowX: 'auto' }}>
@@ -217,7 +128,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
                                     </Box>
                                 </Box>
                                 <Box component="tbody">
-                                    {subscribed.map(row => (
+                                    {subscribedTokens.map(row => (
                                         <Box component="tr" key={row.instrument_token}>
                                             <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.instrument_token}</Box>
                                             <Box component="td" sx={{ p: 1, fontSize: 15 }}>{row.tradingsymbol || '-'}</Box>
