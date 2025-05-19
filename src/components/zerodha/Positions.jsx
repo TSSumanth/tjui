@@ -847,7 +847,8 @@ const Positions = ({ positions }) => {
                 quantity: parseInt(quantity),
                 price: parseFloat(price),
                 product: selectedPosition.product,
-                trigger_price: triggerPrice ? parseFloat(triggerPrice) : undefined
+                trigger_price: triggerPrice ? parseFloat(triggerPrice) : undefined,
+                validity: 'DAY'
             };
 
             await placeRegularOrder(order);

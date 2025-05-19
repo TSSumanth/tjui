@@ -104,6 +104,7 @@ const Holdings = ({ holdings, isSilentUpdate = false }) => {
                 quantity: parseInt(quantity),
                 price: parseFloat(price),
                 product: selectedOrderHolding.product,
+                validity: 'DAY'
             };
             await placeRegularOrder(order);
             handleCloseOrderDialog();

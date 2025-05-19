@@ -4,7 +4,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import { getInstruments } from '../../services/zerodha/api';
 import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
 import { getHolidays } from '../../services/holidays';
-
+import { isMarketHours } from '../../services/zerodha/utils';
 const ZerodhaWebSocketSubscription = () => {
     const [selectedInstrument, setSelectedInstrument] = useState(null);
     const [options, setOptions] = useState([]);
@@ -42,32 +42,6 @@ const ZerodhaWebSocketSubscription = () => {
         fetchHolidays();
     }, []);
 
-    // Check if current time is within market hours (9:15 AM to 3:30 PM IST)
-    const isMarketHours = () => {
-        const now = new Date();
-        const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Convert to IST
-
-        // Check if it's weekend
-        const day = istTime.getDay();
-        if (day === 0 || day === 6) { // 0 is Sunday, 6 is Saturday
-            return false;
-        }
-
-        // Check if it's a holiday
-        const today = istTime.toISOString().split('T')[0];
-        if (holidays.includes(today)) {
-            return false;
-        }
-
-        const hours = istTime.getHours();
-        const minutes = istTime.getMinutes();
-        const currentTime = hours * 60 + minutes;
-
-        const marketStart = 9 * 60 + 15; // 9:15 AM
-        const marketEnd = 15 * 60 + 30;  // 3:30 PM
-
-        return currentTime >= marketStart && currentTime <= marketEnd;
-    };
 
     // Add a debug log to help troubleshoot
     useEffect(() => {
