@@ -194,11 +194,14 @@ export const createCloseHoldingOrder = (holding) => {
 };
 
 // Cancel an open order
-export const cancelZerodhaOrder = async (orderId) => {
-    const response = await api.post(`/api/zerodha/orders/regular/${orderId}`);
-    return response.data;
+export const cancelZerodhaOrder = async (orderId, orderType = 'regular') => {
+    try {
+        const response = await api.delete(`/api/zerodha/orders/${orderType}/${orderId}`);
+        return response.data;
+    } catch (error) {
+        throw new Error(error.response?.data?.error || `Failed to cancel ${orderType} order`);
+    }
 };
-
 
 export const getOrderById = async (orderId) => {
     const response = await api.get(`/api/zerodha/orders/${orderId}`);

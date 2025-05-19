@@ -284,7 +284,8 @@ function Orders() {
         if (!window.confirm(`Cancel order ${order.order_id}?`)) return;
         setCancelLoading(true);
         try {
-            await cancelZerodhaOrder(order.order_id);
+            const orderType = order.order_type === 'AMO' ? 'amo' : 'regular';
+            await cancelZerodhaOrder(order.order_id, orderType);
             await fetchOrders();
         } catch (err) {
             alert(err.message || 'Failed to cancel order');

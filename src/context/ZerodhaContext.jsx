@@ -45,16 +45,20 @@ export const ZerodhaProvider = ({ children }) => {
     const sessionCheckPromise = useRef(null);
 
     // Helper function to make API calls with retry logic
-    const makeApiCallWithRetry = async (apiCall, errorMessage) => {
+    const makeApiCallWithRetry = async (apiCall, errorMessage, options = {}) => {
+        const { maxRetries = MAX_RETRIES, retryDelay = RETRY_DELAY, retryOnError = null } = options;
         try {
             const response = await apiCall();
             retryCount.current = 0; // Reset retry count on success
             return response;
         } catch (err) {
-            if (err.message?.includes('ERR_INSUFFICIENT_RESOURCES') && retryCount.current < MAX_RETRIES) {
+            const shouldRetry = retryOnError ? retryOnError(err) :
+                err.message?.includes('ERR_INSUFFICIENT_RESOURCES');
+
+            if (shouldRetry && retryCount.current < maxRetries) {
                 retryCount.current++;
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryCount.current));
-                return makeApiCallWithRetry(apiCall, errorMessage);
+                await new Promise(resolve => setTimeout(resolve, retryDelay * retryCount.current));
+                return makeApiCallWithRetry(apiCall, errorMessage, options);
             }
             throw new Error(`${errorMessage}: ${err.message}`);
         }
@@ -236,7 +240,15 @@ export const ZerodhaProvider = ({ children }) => {
             }
             // Case 3: Order1 complete, Order2 open
             else if (normStatus1 === 'COMPLETE' && isOrder2Open) {
-                await cancelZerodhaOrder(pair.order2_id);
+                await makeApiCallWithRetry(
+                    () => cancelZerodhaOrder(pair.order2_id),
+                    'Failed to cancel OCO order',
+                    {
+                        maxRetries: 5,
+                        retryDelay: 2000,
+                        retryOnError: (err) => err.message?.includes('Order cannot be cancelled as it is being processed')
+                    }
+                );
                 const newOrder2Details = { ...pair.order2_details, orderstatus: 'CANCELLED' };
                 await updateOrderPair(pair.id, {
                     status: 'COMPLETED',
@@ -246,7 +258,15 @@ export const ZerodhaProvider = ({ children }) => {
             }
             // Case 4: Order2 complete, Order1 open
             else if (normStatus2 === 'COMPLETE' && isOrder1Open) {
-                await cancelZerodhaOrder(pair.order1_id);
+                await makeApiCallWithRetry(
+                    () => cancelZerodhaOrder(pair.order1_id),
+                    'Failed to cancel OCO order',
+                    {
+                        maxRetries: 5,
+                        retryDelay: 2000,
+                        retryOnError: (err) => err.message?.includes('Order cannot be cancelled as it is being processed')
+                    }
+                );
                 const newOrder1Details = { ...pair.order1_details, orderstatus: 'CANCELLED' };
                 await updateOrderPair(pair.id, {
                     status: 'COMPLETED',
