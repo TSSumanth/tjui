@@ -110,7 +110,7 @@ const Orders = ({ orders = [], onRefresh }) => {
     const pendingOrders = orders?.filter(order =>
         order.status === 'OPEN' ||
         order.status === 'TRIGGER PENDING' ||
-        order.status === 'AMO REQ RECEIVED' ||
+        order.status === 'AMO REQ RECEIVED' || 
         order.status === 'MODIFY AMO REQ RECEIVED'
     ) || [];
 
@@ -238,7 +238,6 @@ const Orders = ({ orders = [], onRefresh }) => {
                 open={showOcoDialog}
                 onClose={() => setShowOcoDialog(false)}
                 orders={pendingOrders}
-                fetchOrders={onRefresh}
             />
 
             <Dialog open={showDetails} onClose={handleCloseDetails} maxWidth="md" fullWidth>
