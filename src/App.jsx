@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ZerodhaProvider } from './context/ZerodhaContext';
 import Header from './components/Header/Header';
@@ -19,8 +19,19 @@ import TagManagement from './pages/TagManagement';
 import PairedOrdersPage from './pages/PairedOrdersPage';
 import Holidays from './pages/Holidays';
 import SubscribeLiveDataPage from './pages/SubscribeLiveData';
+import marketHoursService from './services/zerodha/marketHours';
 
 function App() {
+    useEffect(() => {
+        // Start market hours polling when app initializes
+        marketHoursService.startPolling();
+
+        // Cleanup
+        return () => {
+            marketHoursService.stopPolling();
+        };
+    }, []);
+
     return (
         <ZerodhaProvider>
             <BrowserRouter>

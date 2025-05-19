@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Container } from '@mui/material';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
-import ZerodhaWebSocketSubscription from '../components/zerodha/ZerodhaWebSocketSubscription';
+import ZerodhaWebSocketSubscription from '../components/zerodhawebsocket/ZerodhaWebSocketSubscription';
 
 const SubscribeLiveDataPage = () => {
     return (

@@ -5,7 +5,13 @@ import { getInstruments } from '../../services/zerodha/api';
 import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
 import { getHolidays } from '../../services/holidays';
 import { isMarketHours } from '../../services/zerodha/utils';
-const ZerodhaWebSocketSubscription = () => {
+import { useZerodha } from '../../context/ZerodhaContext';
+import marketHoursService from '../../services/zerodha/marketHours';
+import Subscribe from './Subscribe';
+import Unsubscribe from './Unsubscribe';
+
+const ZerodhaWebSocketSubscription = ({ children }) => {
+    const { isConnected, connect, disconnect } = useZerodha();
     const [selectedInstrument, setSelectedInstrument] = useState(null);
     const [options, setOptions] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
@@ -26,6 +32,7 @@ const ZerodhaWebSocketSubscription = () => {
     const [disconnectSuccess, setDisconnectSuccess] = useState(false);
     const [isPolling, setIsPolling] = useState(true);
     const [holidays, setHolidays] = useState([]);
+    const [isMarketOpen, setIsMarketOpen] = useState(false);
 
     // Fetch holidays on component mount
     useEffect(() => {
@@ -42,15 +49,38 @@ const ZerodhaWebSocketSubscription = () => {
         fetchHolidays();
     }, []);
 
-
-    // Add a debug log to help troubleshoot
+    // Subscribe to market hours updates
     useEffect(() => {
-        console.log('Market Hours Check:', {
-            isMarketHours: isMarketHours(),
-            currentTime: new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            day: new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).getDay()
+        const unsubscribe = marketHoursService.subscribe((marketHours) => {
+            setIsMarketOpen(marketHours);
+
+            // Handle WebSocket connection based on market hours
+            if (marketHours && !isConnected) {
+                connect();
+            } else if (!marketHours && isConnected) {
+                disconnect();
+            }
+
+            // Fetch subscriptions and status when market hours change
+            if (isPolling) {
+                fetchSubscriptions();
+                fetchStatus();
+            }
         });
-    }, []);
+
+        return () => unsubscribe();
+    }, [isConnected, connect, disconnect, isPolling]);
+
+    // Poll for subscriptions and status during market hours
+    useEffect(() => {
+        if (isPolling && isMarketOpen) {
+            const interval = setInterval(() => {
+                fetchSubscriptions();
+                fetchStatus();
+            }, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [isPolling, isMarketOpen]);
 
     const fetchSubscriptions = async () => {
         try {
@@ -61,19 +91,6 @@ const ZerodhaWebSocketSubscription = () => {
             setOpenError(true);
         }
     };
-
-    useEffect(() => {
-        if (isPolling) {
-            fetchSubscriptions();
-            if (isMarketHours()) {
-                const interval = setInterval(fetchSubscriptions, 2000);
-                return () => clearInterval(interval);
-            }
-        } else {
-            // Fetch once when polling is stopped or during non-market hours
-            fetchSubscriptions();
-        }
-    }, [isPolling]);
 
     useEffect(() => {
         if (success) setOpenSuccess(true);
@@ -170,23 +187,11 @@ const ZerodhaWebSocketSubscription = () => {
         }
     };
 
-    useEffect(() => {
-        if (isPolling) {
-            fetchStatus();
-            if (isMarketHours()) {
-                const interval = setInterval(fetchStatus, 2000);
-                return () => clearInterval(interval);
-            }
-        }
-    }, [isPolling]);
-
     // Connect to Webhook button handler
     const handleConnectWebhook = async () => {
         setWebhookStatus(ws => ({ ...ws, loading: true }));
         try {
-            // Call subscribe endpoint with empty array to trigger initTicker
             await subscribeToTokens([]);
-            // Wait a moment for status to update
             setTimeout(fetchStatus, 1000);
         } catch {
             // ignore
@@ -256,76 +261,8 @@ const ZerodhaWebSocketSubscription = () => {
                 <Alert onClose={() => setDisconnectSuccess(false)} severity="info" sx={{ fontSize: 13 }}>Webhook disconnected</Alert>
             </Snackbar>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="flex-start" justifyContent="space-between" sx={{ mt: 4, mb: 4, width: '100%' }}>
-                <Box sx={{ flex: 1, minWidth: 320, maxWidth: '45%' }}>
-                    <Paper elevation={1} sx={{ p: 2, border: '1px solid black' }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1a237e', letterSpacing: 1, fontSize: 20 }}>Subscribe Here</Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" width="100%">
-                            <Autocomplete
-                                options={options}
-                                getOptionLabel={option => `${option.tradingsymbol} (${option.name}) [${option.instrument_token}]`}
-                                filterOptions={x => x}
-                                onInputChange={handleInputChange}
-                                onChange={(e, value) => setSelectedInstrument(value)}
-                                value={selectedInstrument}
-                                loading={searchLoading}
-                                sx={{ width: '100%' }}
-                                renderInput={params => (
-                                    <TextField
-                                        {...params}
-                                        label="Search Instrument"
-                                        size="small"
-                                        variant="outlined"
-                                        sx={{ width: '100%' }}
-                                        disabled={loading}
-                                    />
-                                )}
-                            />
-                            <Button
-                                variant="contained"
-                                color="success"
-                                size="small"
-                                onClick={handleSubscribe}
-                                disabled={loading || !selectedInstrument}
-                                sx={{ minWidth: 110, fontWeight: 600, fontSize: 15, boxShadow: 1, '&:hover': { backgroundColor: '#388e3c' } }}
-                            >
-                                {loading ? 'Subscribing...' : 'Subscribe'}
-                            </Button>
-                        </Stack>
-                    </Paper>
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 320, maxWidth: '45%' }}>
-                    <Paper elevation={1} sx={{ p: 2, border: '1px solid black' }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1a237e', letterSpacing: 1, fontSize: 20 }}>Unsubscribe Here</Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" width="100%">
-                            <FormControl size="small" sx={{ width: '100%' }}>
-                                <Select
-                                    value={unsubscribeToken}
-                                    onChange={e => setUnsubscribeToken(e.target.value)}
-                                    displayEmpty
-                                    size="small"
-                                    disabled={unsubLoading || subscribed.length === 0}
-                                >
-                                    <MenuItem value="" disabled>Select Token</MenuItem>
-                                    {subscribed.map(row => (
-                                        <MenuItem key={row.instrument_token} value={row.instrument_token}>
-                                            {row.tradingsymbol ? `${row.tradingsymbol} (${row.instrument_token})` : row.instrument_token}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <Button
-                                variant="contained"
-                                color="error"
-                                size="small"
-                                onClick={handleUnsubscribe}
-                                disabled={unsubLoading || !unsubscribeToken}
-                                sx={{ minWidth: 130, fontWeight: 600, fontSize: 15, boxShadow: 1, '&:hover': { backgroundColor: '#b71c1c' } }}
-                            >
-                                {unsubLoading ? 'Unsubscribing...' : 'Unsubscribe'}
-                            </Button>
-                        </Stack>
-                    </Paper>
-                </Box>
+                <Subscribe onSubscribeSuccess={fetchSubscriptions} />
+                <Unsubscribe subscribed={subscribed} onUnsubscribeSuccess={fetchSubscriptions} />
             </Stack>
             <Box sx={{ width: '100%', px: 0, mt: 2 }}>
                 <Paper elevation={1} sx={{ p: 2, width: '100%', maxWidth: '100%', border: '1px solid black', overflowX: 'auto' }}>
