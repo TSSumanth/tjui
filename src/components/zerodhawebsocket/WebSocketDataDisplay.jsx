@@ -3,9 +3,9 @@ import { Box, Button, Typography, Alert, CircularProgress, Paper, Stack, Snackba
 import { isMarketHours } from '../../services/zerodha/utils';
 import Subscribe from './Subscribe';
 import Unsubscribe from './Unsubscribe';
-import { useWebSocketConnection } from './useWebSocketConnection';
+import { useWebSocket } from './WebSocketManager';
 
-const ZerodhaWebSocketSubscription = ({ children }) => {
+const WebSocketDataDisplay = () => {
     const {
         webhookStatus,
         statusLoading,
@@ -13,7 +13,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         handleDisconnectWebhook,
         subscribedTokens,
         fetchSubscriptions
-    } = useWebSocketConnection();
+    } = useWebSocket();
 
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -155,4 +155,4 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
     );
 };
 
-export default ZerodhaWebSocketSubscription; 
+export default WebSocketDataDisplay; 
