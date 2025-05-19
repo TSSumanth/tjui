@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getWebSocketStatus, subscribeToTokens, disconnectWebSocket, getWebSocketSubscriptions } from '../../services/zerodha/webhook';
 import marketHoursService from '../../services/zerodha/marketHours';
 
@@ -9,14 +9,22 @@ export const useWebSocketConnection = () => {
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [isPolling, setIsPolling] = useState(true);
     const [subscribedTokens, setSubscribed] = useState([]);
+    const lastStatusCheck = useRef(0);
+    const STATUS_CHECK_INTERVAL = 30000; // Check status every 30 seconds
 
-    // Poll status every 2 seconds during market hours
-    const fetchStatus = async () => {
+    // Poll status with throttling
+    const fetchStatus = async (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastStatusCheck.current < STATUS_CHECK_INTERVAL) {
+            return; // Skip if last check was less than 30 seconds ago
+        }
+
         setStatusLoading(true);
         try {
             const res = await getWebSocketStatus();
             setWebhookStatus({ tickerConnected: res.tickerConnected, loading: false });
             setIsConnected(res.tickerConnected);
+            lastStatusCheck.current = now;
         } catch {
             setWebhookStatus({ tickerConnected: false, loading: false });
             setIsConnected(false);
@@ -40,7 +48,7 @@ export const useWebSocketConnection = () => {
         try {
             await subscribeToTokens([]);
             setIsConnected(true);
-            setTimeout(fetchStatus, 1000);
+            fetchStatus(true); // Force status check after connect
         } catch {
             setIsConnected(false);
         } finally {
@@ -54,7 +62,7 @@ export const useWebSocketConnection = () => {
         try {
             await disconnectWebSocket();
             setIsConnected(false);
-            setTimeout(fetchStatus, 1000);
+            fetchStatus(true); // Force status check after disconnect
             return true;
         } catch {
             return false;
@@ -77,7 +85,7 @@ export const useWebSocketConnection = () => {
 
             // Fetch status when market hours change
             if (isPolling) {
-                fetchStatus();
+                fetchStatus(true); // Force status check on market hours change
                 fetchSubscriptions();
             }
         });
@@ -85,11 +93,11 @@ export const useWebSocketConnection = () => {
         return () => unsubscribe();
     }, [isConnected, isPolling]);
 
-    // Poll for status during market hours
+    // Poll for status and subscriptions during market hours
     useEffect(() => {
         if (isPolling && isMarketOpen) {
             const interval = setInterval(() => {
-                fetchStatus();
+                fetchStatus(); // Will be throttled internally
                 fetchSubscriptions();
             }, 2000);
             return () => clearInterval(interval);
