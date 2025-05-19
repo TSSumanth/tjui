@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getOrders, getAccountInfo, getHoldings, getPositions, placeRegularOrder, cancelRegularOrder, modifyRegularOrder } from '../services/zerodha/api';
+import { getOrders, getAccountInfo, placeRegularOrder } from '../services/zerodha/api';
 import { getOrderPairs, getActivePairs, updateOrderPair, getCompletedOrderPairs } from '../services/pairedorders/oco';
 import { getOrderById, cancelZerodhaOrder } from '../services/zerodha/api';
 import { updateAccountSummary, updateMutualFunds, updateEquityMargins } from '../services/accountSummary';

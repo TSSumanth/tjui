@@ -5,13 +5,12 @@ import { getInstruments } from '../../services/zerodha/api';
 import { getWebSocketSubscriptions, subscribeToTokens, unsubscribeFromTokens, getWebSocketStatus, disconnectWebSocket } from '../../services/zerodha/webhook';
 import { getHolidays } from '../../services/holidays';
 import { isMarketHours } from '../../services/zerodha/utils';
-import { useZerodha } from '../../context/ZerodhaContext';
 import marketHoursService from '../../services/zerodha/marketHours';
 import Subscribe from './Subscribe';
 import Unsubscribe from './Unsubscribe';
 
 const ZerodhaWebSocketSubscription = ({ children }) => {
-    const { isConnected, connect, disconnect } = useZerodha();
+    const [isConnected, setIsConnected] = useState(false);
     const [selectedInstrument, setSelectedInstrument] = useState(null);
     const [options, setOptions] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
@@ -31,23 +30,9 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
     const [statusLoading, setStatusLoading] = useState(false);
     const [disconnectSuccess, setDisconnectSuccess] = useState(false);
     const [isPolling, setIsPolling] = useState(true);
-    const [holidays, setHolidays] = useState([]);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
 
-    // Fetch holidays on component mount
-    useEffect(() => {
-        const fetchHolidays = async () => {
-            try {
-                const response = await getHolidays();
-                if (response.success) {
-                    setHolidays(response.data.map(holiday => holiday.date));
-                }
-            } catch (error) {
-                console.error('Failed to fetch holidays:', error);
-            }
-        };
-        fetchHolidays();
-    }, []);
+
 
     // Subscribe to market hours updates
     useEffect(() => {
@@ -56,9 +41,9 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
 
             // Handle WebSocket connection based on market hours
             if (marketHours && !isConnected) {
-                connect();
+                handleConnectWebhook();
             } else if (!marketHours && isConnected) {
-                disconnect();
+                handleDisconnectWebhook();
             }
 
             // Fetch subscriptions and status when market hours change
@@ -69,7 +54,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         });
 
         return () => unsubscribe();
-    }, [isConnected, connect, disconnect, isPolling]);
+    }, [isConnected, isPolling]);
 
     // Poll for subscriptions and status during market hours
     useEffect(() => {
@@ -105,69 +90,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         if (unsubError) setOpenUnsubError(true);
     }, [unsubError]);
 
-    const handleInputChange = async (event, value) => {
-        if (!value || value.length < 2) {
-            setOptions([]);
-            return;
-        }
-        setSearchLoading(true);
-        try {
-            const resp = await getInstruments({ search: value });
-            if (resp.success) setOptions(resp.data);
-            else setOptions([]);
-        } catch {
-            setOptions([]);
-        } finally {
-            setSearchLoading(false);
-        }
-    };
-
-    const handleSubscribe = async () => {
-        setError('');
-        setSuccess('');
-        if (!selectedInstrument) {
-            setError('Please select an instrument');
-            setOpenError(true);
-            return;
-        }
-        setLoading(true);
-        try {
-            await subscribeToTokens([selectedInstrument.instrument_token.toString()]);
-            setSuccess('Subscribed successfully!');
-            setOpenSuccess(true);
-            setSelectedInstrument(null);
-            fetchSubscriptions();
-        } catch (err) {
-            setError('Failed to subscribe');
-            setOpenError(true);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUnsubscribe = async () => {
-        setUnsubError('');
-        setUnsubSuccess('');
-        if (!unsubscribeToken) {
-            setUnsubError('Please select a token to unsubscribe');
-            setOpenUnsubError(true);
-            return;
-        }
-        setUnsubLoading(true);
-        try {
-            await unsubscribeFromTokens([unsubscribeToken]);
-            setUnsubSuccess('Unsubscribed successfully!');
-            setOpenUnsubSuccess(true);
-            setUnsubscribeToken('');
-            fetchSubscriptions();
-        } catch (err) {
-            setUnsubError('Failed to unsubscribe');
-            setOpenUnsubError(true);
-        } finally {
-            setUnsubLoading(false);
-        }
-    };
-
+    
     // Snackbar close handlers
     const handleCloseSuccess = () => { setOpenSuccess(false); setSuccess(''); };
     const handleCloseError = () => { setOpenError(false); setError(''); };
@@ -180,8 +103,10 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         try {
             const res = await getWebSocketStatus();
             setWebhookStatus({ tickerConnected: res.tickerConnected, loading: false });
+            setIsConnected(res.tickerConnected);
         } catch {
             setWebhookStatus({ tickerConnected: false, loading: false });
+            setIsConnected(false);
         } finally {
             setStatusLoading(false);
         }
@@ -192,9 +117,10 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         setWebhookStatus(ws => ({ ...ws, loading: true }));
         try {
             await subscribeToTokens([]);
+            setIsConnected(true);
             setTimeout(fetchStatus, 1000);
         } catch {
-            // ignore
+            setIsConnected(false);
         } finally {
             setWebhookStatus(ws => ({ ...ws, loading: false }));
         }
@@ -204,6 +130,7 @@ const ZerodhaWebSocketSubscription = ({ children }) => {
         setWebhookStatus(ws => ({ ...ws, loading: true }));
         try {
             await disconnectWebSocket();
+            setIsConnected(false);
             setDisconnectSuccess(true);
             setTimeout(fetchStatus, 1000);
         } catch {
