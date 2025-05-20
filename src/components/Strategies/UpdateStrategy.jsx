@@ -140,6 +140,8 @@ function UpdateStrategy({ id }) {
     const [isZerodhaDataReady, setIsZerodhaDataReady] = useState(false);
     const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
     const [openStrategies, setOpenStrategies] = useState([]);
+    const [showRemoveTradeConfirmDialog, setShowRemoveTradeConfirmDialog] = useState(false);
+    const [tradeToRemove, setTradeToRemove] = useState(null);
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -486,7 +488,6 @@ function UpdateStrategy({ id }) {
     }, []);
 
     const handleActionMenuClick = (event, trade) => {
-        event.stopPropagation();
         setActionMenuAnchorEl(event.currentTarget);
         setSelectedTradeForMenu(trade);
     };
@@ -707,6 +708,47 @@ function UpdateStrategy({ id }) {
             });
         }
         setShowDeleteConfirmDialog(false);
+    };
+
+    const handleRemoveTrade = async () => {
+        if (!tradeToRemove) return;
+
+        try {
+            const updatedStrategy = { ...strategy };
+            // Check if it's an option trade by looking for lotsize property
+            const isOptionTrade = tradeToRemove.lotsize !== undefined;
+
+            if (isOptionTrade) {
+                updatedStrategy.option_trades = updatedStrategy.option_trades.filter(id => id !== tradeToRemove.tradeid);
+            } else {
+                updatedStrategy.stock_trades = updatedStrategy.stock_trades.filter(id => id !== tradeToRemove.tradeid);
+            }
+
+            await updateStrategy(updatedStrategy);
+            setStrategy(updatedStrategy);
+            await fetchTrades(); // Refresh the trades list
+            setSnackbar({
+                open: true,
+                message: 'Trade removed from strategy successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error removing trade:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to remove trade from strategy',
+                severity: 'error'
+            });
+        } finally {
+            setShowRemoveTradeConfirmDialog(false);
+            setTradeToRemove(null);
+        }
+    };
+
+    const handleRemoveTradeClick = () => {
+        setTradeToRemove(selectedTradeForMenu);
+        setShowRemoveTradeConfirmDialog(true);
+        handleActionMenuClose();
     };
 
     useEffect(() => {
@@ -1618,8 +1660,14 @@ function UpdateStrategy({ id }) {
                 open={Boolean(actionMenuAnchorEl)}
                 onClose={handleActionMenuClose}
             >
-                <MenuItem onClick={handleCreateActionItem}>
-                    Create Action Item
+                <MenuItem onClick={() => { handleActionMenuClose(); handleTradeClick(selectedTradeForMenu); }}>
+                    <EditIcon fontSize="small" sx={{ mr: 1 }} /> Edit Trade
+                </MenuItem>
+                <MenuItem onClick={() => { handleActionMenuClose(); handleCreateActionItem(); }}>
+                    <AssignmentIcon fontSize="small" sx={{ mr: 1 }} /> Create Action Item
+                </MenuItem>
+                <MenuItem onClick={handleRemoveTradeClick}>
+                    <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> Remove from Strategy
                 </MenuItem>
             </Menu>
 
@@ -1798,6 +1846,24 @@ function UpdateStrategy({ id }) {
                         color="error"
                     >
                         Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={showRemoveTradeConfirmDialog}
+                onClose={() => setShowRemoveTradeConfirmDialog(false)}
+            >
+                <DialogTitle>Remove Trade from Strategy</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to remove this trade from the strategy? This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowRemoveTradeConfirmDialog(false)}>Cancel</Button>
+                    <Button onClick={handleRemoveTrade} color="error" variant="contained">
+                        Remove
                     </Button>
                 </DialogActions>
             </Dialog>
