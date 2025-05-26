@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Container, Stack, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
-import { getAccountInfo, getPositions, getHoldings } from '../services/zerodha/api';
+import { getAccountInfo, getPositions, getHoldings, getInstruments } from '../services/zerodha/api';
 import Holdings from '../components/zerodha/Holdings';
 import Positions from '../components/zerodha/Positions';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -59,6 +59,9 @@ const Portfolio = () => {
         futuresPnL: 0
     });
     const pollIntervalRef = useRef(null);
+    const [positionDetails, setPositionDetails] = useState({});
+    const [isDetailsLoading, setIsDetailsLoading] = useState(true);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Scroll to top when component mounts
     useScrollToTop();
@@ -172,7 +175,83 @@ const Portfolio = () => {
         setPortfolioSummary(summary);
     };
 
-    // Update initializeData to handle session errors better
+    // Add function to fetch instrument details
+    const fetchPositionDetails = async (positionsData) => {
+        try {
+            if (!positionsData || !positionsData.net || !Array.isArray(positionsData.net)) {
+                console.log('No valid positions data available');
+                setIsDetailsLoading(false);
+                return;
+            }
+
+            const allPositions = [...(positionsData.net || []), ...(positionsData.day || [])];
+            const uniqueSymbols = [...new Set(allPositions.map(p => p.tradingsymbol))];
+
+            console.log('Fetching details for symbols:', uniqueSymbols);
+
+            const newPositionDetails = {};
+            let hasAllDetails = true;
+            let retryCount = 0;
+            const maxRetries = 3;
+
+            for (const symbol of uniqueSymbols) {
+                let success = false;
+                while (!success && retryCount < maxRetries) {
+                    try {
+                        const response = await getInstruments({
+                            search: symbol
+                        });
+
+                        if (response && response.data) {
+                            newPositionDetails[symbol] = response.data;
+                            success = true;
+                            console.log(`Successfully fetched details for ${symbol}:`, response.data);
+                        } else {
+                            console.warn(`No data received for ${symbol}, attempt ${retryCount + 1}`);
+                            retryCount++;
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching details for ${symbol}, attempt ${retryCount + 1}:`, error);
+                        retryCount++;
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                    }
+                }
+
+                if (!success) {
+                    console.error(`Failed to fetch details for ${symbol} after ${maxRetries} attempts`);
+                    hasAllDetails = false;
+                }
+            }
+
+            console.log('Fetched position details:', {
+                symbolsCount: uniqueSymbols.length,
+                detailsCount: Object.keys(newPositionDetails).length,
+                hasAllDetails,
+                symbols: uniqueSymbols,
+                details: newPositionDetails
+            });
+
+            // Even if we don't have all details, update with what we have
+            setPositionDetails(prevDetails => ({
+                ...prevDetails,
+                ...newPositionDetails
+            }));
+
+            // Only set loading to false if we have at least some details
+            if (Object.keys(newPositionDetails).length > 0) {
+                setIsDetailsLoading(false);
+            } else {
+                console.warn('No position details were fetched successfully');
+                setIsDetailsLoading(false); // Still set to false to prevent infinite loading
+            }
+        } catch (error) {
+            console.error('Error in fetchPositionDetails:', error);
+            setIsDetailsLoading(false);
+        }
+    };
+
+    // Update initializeData to handle loading states better
     const initializeData = async (setLoading = true) => {
         try {
             if (setLoading) {
@@ -183,7 +262,7 @@ const Portfolio = () => {
 
             if (isSessionValid) {
                 console.log('Session is valid, fetching data...');
-                setHasShownSessionError(false); // Reset error state on successful session
+                setHasShownSessionError(false);
 
                 const holdingsRes = await getHoldings();
                 const positionsRes = await getPositions();
@@ -193,9 +272,10 @@ const Portfolio = () => {
                 }
                 if (positionsRes?.data) {
                     setPositions(positionsRes.data);
+                    // Fetch instrument details when positions are updated
+                    await fetchPositionDetails(positionsRes.data);
                 }
 
-                // Only calculate summary if we have valid data
                 if (holdingsRes?.data || positionsRes?.data) {
                     calculatePortfolioSummary(
                         holdingsRes?.data || [],
@@ -206,6 +286,7 @@ const Portfolio = () => {
                 console.log('Session is not valid');
                 setHoldings([]);
                 setPositions({ net: [] });
+                setPositionDetails({});
                 // Reset summary to initial state without calculating
                 setPortfolioSummary({
                     holdingsPnL: 0,
@@ -222,7 +303,6 @@ const Portfolio = () => {
                     futuresPnL: 0
                 });
 
-                // Only show session error if we haven't shown it before and this is not the initial load
                 if (!hasShownSessionError && !setLoading) {
                     setNotification({
                         open: true,
@@ -242,7 +322,7 @@ const Portfolio = () => {
                 });
                 setHoldings([]);
                 setPositions({ net: [] });
-                // Reset summary to initial state without calculating
+                setPositionDetails({});
                 setPortfolioSummary({
                     holdingsPnL: 0,
                     holdingsDayPnL: 0,
@@ -261,127 +341,41 @@ const Portfolio = () => {
         } finally {
             if (setLoading) {
                 setLocalLoading(false);
+                setIsInitialLoad(false);
             }
         }
     };
 
-    // Update polling effect to handle session validity and market hours
+    // Add effect to handle initial load
     useEffect(() => {
-        let marketHoursInterval;
+        initializeData(true);
+    }, []);
 
-        const startPolling = async () => {
-            console.log('Starting polling...');
-            const isSessionValid = await checkSession();
-            if (!isSessionValid) {
-                console.log('Session invalid - stopping polling');
-                if (pollIntervalRef.current) {
-                    clearInterval(pollIntervalRef.current);
-                    pollIntervalRef.current = null;
-                }
-                // Only show session error if we haven't shown it before
-                if (!hasShownSessionError) {
-                    setNotification({
-                        open: true,
-                        message: 'Session expired. Please refresh the page or reconnect.',
-                        severity: 'error'
-                    });
-                    setHasShownSessionError(true);
-                }
-                return;
-            }
+    // Update polling to fetch instrument details
+    const startPolling = async () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+        }
 
-            // Clear any existing interval before starting a new one
-            if (pollIntervalRef.current) {
-                console.log('Clearing existing polling interval');
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-            }
-
-            console.log('Setting up new polling interval');
-            // Set up polling interval
-            pollIntervalRef.current = setInterval(async () => {
-                console.log('Polling interval triggered');
-                if (isMarketHours()) {
-                    console.log('Market hours - fetching data...');
-                    const isValid = await checkSession();
-                    if (isValid) {
-                        initializeData(false); // Silent update during market hours
-                    } else {
-                        console.log('Session invalid - stopping polling');
-                        if (pollIntervalRef.current) {
-                            clearInterval(pollIntervalRef.current);
-                            pollIntervalRef.current = null;
-                        }
-                        // Only show session error if we haven't shown it before
-                        if (!hasShownSessionError) {
-                            setNotification({
-                                open: true,
-                                message: 'Session expired. Please refresh the page or reconnect.',
-                                severity: 'error'
-                            });
-                            setHasShownSessionError(true);
-                        }
-                    }
-                } else {
-                    console.log('Outside market hours - skipping fetch');
-                    // Clear interval when market closes
-                    if (pollIntervalRef.current) {
-                        clearInterval(pollIntervalRef.current);
-                        pollIntervalRef.current = null;
-                    }
+        const poll = async () => {
+            try {
+                const positionsRes = await getPositions();
+                if (positionsRes?.data) {
+                    setPositions(positionsRes.data);
+                    // Fetch instrument details when positions are updated
+                    await fetchPositionDetails(positionsRes.data);
                 }
-            }, 5000); // 5 seconds
-        };
-
-        const checkMarketHours = async () => {
-            const isOpen = isMarketHours();
-            console.log('Market hours check:', isOpen ? 'Market is open' : 'Market is closed');
-
-            if (isOpen) {
-                const isSessionValid = await checkSession();
-                if (isSessionValid) {
-                    console.log('Market opened and session valid - starting polling');
-                    await startPolling(); // Make sure to await startPolling
-                } else {
-                    console.log('Market opened but session invalid - not starting polling');
-                    // Don't show session error here, let initializeData handle it
-                }
-            } else {
-                console.log('Market is closed - clearing polling interval');
-                // Clear polling interval if market is closed
-                if (pollIntervalRef.current) {
-                    clearInterval(pollIntervalRef.current);
-                    pollIntervalRef.current = null;
-                }
+            } catch (error) {
+                console.error('Error polling positions:', error);
             }
         };
 
-        // Initial data fetch
-        console.log('Initial data fetch...');
-        initializeData(true); // Show loading state for initial fetch
+        // Initial poll
+        await poll();
 
-        // Check market hours and start polling if needed
-        console.log('Initial market hours check...');
-        checkMarketHours();
-
-        // Set up market hours check interval
-        console.log('Setting up market hours check interval');
-        marketHoursInterval = setInterval(checkMarketHours, 60000);
-
-        // Cleanup function
-        return () => {
-            console.log('Cleaning up intervals');
-            if (pollIntervalRef.current) {
-                console.log('Cleaning up polling interval');
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-            }
-            if (marketHoursInterval) {
-                console.log('Cleaning up market hours interval');
-                clearInterval(marketHoursInterval);
-            }
-        };
-    }, []); // Empty dependency array since we want this to run only once on mount
+        // Set up interval for subsequent polls
+        pollIntervalRef.current = setInterval(poll, 2000);
+    };
 
     const handleCloseNotification = () => {
         setNotification(prev => ({ ...prev, open: false }));
@@ -454,7 +448,7 @@ const Portfolio = () => {
     };
 
     // Show loading state while initializing
-    if (localLoading || loading) {
+    if (isInitialLoad || localLoading || loading) {
         return (
             <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
                 <ZerodhaSubHeader />
@@ -463,9 +457,14 @@ const Portfolio = () => {
                         mt: 8,
                         display: 'flex',
                         justifyContent: 'center',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        flexDirection: 'column',
+                        gap: 2
                     }}>
                         <CircularProgress />
+                        <Typography variant="body1" color="text.secondary">
+                            Loading portfolio data...
+                        </Typography>
                     </Box>
                 </Container>
             </Box>
@@ -837,7 +836,11 @@ const Portfolio = () => {
                                 </Typography>
                             </Stack>
                         </Box>
-                        <Positions positions={positions} isSilentUpdate={!localLoading} />
+                        <Positions
+                            positions={positions}
+                            positionDetails={positionDetails}
+                            isDetailsLoading={isDetailsLoading}
+                        />
                     </Paper>
                 </Box>
             </Container>

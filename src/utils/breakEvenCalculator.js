@@ -2,7 +2,7 @@ const extractOptionDetails = (tradingsymbol) => {
     if (!tradingsymbol) return null;
 
     // Option: SYMBOL + EXPIRY + STRIKE + CE/PE
-    const optionPattern = /^([A-Z]+)(\d{2}[A-Z]{3})(\d+)(CE|PE)$/;
+    const optionPattern = /^([A-Z]+)(\d{2}[A-Z]{3})(\d+(?:\.\d+)?)(CE|PE)$/;
     // Future: SYMBOL + EXPIRY + FUT
     const futurePattern = /^([A-Z]+)(\d{2}[A-Z]{3})FUT$/;
 
@@ -45,7 +45,10 @@ function parseOptions(options, current_stock_price) {
 
     for (const option of options) {
         let option_details = extractOptionDetails(option.instrument_type);
-        if (!option_details) continue;
+        if (!option_details) {
+            console.warn(`Could not parse option details for: ${option.instrument_type}`);
+            continue;
+        }
         option_details.price = option.price;
         option_details.quantity = option.quantity;
         option_details.position = option.position;
@@ -87,8 +90,7 @@ function calculateTotalPremium(call, put, future) {
 }
 
 function calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE) {
-
-    let stock_price = CURRENT_STOCK_PRICE;
+    let stock_price = parseFloat(CURRENT_STOCK_PRICE);
     let total_call_profit = 0;
     for (const call_option of CALL_OPTIONS) {
         if (stock_price > call_option.strike) {
@@ -122,10 +124,13 @@ function calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES,
 
 function findUpperBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium, max_stock_movement = 20) {
     let break_even = 0;
-    for (let stock_price = CURRENT_STOCK_PRICE; stock_price < CURRENT_STOCK_PRICE * ((100 + max_stock_movement) / 100); stock_price++) {
+    const startPrice = parseFloat(CURRENT_STOCK_PRICE);
+    const endPrice = startPrice * ((100 + max_stock_movement) / 100);
+    // Use smaller step size for more precise break-even points
+    for (let stock_price = startPrice; stock_price < endPrice; stock_price += 0.1) {
         let total_pl = calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES, stock_price);
         if (total_pl > total_premium) {
-            break_even = stock_price;
+            break_even = parseFloat(stock_price.toFixed(2));
             break;
         }
     }
@@ -134,10 +139,13 @@ function findUpperBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PR
 
 function findLowerBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium, max_stock_movement = 20) {
     let break_even = 0;
-    for (let stock_price = CURRENT_STOCK_PRICE; stock_price > CURRENT_STOCK_PRICE * ((100 - max_stock_movement) / 100); stock_price--) {
+    const startPrice = parseFloat(CURRENT_STOCK_PRICE);
+    const endPrice = startPrice * ((100 - max_stock_movement) / 100);
+    // Use smaller step size for more precise break-even points
+    for (let stock_price = startPrice; stock_price > endPrice; stock_price -= 0.1) {
         let total_pl = calculate_Combined_PAndL_At_A_Price(CALL_OPTIONS, PUT_OPTIONS, FUTURES, stock_price);
         if (total_pl > total_premium) {
-            break_even = stock_price;
+            break_even = parseFloat(stock_price.toFixed(2));
             break;
         }
     }
@@ -146,8 +154,8 @@ function findLowerBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PR
 
 function calculateBreakEven(input) {
     let break_even_points = { upper: 0, lower: 0 };
-    let manual_pl = input.manual_pl || 0;
-    const CURRENT_STOCK_PRICE = (input.current_price).toFixed(0);
+    let manual_pl = parseFloat(input.manual_pl || 0);
+    const CURRENT_STOCK_PRICE = parseFloat(input.current_price);
     const {
         CALL_OPTIONS,
         PUT_OPTIONS,

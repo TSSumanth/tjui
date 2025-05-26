@@ -39,7 +39,6 @@ import TodayIcon from '@mui/icons-material/Today';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 
-
 // Utility functions
 const getUnderlyingSymbol = (tradingsymbol) => {
     if (!tradingsymbol) return '';
@@ -48,40 +47,33 @@ const getUnderlyingSymbol = (tradingsymbol) => {
     return match ? match[1] : symbol;
 };
 
-const getPositionType = (tradingsymbol) => {
-    if (!tradingsymbol) return 'Stock';
-    const symbol = tradingsymbol.toUpperCase().trim();
-    if (symbol.endsWith('FUT')) {
-        return 'Future';
-    } else if (/^[A-Z]+\d{2}[A-Z]+\d+(CE|PE)$/.test(symbol)) {
-        // Matches typical option format: SYMBOL+DATE+STRIKE+CE/PE
-        return 'Option';
+const getPositionType = (tradingsymbol, positionDetails) => {
+    if (!tradingsymbol) {
+        return 'Stock';
     }
-    return 'Stock';
+
+    const details = positionDetails?.[tradingsymbol];
+    if (!details) {
+        return 'Stock';
+    }
+
+    return details[0].instrument_type === 'FUT' ? 'Future' :
+        details[0].instrument_type === 'CE' || details[0].instrument_type === 'PE' ? 'Option' : 'Stock';
 };
 
-const extractOptionDetails = (tradingsymbol) => {
-    // Early return for non-option symbols
-    if (!tradingsymbol || !tradingsymbol.endsWith('CE') && !tradingsymbol.endsWith('PE')) {
-        return null;
-    }
+const extractOptionDetails = (tradingsymbol, positionDetails) => {
+    const details = positionDetails?.[tradingsymbol];
+    if (!details) return null;
 
-    // Cache the regex pattern
-    const optionPattern = /([A-Z]+)(\d{2}[A-Z]+)(\d+)(CE|PE)/;
-
-    try {
-        const match = tradingsymbol.match(optionPattern);
-        if (!match) return null;
-
+    if (details.instrument_type === 'CE' || details.instrument_type === 'PE') {
         return {
-            symbol: match[1],
-            expiry: match[2],
-            strike: parseFloat(match[3]),
-            type: match[4]
+            symbol: details.name,
+            expiry: details.expiry,
+            strike: details.strike,
+            type: details.instrument_type
         };
-    } catch (error) {
-        return null;
     }
+    return null;
 };
 
 const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
@@ -105,10 +97,6 @@ const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
     // Parse manual P/L value
     const manualPl = parseFloat(manualPlValue) || 0;
 
-    console.log('manualPl:', manualPl);
-    console.log('currentPrice:', currentPrice);
-    console.log('options:', JSON.stringify(options));
-
     // Call the new calculator with all required attributes
     const breakEvenPoints = calculateBreakEven({
         current_price: currentPrice,
@@ -129,21 +117,22 @@ const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
     };
 };
 
-const calculateIntrinsicValue = (option, ltpMap) => {
-    const details = extractOptionDetails(option.tradingsymbol);
+const calculateIntrinsicValue = (option, ltpMap, positionDetails) => {
+    const details = positionDetails[option.tradingsymbol];
+
     if (!details) return 0;
-    const stockLTP = ltpMap[details.symbol];
+    const stockLTP = ltpMap[details[0].name];
     if (!stockLTP) return 0;
-    if (details.type === 'CE') {
-        return Math.max(stockLTP - details.strike, 0);
-    } else if (details.type === 'PE') {
-        return Math.max(details.strike - stockLTP, 0);
+    if (details[0].instrument_type === 'CE') {
+        return Math.max(stockLTP - details[0].strike, 0);
+    } else if (details[0].instrument_type === 'PE') {
+        return Math.max(details[0].strike - stockLTP, 0);
     }
     return 0;
 };
 
-const calculateTimeValue = (option, ltpMap) => {
-    const intrinsic = calculateIntrinsicValue(option, ltpMap);
+const calculateTimeValue = (option, ltpMap, positionDetails) => {
+    const intrinsic = calculateIntrinsicValue(option, ltpMap, positionDetails);
     const optionLTP = Number(option.last_price) || 0;
     return Math.max(optionLTP - intrinsic, 0);
 };
@@ -164,7 +153,7 @@ const StyledTableCell = ({ children, align = 'left', sx = {}, ...props }) => (
     </TableCell>
 );
 
-const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions }) => {
+const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositions, prevPositions, positionDetails }) => {
     const [expanded, setExpanded] = useState(true);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedPosition, setSelectedPosition] = useState(null);
@@ -181,8 +170,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
     // Log positions data on mount and updates
     useEffect(() => {
-        console.log('PositionTable positions:', positions);
-        console.log('Underlying:', underlying);
     }, [positions, underlying]);
 
     // Fetch LTPs for positions
@@ -193,11 +180,12 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         try {
             // Get unique underlying symbols
             const underlyingSymbols = [...new Set(positions.map(position => {
-                const symbol = getUnderlyingSymbol(position.tradingsymbol);
-                return symbol;
+                const details = positionDetails?.[position.tradingsymbol];
+                if (!details) {
+                    return getUnderlyingSymbol(position.tradingsymbol);
+                }
+                return details[0].name;
             }))];
-
-            console.log('Fetching LTPs for underlying symbols:', underlyingSymbols);
 
             // Create instruments array for LTP fetch
             const instruments = underlyingSymbols.map(symbol => ({
@@ -206,7 +194,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
             }));
 
             const newLtpMap = await fetchLTPs(instruments);
-            console.log('Received LTP map:', newLtpMap);
             setLtpMap(newLtpMap);
         } catch (error) {
             console.error('Error fetching LTPs:', error);
@@ -218,7 +205,6 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     // Fetch LTPs when positions change
     useEffect(() => {
         if (positions?.length) {
-            console.log('Positions data changed - fetching LTPs');
             fetchPositionLTPs();
         }
     }, []);
@@ -233,7 +219,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 const lastPrice = Number(position.last_price) || 0;
                 const closePrice = Number(position.close_price) || lastPrice;
                 const quantity = Number(position.quantity) || 0;
-                const positionType = getPositionType(position.tradingsymbol);
+                const positionType = getPositionType(position.tradingsymbol, positionDetails);
 
                 if (positionType === 'Future' || positionType === 'Option') {
                     acc.dayPnL += quantity * (lastPrice - closePrice);
@@ -248,7 +234,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
 
             return acc;
         }, { dayPnL: 0, totalPnL: 0 });
-    }, [positions]);
+    }, [positions, positionDetails]);
 
     // Memoize the break-even calculation
     const breakEvenResult = React.useMemo(() => {
@@ -394,7 +380,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const lastPrice = Number(position.last_price) || 0;
         const closePrice = Number(position.close_price) || lastPrice;
         const quantity = Number(position.quantity) || 0;
-        const positionType = getPositionType(position.tradingsymbol);
+        const positionType = getPositionType(position.tradingsymbol, positionDetails);
         const isClosed = quantity === 0 || position.is_closed;
 
         // For closed positions, show total P&L in Day's P&L column
@@ -429,9 +415,8 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         const totalPnL = Number(position.pnl) || 0;
 
         const isOption = positionType === 'Option';
-        const intrinsicValue = isOption ? calculateIntrinsicValue(position, ltpMap) : '';
-        const timeValue = isOption ? calculateTimeValue(position, ltpMap) : '';
-
+        const intrinsicValue = isOption ? calculateIntrinsicValue(position, ltpMap, positionDetails) : '';
+        const timeValue = isOption ? calculateTimeValue(position, ltpMap, positionDetails) : '';
 
         return (
             <TableRow
@@ -462,7 +447,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
                 </StyledTableCell>
                 <StyledTableCell>
                     <Chip
-                        label={getPositionType(position.tradingsymbol)}
+                        label={getPositionType(position.tradingsymbol, positionDetails)}
                         size="small"
                         sx={{
                             bgcolor: 'secondary.50',
@@ -741,7 +726,7 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
     );
 };
 
-const Positions = ({ positions }) => {
+const Positions = ({ positions, positionDetails, isDetailsLoading }) => {
     const [prevPositions, setPrevPositions] = React.useState(null);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const [orderDialogAnchorEl, setOrderDialogAnchorEl] = React.useState(null);
@@ -891,13 +876,25 @@ const Positions = ({ positions }) => {
 
     // Group positions by underlying
     const groupedPositions = allPositions.reduce((acc, position) => {
-        const underlying = getUnderlyingSymbol(position.tradingsymbol);
+        const underlying = positionDetails[position.tradingsymbol]?.name || getUnderlyingSymbol(position.tradingsymbol);
         if (!acc[underlying]) {
             acc[underlying] = [];
         }
         acc[underlying].push(position);
         return acc;
     }, {});
+
+    // Show loading state only if we have positions but no details yet
+    if (isDetailsLoading && Object.keys(positionDetails).length === 0) {
+        return (
+            <Box sx={{ p: 2 }}>
+                <LinearProgress />
+                <Typography variant="body2" sx={{ mt: 1, textAlign: 'center' }}>
+                    Loading position details...
+                </Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box>
@@ -911,6 +908,7 @@ const Positions = ({ positions }) => {
                                 onOpenOrderDialog={handleOpenOrderDialog}
                                 loadingPositions={{}}
                                 prevPositions={prevPositions}
+                                positionDetails={positionDetails}
                             />
                         </Card>
                     </Grid>
