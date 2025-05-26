@@ -104,7 +104,7 @@ const initPolling = () => {
         const interval = setInterval(() => {
             fetchStatus(); // Will be throttled internally
             fetchSubscriptions();
-        }, 2000);
+        }, 30000); // Match portfolio polling interval
 
         setState({ pollingInterval: interval });
         return interval;

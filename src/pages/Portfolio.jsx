@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Container, Stack, Grid, Button, Switch, FormControlLabel, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { Box, Typography, Container, Stack, Grid, Button, Tooltip, Paper, useTheme, alpha, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useZerodha } from '../context/ZerodhaContext';
 import { getAccountInfo, getPositions, getHoldings, getInstruments } from '../services/zerodha/api';
 import Holdings from '../components/zerodha/Holdings';
@@ -13,6 +13,8 @@ import LinkIcon from '@mui/icons-material/Link';
 import ZerodhaSubHeader from '../components/zerodha/ZerodhaSubHeader';
 import { getPortfolioValue, createPortfolioValue, updatePortfolioValue } from '../services/portfolioValue';
 import { isMarketHours } from '../services/zerodha/utils';
+import { useWebSocket } from '../components/zerodhawebsocket/WebSocketManager';
+
 const formatCurrency = (value) => {
     if (typeof value !== 'number' || isNaN(value)) {
         return '₹0.00';
@@ -39,6 +41,7 @@ const getPositionType = (tradingsymbol) => {
 const Portfolio = () => {
     const theme = useTheme();
     const { loading, isAuth, sessionActive, checkSession } = useZerodha();
+    const { isConnected } = useWebSocket();
     const [holdings, setHoldings] = useState([]);
     const [positions, setPositions] = useState({ net: [] });
     const [localLoading, setLocalLoading] = useState(true);
@@ -175,37 +178,43 @@ const Portfolio = () => {
         setPortfolioSummary(summary);
     };
 
+    // Helper function to get missing symbols
+    const getMissingSymbols = (positionsData) => {
+        if (!positionsData || !positionsData.net || !Array.isArray(positionsData.net)) {
+            return [];
+        }
+
+        const allPositions = [...(positionsData.net || []), ...(positionsData.day || [])];
+        const uniqueSymbols = [...new Set(allPositions.map(p => p.tradingsymbol))];
+        return uniqueSymbols.filter(symbol => !positionDetails[symbol]);
+    };
+
     // Add function to fetch instrument details
-    const fetchPositionDetails = async (positionsData) => {
+    const fetchPositionDetails = async (positionsData, log = "From Portfolio Page") => {
         try {
-            if (!positionsData || !positionsData.net || !Array.isArray(positionsData.net)) {
-                console.log('No valid positions data available');
+            const missingSymbols = getMissingSymbols(positionsData);
+            if (missingSymbols.length === 0) {
                 setIsDetailsLoading(false);
                 return;
             }
-
-            const allPositions = [...(positionsData.net || []), ...(positionsData.day || [])];
-            const uniqueSymbols = [...new Set(allPositions.map(p => p.tradingsymbol))];
-
-            console.log('Fetching details for symbols:', uniqueSymbols);
 
             const newPositionDetails = {};
             let hasAllDetails = true;
             let retryCount = 0;
             const maxRetries = 3;
 
-            for (const symbol of uniqueSymbols) {
+            for (const symbol of missingSymbols) {
                 let success = false;
                 while (!success && retryCount < maxRetries) {
                     try {
                         const response = await getInstruments({
-                            search: symbol
+                            search: symbol,
+                            log: log
                         });
 
                         if (response && response.data) {
                             newPositionDetails[symbol] = response.data;
                             success = true;
-                            console.log(`Successfully fetched details for ${symbol}:`, response.data);
                         } else {
                             console.warn(`No data received for ${symbol}, attempt ${retryCount + 1}`);
                             retryCount++;
@@ -224,19 +233,20 @@ const Portfolio = () => {
                 }
             }
 
-            console.log('Fetched position details:', {
-                symbolsCount: uniqueSymbols.length,
-                detailsCount: Object.keys(newPositionDetails).length,
-                hasAllDetails,
-                symbols: uniqueSymbols,
-                details: newPositionDetails
-            });
-
             // Even if we don't have all details, update with what we have
             setPositionDetails(prevDetails => ({
                 ...prevDetails,
                 ...newPositionDetails
             }));
+
+            // Set loading to false and show notification if we couldn't fetch all details
+            if (!hasAllDetails) {
+                setNotification({
+                    open: true,
+                    message: 'Some instrument details could not be fetched. Please try refreshing.',
+                    severity: 'warning'
+                });
+            }
 
             // Only set loading to false if we have at least some details
             if (Object.keys(newPositionDetails).length > 0) {
@@ -248,15 +258,110 @@ const Portfolio = () => {
         } catch (error) {
             console.error('Error in fetchPositionDetails:', error);
             setIsDetailsLoading(false);
+            setNotification({
+                open: true,
+                message: 'Error fetching instrument details. Please try refreshing.',
+                severity: 'error'
+            });
         }
     };
 
-    // Update initializeData to handle loading states better
-    const initializeData = async (setLoading = true) => {
-        try {
-            if (setLoading) {
-                setLocalLoading(true);
+    // Update polling to fetch instrument details
+    const startPolling = async () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+
+        const poll = async () => {
+            // Only poll during market hours and when WebSocket is not connected
+            if (!isMarketHours() || isConnected) {
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                }
+                return;
             }
+
+            try {
+                console.log('Polling positions and holdings...');
+                // Fetch both positions and holdings
+                const [positionsRes, holdingsRes] = await Promise.all([
+                    getPositions(),
+                    getHoldings()
+                ]);
+
+                if (positionsRes?.data) {
+                    setPositions(positionsRes.data);
+
+                    // Only fetch instrument details if we have missing symbols
+                    const missingSymbols = getMissingSymbols(positionsRes.data);
+                    if (missingSymbols.length > 0) {
+                        await fetchPositionDetails(positionsRes.data, "1");
+                    }
+                }
+
+                if (holdingsRes?.data) {
+                    setHoldings(holdingsRes.data);
+                }
+
+                // Update portfolio summary with new data
+                if (positionsRes?.data || holdingsRes?.data) {
+                    calculatePortfolioSummary(
+                        holdingsRes?.data || holdings,
+                        positionsRes?.data || positions
+                    );
+                }
+            } catch (error) {
+                console.error('Error polling data:', error);
+            }
+        };
+
+        // Initial poll
+        await poll();
+
+        // Set up interval for subsequent polls - now every 30 seconds
+        pollIntervalRef.current = setInterval(poll, 30000);
+    };
+
+    // Monitor market hours and WebSocket connection
+    useEffect(() => {
+        let isComponentMounted = true;
+        const checkAndUpdatePolling = () => {
+            if (!isComponentMounted) return;
+
+            if (isMarketHours() && !isConnected) {
+                if (!pollIntervalRef.current) {
+                    startPolling();
+                }
+            } else {
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                }
+            }
+        };
+
+        // Check immediately
+        checkAndUpdatePolling();
+
+        // Set up interval to check market hours and WebSocket connection
+        const checkInterval = setInterval(checkAndUpdatePolling, 30000); // Check every 30 seconds
+
+        return () => {
+            isComponentMounted = false;
+            clearInterval(checkInterval);
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+        };
+    }, [isConnected]); // Add isConnected to dependencies
+
+    // Add a refresh function that can be used by the refresh button
+    const handleRefresh = async () => {
+        try {
+            setLocalLoading(true);
             const isSessionValid = await checkSession();
             console.log('Session validation result:', isSessionValid);
 
@@ -264,16 +369,18 @@ const Portfolio = () => {
                 console.log('Session is valid, fetching data...');
                 setHasShownSessionError(false);
 
-                const holdingsRes = await getHoldings();
-                const positionsRes = await getPositions();
+                const [holdingsRes, positionsRes] = await Promise.all([
+                    getHoldings(),
+                    getPositions()
+                ]);
 
                 if (holdingsRes?.data) {
                     setHoldings(holdingsRes.data);
                 }
                 if (positionsRes?.data) {
                     setPositions(positionsRes.data);
-                    // Fetch instrument details when positions are updated
-                    await fetchPositionDetails(positionsRes.data);
+                    // Fetch instrument details only for new symbols
+                    await fetchPositionDetails(positionsRes.data, "2");
                 }
 
                 if (holdingsRes?.data || positionsRes?.data) {
@@ -303,7 +410,7 @@ const Portfolio = () => {
                     futuresPnL: 0
                 });
 
-                if (!hasShownSessionError && !setLoading) {
+                if (!hasShownSessionError) {
                     setNotification({
                         open: true,
                         message: 'Session expired. Please refresh the page or reconnect.',
@@ -313,8 +420,92 @@ const Portfolio = () => {
                 }
             }
         } catch (err) {
-            console.error('Error initializing data:', err);
-            if (setLoading) {
+            console.error('Error refreshing data:', err);
+            setNotification({
+                open: true,
+                message: 'Failed to refresh portfolio data. Please try again.',
+                severity: 'error'
+            });
+        } finally {
+            setLocalLoading(false);
+        }
+    };
+
+    // Initialize data and start polling
+    useEffect(() => {
+        let isComponentMounted = true;
+        const initialize = async () => {
+            try {
+                setLocalLoading(true);
+                const isSessionValid = await checkSession();
+                console.log('Session validation result:', isSessionValid);
+
+                if (!isSessionValid) {
+                    console.log('Session is not valid');
+                    setHoldings([]);
+                    setPositions({ net: [] });
+                    setPositionDetails({});
+                    // Reset summary to initial state without calculating
+                    setPortfolioSummary({
+                        holdingsPnL: 0,
+                        holdingsDayPnL: 0,
+                        positionsTotalPnL: 0,
+                        positionsDayPnL: 0,
+                        activePositionsCount: 0,
+                        totalPnL: 0,
+                        totalDayPnL: 0,
+                        positionsTotalValue: 0,
+                        totalEquityHoldingsValue: 0,
+                        longOptionsNotional: 0,
+                        shortOptionsPnL: 0,
+                        futuresPnL: 0
+                    });
+
+                    setNotification({
+                        open: true,
+                        message: 'Session expired. Please refresh the page or reconnect.',
+                        severity: 'error'
+                    });
+                    setHasShownSessionError(true);
+                    setLocalLoading(false);
+                    setIsInitialLoad(false);
+                    return;
+                }
+
+                if (!isComponentMounted) return;
+
+                console.log('Session is valid, fetching data...');
+                setHasShownSessionError(false);
+
+                const [holdingsRes, positionsRes] = await Promise.all([
+                    getHoldings(),
+                    getPositions()
+                ]);
+
+                if (!isComponentMounted) return;
+
+                if (holdingsRes?.data) {
+                    setHoldings(holdingsRes.data);
+                }
+                if (positionsRes?.data) {
+                    setPositions(positionsRes.data);
+                    // Fetch instrument details only during initial load
+                    await fetchPositionDetails(positionsRes.data, "3");
+                }
+
+                if (holdingsRes?.data || positionsRes?.data) {
+                    calculatePortfolioSummary(
+                        holdingsRes?.data || [],
+                        positionsRes?.data || { net: [] }
+                    );
+                }
+
+                if (isMarketHours()) {
+                    await startPolling();
+                }
+            } catch (err) {
+                if (!isComponentMounted) return;
+                console.error('Error initializing data:', err);
                 setNotification({
                     open: true,
                     message: 'Failed to fetch portfolio data. Please try again.',
@@ -337,45 +528,23 @@ const Portfolio = () => {
                     shortOptionsPnL: 0,
                     futuresPnL: 0
                 });
-            }
-        } finally {
-            if (setLoading) {
-                setLocalLoading(false);
-                setIsInitialLoad(false);
-            }
-        }
-    };
-
-    // Add effect to handle initial load
-    useEffect(() => {
-        initializeData(true);
-    }, []);
-
-    // Update polling to fetch instrument details
-    const startPolling = async () => {
-        if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-        }
-
-        const poll = async () => {
-            try {
-                const positionsRes = await getPositions();
-                if (positionsRes?.data) {
-                    setPositions(positionsRes.data);
-                    // Fetch instrument details when positions are updated
-                    await fetchPositionDetails(positionsRes.data);
+            } finally {
+                if (isComponentMounted) {
+                    setLocalLoading(false);
+                    setIsInitialLoad(false);
                 }
-            } catch (error) {
-                console.error('Error polling positions:', error);
             }
         };
+        initialize();
 
-        // Initial poll
-        await poll();
-
-        // Set up interval for subsequent polls
-        pollIntervalRef.current = setInterval(poll, 2000);
-    };
+        return () => {
+            isComponentMounted = false;
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+        };
+    }, []);
 
     const handleCloseNotification = () => {
         setNotification(prev => ({ ...prev, open: false }));
@@ -538,7 +707,7 @@ const Portfolio = () => {
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
-                        onClick={() => initializeData(true)}
+                        onClick={handleRefresh}
                         disabled={loading}
                         size="small"
                         sx={{

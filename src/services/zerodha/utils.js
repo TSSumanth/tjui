@@ -7,7 +7,7 @@ const isMarketHours = () => {
     const currentTime = hours * 100 + minutes;
 
     // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 4:00 PM
-    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1600;
+    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1700;
     // return true;
 };
 
