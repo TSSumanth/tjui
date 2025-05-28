@@ -12,8 +12,6 @@ import {
     ListItem,
     ListItemText,
     Radio,
-    RadioGroup,
-    FormControlLabel,
     Alert,
     TextField,
     Card,
@@ -26,9 +24,32 @@ import { v4 as uuidv4 } from 'uuid';
 import { getStockTrades, addNewStockTrade, addNewOptionTrade, getOptionTrades, updateOptionTrade, updateStockTrade } from '../../services/trades';
 import { getOrders, addStockOrder, addOptionOrder, getTradeOptionOrders, updateOptionOrder, getTradeStockOrders, updateStockOrder } from '../../services/orders';
 import { getInstruments } from '../../services/zerodha/api';
-import { formatDateTime, formatPrice } from '../../utils/formatters';
+import { formatPrice } from '../../utils/formatters';
 import moment from 'moment';
 import { AssignTradesToStrategy } from '../Strategies/AssignTradesPopup';
+
+async function getTradeDetails(symbol) {
+    try {
+        const response = await getInstruments({ search: symbol });
+        if (response?.data?.length > 0) {
+            for (const instrument of response.data) {
+                if (instrument.tradingsymbol === symbol) {
+                    return {
+                        type: instrument.instrument_type, // 'EQ', 'FUT', 'CE', 'PE'
+                        strikePrice: instrument.strike,
+                        underlyingAsset: instrument.name,
+                        lotSize: instrument.lot_size,
+                        expiry: instrument.expiry
+                    };
+                }
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching instrument details:', error);
+        return null;
+    }
+}
 
 function isOptionOrFuture(order) {
     // Check if it's from NFO exchange
@@ -36,18 +57,7 @@ function isOptionOrFuture(order) {
 
     // For non-NFO exchanges, check if it's a valid option/future symbol
     const symbol = order.tradingsymbol || '';
-
-    // Check for CE/PE at the end of the symbol
-    const hasOptionSuffix = /(CE|PE)$/.test(symbol);
-    if (!hasOptionSuffix) return false;
-
-    // Check if it has a valid expiry format (e.g., 24MAY, 24JUN, etc.)
-    const hasExpiry = /[0-9]{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/.test(symbol);
-    if (!hasExpiry) return false;
-
-    // Check if it has a strike price (numbers before CE/PE)
-    const hasStrike = /[0-9]+(CE|PE|FUT)$/.test(symbol);
-    return hasStrike;
+    return symbol.endsWith('FUT') || symbol.endsWith('CE') || symbol.endsWith('PE');
 }
 
 function extractStrikePrice(order) {
@@ -85,36 +95,37 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
     const [lotSizeLoading, setLotSizeLoading] = useState(false);
     const [showAssignStrategy, setShowAssignStrategy] = useState(false);
     const [newlyCreatedTrade, setNewlyCreatedTrade] = useState(null);
+    const [tradeDetails, setTradeDetails] = useState(null);
 
     useEffect(() => {
         if (open && order) {
             fetchOpenTrades();
+            fetchTradeDetails();
         }
-        // Fetch lot size for options/futures
-        const fetchLotSize = async () => {
-            if (open && order && isOptionOrFuture(order) && order.tradingsymbol) {
-                setLotSizeLoading(true);
-                try {
-                    const resp = await getInstruments({ search: order.tradingsymbol });
-                    if (resp && resp.success && resp.data && resp.data.length > 0) {
-                        const instrument = resp.data[0];
-                        if (instrument.lot_size && !lotSize) {
-                            setLotSize(instrument.lot_size);
-                        }
-                    }
-                } catch (e) {
-                    // Optionally handle error
-                } finally {
-                    setLotSizeLoading(false);
+    }, [open, order]);
+
+    const fetchTradeDetails = async () => {
+        if (!order?.tradingsymbol) return;
+
+        setLotSizeLoading(true);
+        try {
+            const details = await getTradeDetails(order.tradingsymbol);
+            if (details) {
+                setTradeDetails(details);
+                if (details.lotSize && !lotSize) {
+                    setLotSize(details.lotSize);
                 }
             }
-        };
-        fetchLotSize();
-    }, [open, order]);
+        } catch (error) {
+            console.error('Error fetching trade details:', error);
+        } finally {
+            setLotSizeLoading(false);
+        }
+    };
 
     if (!order) return null;
 
-    const isOption = isOptionOrFuture(order);
+    const isOption = tradeDetails?.type === 'CE' || tradeDetails?.type === 'PE' || tradeDetails?.type === 'FUT';
 
     const fetchOpenTrades = async () => {
         setLoading(true);
@@ -130,11 +141,11 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                 trades = await getStockTrades({ status: 'OPEN' });
             }
             // For options, match by underlying asset; for stocks, match by asset name
-            const orderAsset = isOption ? getUnderlyingAsset(order.tradingsymbol) : order.tradingsymbol.split('-')[0];
+            const orderAsset = isOption ? tradeDetails?.underlyingAsset : order.tradingsymbol.split('-')[0];
             const filtered = trades.filter(trade => {
                 if (!trade.asset) return false;
                 if (isOption) {
-                    return getUnderlyingAsset(trade.asset).toUpperCase() === orderAsset.toUpperCase();
+                    return trade.asset.toUpperCase().includes(orderAsset.toUpperCase());
                 } else {
                     return trade.asset.toUpperCase() === orderAsset.toUpperCase();
                 }
@@ -378,7 +389,6 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
             let tradePayload;
             if (isOption) {
                 // Option/Future order
-                const strikeprize = extractStrikePrice(order);
                 const orderPayload = {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
@@ -460,7 +470,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     tags: 'zerodha',
                     ltp: order.price,
                     lotsize: lotSize,
-                    strikeprize: strikeprize,
+                    strikeprize: tradeDetails?.strikePrice,
                     finalexitprice,
                     capitalused,
                     overallreturn,
@@ -559,7 +569,6 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
             setNewlyCreatedTrade(tradePayload);
             setShowAssignStrategy(true);
             setCreating(false);
-            // Do not call onSuccess/onClose yet; wait for strategy assignment popup
         } catch (err) {
             setError('Failed to create new trade.');
             setCreating(false);
@@ -624,6 +633,38 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                                 <Typography variant="body2" color="text.secondary">Price</Typography>
                                 <Typography variant="body1" fontWeight={500}>₹{formatPrice(order.price)}</Typography>
                             </Box>
+                            {tradeDetails && (
+                                <>
+                                    <Box>
+                                        <Typography variant="body2" color="text.secondary">Instrument Type</Typography>
+                                        <Typography variant="body1" fontWeight={500}>
+                                            {tradeDetails.type === 'EQ' ? 'Stock' :
+                                                tradeDetails.type === 'FUT' ? 'Future' :
+                                                    tradeDetails.type === 'CE' ? 'Call Option' :
+                                                        tradeDetails.type === 'PE' ? 'Put Option' :
+                                                            tradeDetails.type}
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="body2" color="text.secondary">Underlying Asset</Typography>
+                                        <Typography variant="body1" fontWeight={500}>{tradeDetails.underlyingAsset}</Typography>
+                                    </Box>
+                                    {(tradeDetails.type === 'CE' || tradeDetails.type === 'PE') && (
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Strike Price</Typography>
+                                            <Typography variant="body1" fontWeight={500}>₹{formatPrice(tradeDetails.strikePrice)}</Typography>
+                                        </Box>
+                                    )}
+                                    {tradeDetails.expiry && (
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">Expiry</Typography>
+                                            <Typography variant="body1" fontWeight={500}>
+                                                {moment(tradeDetails.expiry).format('DD MMM YYYY')}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </>
+                            )}
                         </Box>
                     </CardContent>
                 </Card>
