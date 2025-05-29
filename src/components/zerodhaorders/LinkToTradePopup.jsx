@@ -51,38 +51,6 @@ async function getTradeDetails(symbol) {
     }
 }
 
-function isOptionOrFuture(order) {
-    // Check if it's from NFO exchange
-    if (order.exchange === 'NFO') return true;
-
-    // For non-NFO exchanges, check if it's a valid option/future symbol
-    const symbol = order.tradingsymbol || '';
-    return symbol.endsWith('FUT') || symbol.endsWith('CE') || symbol.endsWith('PE');
-}
-
-function extractStrikePrice(order) {
-    // Prefer direct field if available
-    if (order.strike_price) return Number(order.strike_price);
-
-    // Try to parse from tradingsymbol (e.g., NIFTY24MAY22500CE)
-    const symbol = order.tradingsymbol || '';
-    const match = symbol.match(/(\d+)(CE|PE|FUT)$/);
-    if (match) return Number(match[1]);
-    return null;
-}
-
-function getUnderlyingAsset(symbol) {
-    // For options/futures, extract the underlying asset (e.g., NIFTY from NIFTY24MAY22500CE)
-    if (!symbol) return '';
-
-    // Remove the expiry and strike price parts
-    const match = symbol.match(/^([A-Z]+)[0-9]/);
-    if (match) return match[1];
-
-    // For stocks, just return the symbol (may need further normalization)
-    return symbol.split('-')[0];
-}
-
 const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [openTrades, setOpenTrades] = useState([]);
@@ -98,8 +66,9 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
     const [tradeDetails, setTradeDetails] = useState(null);
 
     useEffect(() => {
+        setOpenTrades([]);
+        setTradeDetails(null);
         if (open && order) {
-            fetchOpenTrades();
             fetchTradeDetails();
         }
     }, [open, order]);
@@ -115,6 +84,8 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                 if (details.lotSize && !lotSize) {
                     setLotSize(details.lotSize);
                 }
+                // Fetch trades after we have the details
+                await fetchOpenTrades(details);
             }
         } catch (error) {
             console.error('Error fetching trade details:', error);
@@ -127,7 +98,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
 
     const isOption = tradeDetails?.type === 'CE' || tradeDetails?.type === 'PE' || tradeDetails?.type === 'FUT';
 
-    const fetchOpenTrades = async () => {
+    const fetchOpenTrades = async (details) => {
         setLoading(true);
         setError(null);
         setOpenTrades([]);
@@ -135,17 +106,29 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
         try {
             // Fetch all open trades of the correct type
             let trades = [];
-            if (isOption) {
+            const isOptionTrade = details.type === 'CE' || details.type === 'PE' || details.type === 'FUT';
+            if (isOptionTrade) {
                 trades = await getOptionTrades({ status: 'OPEN' });
             } else {
                 trades = await getStockTrades({ status: 'OPEN' });
             }
             // For options, match by underlying asset; for stocks, match by asset name
-            const orderAsset = isOption ? tradeDetails?.underlyingAsset : order.tradingsymbol.split('-')[0];
+            const orderAsset = isOptionTrade ? details.underlyingAsset : order.tradingsymbol.split('-')[0];
+            const orderSymbol = order.tradingsymbol;
             const filtered = trades.filter(trade => {
                 if (!trade.asset) return false;
-                if (isOption) {
-                    return trade.asset.toUpperCase().includes(orderAsset.toUpperCase());
+                if (isOptionTrade) {
+                    // First check for exact symbol match
+                    const exactMatch = trade.asset.toUpperCase() === orderSymbol.toUpperCase();
+                    if (exactMatch) {
+                        return true;
+                    }
+                    // Only check underlying asset if no exact matches were found
+                    const hasExactMatches = trades.some(t => t.asset.toUpperCase() === orderSymbol.toUpperCase());
+                    if (!hasExactMatches) {
+                        return trade.asset.toUpperCase().includes(orderAsset.toUpperCase());
+                    }
+                    return false;
                 } else {
                     return trade.asset.toUpperCase() === orderAsset.toUpperCase();
                 }
@@ -201,7 +184,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
                     quantity: lots,
-                    price: order.price,
+                    price: order.average_price,
                     date: getFormattedDate(order.order_timestamp),
                     tradeid: selectedTradeId,
                     notes: 'Linked from Zerodha',
