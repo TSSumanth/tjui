@@ -862,29 +862,62 @@ function UpdateStrategy({ id }) {
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
 
-        // Remove combinedBreakeven calculation and UI
-        // --- NEW: Calculate break-even using breakEvenCalculator.js ---
-        const openOptionAndFutureTrades = optionTrades
-            .filter(trade => trade.status === 'OPEN' && (
-                trade.asset.endsWith('CE') ||
-                trade.asset.endsWith('PE') ||
-                trade.asset.endsWith('FUT')
-            ))
-            .map(trade => ({
-                instrument_type: trade.asset,
-                price: parseFloat(trade.entryprice),
-                quantity: parseInt(trade.openquantity),
-                position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
-                lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
-            }));
-        const breakEvenPoints = (strategy?.symbol_ltp && openOptionAndFutureTrades.length > 0)
-            ? calculateBreakEven({
-                current_price: parseFloat(strategy.symbol_ltp),
-                manual_pl: plSummary.realizedPL,
-                options: openOptionAndFutureTrades
-            })
-            : null;
-        // --- END NEW ---
+        // State for break-even points
+        const [breakEvenPoints, setBreakEvenPoints] = React.useState(null);
+
+        // Calculate break-even points when dependencies change
+        React.useEffect(() => {
+            let mounted = true;
+
+            const calculateBreakEvenPoints = async () => {
+                if (!strategy?.symbol_ltp) {
+                    setBreakEvenPoints(null);
+                    return;
+                }
+
+                const openOptionAndFutureTrades = optionTrades
+                    .filter(trade => trade.status === 'OPEN' && (
+                        trade.asset.endsWith('CE') ||
+                        trade.asset.endsWith('PE') ||
+                        trade.asset.endsWith('FUT')
+                    ))
+                    .map(trade => ({
+                        instrument_type: trade.asset,
+                        price: parseFloat(trade.entryprice),
+                        quantity: parseInt(trade.openquantity),
+                        position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
+                        lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
+                    }));
+
+                if (openOptionAndFutureTrades.length === 0) {
+                    setBreakEvenPoints(null);
+                    return;
+                }
+
+                try {
+                    const result = await calculateBreakEven({
+                        current_price: parseFloat(strategy.symbol_ltp),
+                        manual_pl: plSummary.realizedPL,
+                        options: openOptionAndFutureTrades
+                    });
+
+                    if (mounted) {
+                        setBreakEvenPoints(result);
+                    }
+                } catch (error) {
+                    console.error('Error calculating break-even points:', error);
+                    if (mounted) {
+                        setBreakEvenPoints(null);
+                    }
+                }
+            };
+
+            calculateBreakEvenPoints();
+
+            return () => {
+                mounted = false;
+            };
+        }, [strategy?.symbol_ltp, optionTrades, plSummary.realizedPL]);
 
         return (
             <Card sx={{ mb: 3 }}>
@@ -967,7 +1000,7 @@ function UpdateStrategy({ id }) {
                             </Typography>
                         </Grid>
 
-                        {/* --- NEW: Break-even from breakEvenCalculator.js --- */}
+                        {/* Break-even Points */}
                         {breakEvenPoints && (
                             <Grid item xs={12}>
                                 <Divider sx={{ my: 2 }} />
@@ -980,7 +1013,7 @@ function UpdateStrategy({ id }) {
                                             Lower Break-even
                                         </Typography>
                                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                            ₹{breakEvenPoints.lower}
+                                            ₹{breakEvenPoints.lower.toFixed(2)}
                                         </Typography>
                                     </Box>
                                     <Box>
@@ -988,13 +1021,12 @@ function UpdateStrategy({ id }) {
                                             Upper Break-even
                                         </Typography>
                                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                            ₹{breakEvenPoints.upper}
+                                            ₹{breakEvenPoints.upper.toFixed(2)}
                                         </Typography>
                                     </Box>
                                 </Box>
                             </Grid>
                         )}
-                        {/* --- END NEW --- */}
                     </Grid>
                 </CardContent>
             </Card>

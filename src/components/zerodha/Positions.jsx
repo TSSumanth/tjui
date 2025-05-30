@@ -61,22 +61,8 @@ const getPositionType = (tradingsymbol, positionDetails) => {
         details[0].instrument_type === 'CE' || details[0].instrument_type === 'PE' ? 'Option' : 'Stock';
 };
 
-const extractOptionDetails = (tradingsymbol, positionDetails) => {
-    const details = positionDetails?.[tradingsymbol];
-    if (!details) return null;
 
-    if (details.instrument_type === 'CE' || details.instrument_type === 'PE') {
-        return {
-            symbol: details.name,
-            expiry: details.expiry,
-            strike: details.strike,
-            type: details.instrument_type
-        };
-    }
-    return null;
-};
-
-const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
+const calculateBreakeven = async (positions, manualPlValue = 0, currentPrice = 0) => {
     if (!positions || positions.length === 0) return null;
 
     // Transform positions into the format expected by the new calculator
@@ -97,24 +83,29 @@ const calculateBreakeven = (positions, manualPlValue = 0, currentPrice = 0) => {
     // Parse manual P/L value
     const manualPl = parseFloat(manualPlValue) || 0;
 
-    // Call the new calculator with all required attributes
-    const breakEvenPoints = calculateBreakEven({
-        current_price: currentPrice,
-        manual_pl: manualPl,
-        options: options
-    });
+    try {
+        // Call the new calculator with all required attributes
+        const breakEvenPoints = await calculateBreakEven({
+            current_price: currentPrice,
+            manual_pl: manualPl,
+            options: options
+        });
 
-    // Filter out zero values and sort the break-even points
-    const validBreakEvenPoints = [breakEvenPoints.lower, breakEvenPoints.upper]
-        .filter(point => point !== 0 && !isNaN(point))
-        .sort((a, b) => a - b);
+        // Filter out zero values and sort the break-even points
+        const validBreakEvenPoints = [breakEvenPoints.lower, breakEvenPoints.upper]
+            .filter(point => point !== 0 && !isNaN(point))
+            .sort((a, b) => a - b);
 
-    return {
-        breakevenPoints: validBreakEvenPoints,
-        netPremium: totalPremium,
-        perLotPremium: totalPremium,
-        currentPrice: currentPrice
-    };
+        return {
+            breakevenPoints: validBreakEvenPoints,
+            netPremium: totalPremium,
+            perLotPremium: totalPremium,
+            currentPrice: currentPrice
+        };
+    } catch (error) {
+        console.error('Error calculating break-even:', error);
+        return null;
+    }
 };
 
 const calculateIntrinsicValue = (option, ltpMap, positionDetails) => {
@@ -180,11 +171,17 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         try {
             // Get unique underlying symbols
             const underlyingSymbols = [...new Set(positions.map(position => {
-                const details = positionDetails?.[position.tradingsymbol];
-                if (!details) {
-                    return getUnderlyingSymbol(position.tradingsymbol);
-                }
-                return details[0].name;
+                let details = positionDetails?.[position.tradingsymbol];
+                console.log('details:', details);
+                // if (!details) {
+                //     details = getUnderlyingSymbol(position.tradingsymbol);
+                //     details === "NIFTY" ? details = "NIFTY 50" : details;
+                //     console.log('details:', details);
+                // }
+                let symbol = ''
+                details[0].name === "NIFTY" ? symbol = "NIFTY 50" : symbol = details[0].name;
+                console.log('details 2:', symbol);
+                return symbol;
             }))];
 
             // Create instruments array for LTP fetch
@@ -236,15 +233,35 @@ const PositionTable = ({ positions, underlying, onOpenOrderDialog, loadingPositi
         }, { dayPnL: 0, totalPnL: 0 });
     }, [positions, positionDetails]);
 
-    // Memoize the break-even calculation
-    const breakEvenResult = React.useMemo(() => {
-        if (!positions || positions.length === 0) return null;
+    // Get the current price from LTP map first, then fallback to position's last_price
+    const currentPrice = React.useMemo(() => {
+        return ltpMap[underlying] || positions[0]?.last_price || positions[0]?.average_price || 0;
+    }, [ltpMap, underlying, positions]);
 
-        // Get the current price from LTP map first, then fallback to position's last_price
-        const currentPrice = ltpMap[underlying] || positions[0]?.last_price || positions[0]?.average_price || 0;
+    // Calculate break-even points
+    const [breakEvenResult, setBreakEvenResult] = React.useState(null);
 
-        return calculateBreakeven(positions, manualPl, currentPrice);
-    }, [positions, manualPl, ltpMap, underlying]);
+    React.useEffect(() => {
+        let mounted = true;
+
+        const calculate = async () => {
+            if (!positions || positions.length === 0) {
+                setBreakEvenResult(null);
+                return;
+            }
+
+            const result = await calculateBreakeven(positions, manualPl, currentPrice);
+            if (mounted) {
+                setBreakEvenResult(result);
+            }
+        };
+
+        calculate();
+
+        return () => {
+            mounted = false;
+        };
+    }, [positions, manualPl, currentPrice]);
 
     // Handle smooth updates
     React.useEffect(() => {
@@ -876,7 +893,20 @@ const Positions = ({ positions, positionDetails, isDetailsLoading }) => {
 
     // Group positions by underlying
     const groupedPositions = allPositions.reduce((acc, position) => {
-        const underlying = positionDetails[position.tradingsymbol]?.name || getUnderlyingSymbol(position.tradingsymbol);
+        // First try to get the underlying from positionDetails
+        let underlying = '';
+        if (positionDetails[position.tradingsymbol]?.name) {
+            underlying = positionDetails[position.tradingsymbol].name;
+        } else {
+            // If positionDetails is not loaded yet, extract from trading symbol
+            const parts = position.tradingsymbol.split(/(\d+)/);
+            underlying = parts[0];
+            // Special case for NIFTY
+            if (underlying === 'NIFTY') {
+                underlying = 'NIFTY 50';
+            }
+        }
+
         if (!acc[underlying]) {
             acc[underlying] = [];
         }

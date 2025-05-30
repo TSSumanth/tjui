@@ -211,8 +211,18 @@ const Portfolio = () => {
                         });
 
                         if (response && response.data) {
-                            newPositionDetails[symbol] = response.data;
-                            success = true;
+                            console.log('response of getInstruments:', response.data);
+                            if (response.data.length > 1) {
+                                for (const data of response.data) {
+                                    if (data.tradingsymbol === symbol) {
+                                        newPositionDetails[symbol] = [data];
+                                        success = true;
+                                    }
+                                }
+                            } else {
+                                newPositionDetails[symbol] = response.data;
+                                success = true;
+                            }
                         } else {
                             console.warn(`No data received for ${symbol}, attempt ${retryCount + 1}`);
                             retryCount++;
