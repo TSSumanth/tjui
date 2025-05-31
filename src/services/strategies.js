@@ -45,7 +45,6 @@ export const getStrategies = async (filter = {}) => {
         });
 
         if (response.status === 200) {
-            console.log('Raw API response:', response.data);
             return response.data;
         }
 

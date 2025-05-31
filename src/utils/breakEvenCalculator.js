@@ -156,22 +156,13 @@ async function calculateBreakEven(input) {
         CALL_OPTIONS,
         PUT_OPTIONS,
         FUTURES,
-        CALL_STRIKE_PRICES,
-        PUT_STRIKE_PRICES,
         total_call_premium,
         total_put_premium,
         total_future_premium
     } = await parseOptions(input.options);
-    console.log("All Options:", JSON.stringify(input.options));
     const total_premium = calculateTotalPremium(total_call_premium, total_put_premium, total_future_premium) - manual_pl;
-    const sortedCallStrikes = Array.from(CALL_STRIKE_PRICES).sort((a, b) => a - b);
-    const sortedPutStrikes = Array.from(PUT_STRIKE_PRICES).sort((a, b) => a - b);
-    console.log('Sorted CALL STRIKE PRICES:', sortedCallStrikes);
-    console.log('Sorted PUT STRIKE PRICES:', sortedPutStrikes);
-    console.log('total_premium:', total_premium);
     break_even_points.upper = findUpperBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium);
     break_even_points.lower = findLowerBreakEven(CALL_OPTIONS, PUT_OPTIONS, FUTURES, CURRENT_STOCK_PRICE, total_premium);
-    console.log('Break-even points:', break_even_points);
     return break_even_points;
 }
 

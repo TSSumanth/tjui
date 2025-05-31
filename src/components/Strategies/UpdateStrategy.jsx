@@ -56,7 +56,6 @@ import { CreateActionItem } from "../ActionItems/ActionModelPopup";
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import { useZerodha } from '../../context/ZerodhaContext';
 import SyncIcon from '@mui/icons-material/Sync';
 import EditIcon from '@mui/icons-material/Edit';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
@@ -99,7 +98,7 @@ const TABLE_STYLES = {
 };
 
 function UpdateStrategy({ id }) {
-    const { sessionActive, holdings, positions } = useZerodha();
+    // const { sessionActive, holdings, positions } = useZerodha();
     const [strategy, setStrategy] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -136,12 +135,11 @@ function UpdateStrategy({ id }) {
         status: 'idle' // 'idle' | 'syncing' | 'complete'
     });
     const navigate = useNavigate();
-    const hasSyncedOnLoad = useRef(false);
-    const [isZerodhaDataReady, setIsZerodhaDataReady] = useState(false);
     const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false);
     const [openStrategies, setOpenStrategies] = useState([]);
     const [showRemoveTradeConfirmDialog, setShowRemoveTradeConfirmDialog] = useState(false);
     const [tradeToRemove, setTradeToRemove] = useState(null);
+    const [breakEvenPoints, setBreakEvenPoints] = React.useState(null);
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -159,9 +157,7 @@ function UpdateStrategy({ id }) {
     }, []);
 
     const fetchTrades = useCallback(async () => {
-        console.log('fetchTrades called with strategy:', strategy);
         if (!strategy) {
-            console.log('No strategy data available, skipping trade fetch');
             return;
         }
 
@@ -169,7 +165,6 @@ function UpdateStrategy({ id }) {
             const stockTradeIds = Array.isArray(strategy.stock_trades) ? strategy.stock_trades : [];
             const optionTradeIds = Array.isArray(strategy.option_trades) ? strategy.option_trades : [];
 
-            console.log('Fetching trades with IDs:', { stockTradeIds, optionTradeIds });
 
             let stockTradesData = [];
             let optionTradesData = [];
@@ -177,7 +172,6 @@ function UpdateStrategy({ id }) {
 
             if (stockTradeIds.length > 0) {
                 stockTradesData = await getStockTradesbyId(stockTradeIds);
-                console.log('Fetched stock trades:', stockTradesData);
                 if (Array.isArray(stockTradesData)) {
                     overallReturn += stockTradesData.reduce((sum, trade) => sum + (Number(trade.return) || 0), 0);
                 }
@@ -185,7 +179,6 @@ function UpdateStrategy({ id }) {
 
             if (optionTradeIds.length > 0) {
                 optionTradesData = await getOptionTradesbyId(optionTradeIds);
-                console.log('Fetched option trades:', optionTradesData);
                 if (Array.isArray(optionTradesData)) {
                     overallReturn += optionTradesData.reduce((sum, trade) => sum + (Number(trade.return) || 0), 0);
                 }
@@ -224,12 +217,6 @@ function UpdateStrategy({ id }) {
             const formattedStockTrades = formatTrades(stockTradesData || []);
             const formattedOptionTrades = formatTrades(optionTradesData || []);
 
-            console.log('Setting trades state with:', {
-                stockTrades: formattedStockTrades,
-                optionTrades: formattedOptionTrades,
-                overallReturn
-            });
-
             setStockTrades(formattedStockTrades);
             setOptionTrades(formattedOptionTrades);
         } catch (error) {
@@ -249,16 +236,12 @@ function UpdateStrategy({ id }) {
         try {
             // Get strategy by ID
             const response = await getStrategies({ id });
-            console.log('Strategy API Response:', response);
 
             if (response) {
                 // Handle both array and single object responses
                 const strategyData = Array.isArray(response) ? response[0] : response;
 
                 if (strategyData && strategyData.id) {
-                    console.log('Strategy data:', strategyData);
-                    console.log('Stock trades:', strategyData.stock_trades);
-                    console.log('Option trades:', strategyData.option_trades);
 
                     // Ensure trades are arrays
                     if (!Array.isArray(strategyData.stock_trades)) {
@@ -306,12 +289,10 @@ function UpdateStrategy({ id }) {
 
     const handleSubmitTrade = async (tradeDetails, isStock) => {
         try {
-            console.log('Submitting trade:', tradeDetails, 'isStock:', isStock);
             const response = isStock
                 ? await addNewStockTrade({ ...tradeDetails, strategy_id: id })
                 : await addNewOptionTrade({ ...tradeDetails, strategy_id: id });
 
-            console.log('Trade submission response:', response);
 
             if (response?.tradeid) {
                 // Create a new array of trade IDs
@@ -325,11 +306,8 @@ function UpdateStrategy({ id }) {
                     ]
                 };
 
-                console.log('Updating strategy with new trade:', updatedStrategy);
-
                 // Update the strategy in the database
                 const updateResponse = await updateStrategy(updatedStrategy);
-                console.log('Strategy update response:', updateResponse);
 
                 if (updateResponse) {
                     // Fetch the updated strategy to ensure we have the latest data
@@ -337,7 +315,6 @@ function UpdateStrategy({ id }) {
                     const strategyData = Array.isArray(refreshedStrategy) ? refreshedStrategy[0] : refreshedStrategy;
 
                     if (strategyData) {
-                        console.log('Refreshed strategy data:', strategyData);
                         setStrategy(strategyData);
                         await fetchTrades();
                     }
@@ -472,6 +449,47 @@ function UpdateStrategy({ id }) {
                 unrealized_pl: unrealizedPL
             }));
         }
+
+        // Calculate break-even points after P/L summary is updated
+        const calculateBreakEvenPoints = async () => {
+            if (!strategy?.symbol_ltp) {
+                setBreakEvenPoints(null);
+                return;
+            }
+
+            const openOptionAndFutureTrades = optionTrades
+                .filter(trade => trade.status === 'OPEN' && (
+                    trade.asset.endsWith('CE') ||
+                    trade.asset.endsWith('PE') ||
+                    trade.asset.endsWith('FUT')
+                ))
+                .map(trade => ({
+                    instrument_type: trade.asset,
+                    price: parseFloat(trade.entryprice),
+                    quantity: parseInt(trade.openquantity),
+                    position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
+                    lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
+                }));
+
+            if (openOptionAndFutureTrades.length === 0) {
+                setBreakEvenPoints(null);
+                return;
+            }
+
+            try {
+                const result = await calculateBreakEven({
+                    current_price: parseFloat(strategy.symbol_ltp),
+                    manual_pl: realizedPL,
+                    options: openOptionAndFutureTrades
+                });
+                setBreakEvenPoints(result);
+            } catch (error) {
+                console.error('Error calculating break-even points:', error);
+                setBreakEvenPoints(null);
+            }
+        };
+
+        calculateBreakEvenPoints();
     }, [stockTrades, optionTrades, calculateUnrealizedPL, checkAllTradesHaveLTP, strategy]);
 
     const sortTrades = useCallback((trades) => {
@@ -524,18 +542,18 @@ function UpdateStrategy({ id }) {
         }
     };
 
-    const handleGetLTPFromZerodha = async () => {
-        if (!sessionActive) {
-            setSnackbar({
-                open: true,
-                message: 'No active session available for Zerodha. Please connect to Zerodha and try again.',
-                severity: 'error'
-            });
-            return;
-        }
+    // const handleGetLTPFromZerodha = async () => {
+    //     if (!sessionActive) {
+    //         setSnackbar({
+    //             open: true,
+    //             message: 'No active session available for Zerodha. Please connect to Zerodha and try again.',
+    //             severity: 'error'
+    //         });
+    //         return;
+    //     }
 
-        setShowZerodhaConfirmDialog(true);
-    };
+    //     setShowZerodhaConfirmDialog(true);
+    // };
 
     const handleConfirmZerodhaSync = async () => {
         setShowZerodhaConfirmDialog(false);
@@ -543,9 +561,9 @@ function UpdateStrategy({ id }) {
         setSyncProgress({ total: 0, current: 0, status: 'syncing' });
 
         try {
-            if (!sessionActive) {
-                throw new Error('No active Zerodha session');
-            }
+            // if (!sessionActive) {
+            //     throw new Error('No active Zerodha session');
+            // }
 
             const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
             const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
@@ -553,7 +571,6 @@ function UpdateStrategy({ id }) {
             setSyncProgress(prev => ({ ...prev, total: totalTrades }));
 
             // Create instruments array for LTP fetch
-            const instruments = [];
             const updatedStockTrades = [];
             const updatedOptionTrades = [];
 
@@ -564,11 +581,9 @@ function UpdateStrategy({ id }) {
                         exchange: 'NSE',
                         tradingsymbol: trade.symbol
                     };
-                    console.log('Fetching LTP for stock:', instrument);
 
                     try {
                         const ltpMap = await fetchLTPs([instrument]);
-                        console.log('Received LTP for stock:', ltpMap);
 
                         const ltp = ltpMap[trade.symbol];
                         if (ltp) {
@@ -593,11 +608,9 @@ function UpdateStrategy({ id }) {
                     exchange: 'NFO',
                     tradingsymbol: trade.asset
                 };
-                console.log('Fetching LTP for option:', instrument);
 
                 try {
                     const ltpMap = await fetchLTPs([instrument]);
-                    console.log('Received LTP for option:', ltpMap);
 
                     const ltp = ltpMap[trade.asset];
                     if (ltp) {
@@ -622,10 +635,7 @@ function UpdateStrategy({ id }) {
                         exchange: 'NSE',
                         tradingsymbol: strategy.symbol
                     };
-                    console.log('Fetching LTP for strategy symbol:', symbolInstrument);
-
                     const symbolLtpMap = await fetchLTPs([symbolInstrument]);
-                    console.log('Received LTP for strategy symbol:', symbolLtpMap);
 
                     const symbolLTP = symbolLtpMap[strategy.symbol];
                     if (symbolLTP !== undefined) {
@@ -752,7 +762,6 @@ function UpdateStrategy({ id }) {
     };
 
     useEffect(() => {
-        console.log('Initial load - fetching strategy');
         fetchStrategy();
     }, [id, fetchStrategy]);
 
@@ -791,58 +800,6 @@ function UpdateStrategy({ id }) {
     }, [stockTrades, optionTrades]);
 
     useEffect(() => {
-        if (sessionActive && holdings && positions) {
-            const hasHoldings = holdings.length > 0;
-            const hasPositions = Array.isArray(positions) ? positions.length > 0 :
-                (positions && typeof positions === 'object' ? Object.keys(positions).length > 0 : false);
-
-            setIsZerodhaDataReady(hasHoldings || hasPositions);
-        } else {
-            setIsZerodhaDataReady(false);
-        }
-    }, [sessionActive, holdings, positions]);
-
-    useEffect(() => {
-        const autoSyncLTP = async () => {
-            if (hasSyncedOnLoad.current ||
-                !sessionActive ||
-                !strategy ||
-                isFetchingZerodhaLTP) {
-                return;
-            }
-
-            const hasOpenTrades = stockTrades.some(trade => trade.status === 'OPEN') ||
-                optionTrades.some(trade => trade.status === 'OPEN');
-
-            if (!hasOpenTrades) {
-                return;
-            }
-
-            const hasHoldings = holdings && holdings.length > 0;
-            const hasPositions = positions && (
-                (Array.isArray(positions) && positions.length > 0) ||
-                (typeof positions === 'object' && (
-                    (positions.net && positions.net.length > 0) ||
-                    (positions.day && positions.day.length > 0)
-                ))
-            );
-
-            if (!hasHoldings && !hasPositions) {
-                return;
-            }
-
-            hasSyncedOnLoad.current = true;
-            await handleConfirmZerodhaSync();
-        };
-
-        const timer = setTimeout(() => {
-            autoSyncLTP();
-        }, 5000);
-
-        return () => clearTimeout(timer);
-    }, [sessionActive, strategy, stockTrades, optionTrades, isFetchingZerodhaLTP, holdings, positions]);
-
-    useEffect(() => {
         const fetchOpenStrategies = async () => {
             try {
                 const response = await getOpenStrategies();
@@ -861,63 +818,6 @@ function UpdateStrategy({ id }) {
                 .filter(trade => trade.status === 'OPEN' && (!trade.ltp || parseFloat(trade.ltp) === 0 || parseFloat(trade.ltp) === 0.00))
                 .map(trade => `${trade.asset}${trade.strikeprize ? ` ${trade.strikeprize}` : ''}`);
         }, [stockTrades, optionTrades]);
-
-        // State for break-even points
-        const [breakEvenPoints, setBreakEvenPoints] = React.useState(null);
-
-        // Calculate break-even points when dependencies change
-        React.useEffect(() => {
-            let mounted = true;
-
-            const calculateBreakEvenPoints = async () => {
-                if (!strategy?.symbol_ltp) {
-                    setBreakEvenPoints(null);
-                    return;
-                }
-
-                const openOptionAndFutureTrades = optionTrades
-                    .filter(trade => trade.status === 'OPEN' && (
-                        trade.asset.endsWith('CE') ||
-                        trade.asset.endsWith('PE') ||
-                        trade.asset.endsWith('FUT')
-                    ))
-                    .map(trade => ({
-                        instrument_type: trade.asset,
-                        price: parseFloat(trade.entryprice),
-                        quantity: parseInt(trade.openquantity),
-                        position: trade.tradetype === 'LONG' ? 'BUY' : 'SELL',
-                        lot_size: trade.lotsize ? parseInt(trade.lotsize) : 0
-                    }));
-
-                if (openOptionAndFutureTrades.length === 0) {
-                    setBreakEvenPoints(null);
-                    return;
-                }
-
-                try {
-                    const result = await calculateBreakEven({
-                        current_price: parseFloat(strategy.symbol_ltp),
-                        manual_pl: plSummary.realizedPL,
-                        options: openOptionAndFutureTrades
-                    });
-
-                    if (mounted) {
-                        setBreakEvenPoints(result);
-                    }
-                } catch (error) {
-                    console.error('Error calculating break-even points:', error);
-                    if (mounted) {
-                        setBreakEvenPoints(null);
-                    }
-                }
-            };
-
-            calculateBreakEvenPoints();
-
-            return () => {
-                mounted = false;
-            };
-        }, [strategy?.symbol_ltp, optionTrades, plSummary.realizedPL]);
 
         return (
             <Card sx={{ mb: 3 }}>
@@ -999,39 +899,50 @@ function UpdateStrategy({ id }) {
                                 )}
                             </Typography>
                         </Grid>
-
-                        {/* Break-even Points */}
-                        {breakEvenPoints && (
-                            <Grid item xs={12}>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Break-even Points (using Symbol LTP and Realized P/L)
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mt: 1 }}>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Lower Break-even
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                            ₹{breakEvenPoints.lower.toFixed(2)}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Upper Break-even
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                            ₹{breakEvenPoints.upper.toFixed(2)}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Grid>
-                        )}
                     </Grid>
                 </CardContent>
             </Card>
         );
     };
+
+    const BreakEvenPointsCard = React.memo(() => {
+        return (
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                        Break-even Points
+                    </Typography>
+                    {breakEvenPoints && (
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Break-even Points (using Symbol LTP and Realized P/L)
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mt: 1 }}>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Lower Break-even
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        ₹{breakEvenPoints.lower.toFixed(2)}
+                                    </Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Upper Break-even
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        ₹{breakEvenPoints.upper.toFixed(2)}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Grid>
+                    )}
+                </CardContent>
+            </Card>
+        );
+    }, [breakEvenPoints]);
+    BreakEvenPointsCard.displayName = 'BreakEvenPointsCard';
 
     const LTPInput = React.memo(({ trade, value, onValueChange }) => {
         const handleChange = React.useCallback((e) => {
@@ -1338,6 +1249,7 @@ function UpdateStrategy({ id }) {
 
                             <Box sx={{ mt: 3 }}>
                                 <PLSummaryCard />
+                                <BreakEvenPointsCard />
                             </Box>
 
                             <Box sx={{
@@ -1351,8 +1263,8 @@ function UpdateStrategy({ id }) {
                                     variant="outlined"
                                     startIcon={<SyncIcon />}
                                     onClick={() => {
-                                        console.log('Sync button clicked');
-                                        handleGetLTPFromZerodha();
+                                        // handleGetLTPFromZerodha();
+                                        setShowZerodhaConfirmDialog(true);
                                     }}
                                     disabled={isFetchingZerodhaLTP}
                                 >
@@ -1401,11 +1313,12 @@ function UpdateStrategy({ id }) {
                                 }
                             }}
                         >
-                            <Tab label="Trades" />
+                            <Tab label="Open Trades" />
+                            <Tab label="Closed Trades" />
                             <Tab label="Notes" />
                         </Tabs>
 
-                        {/* Trades Tab */}
+                        {/* Open Trades Tab */}
                         {activeTab === 0 && (
                             <Box sx={{ p: 3 }}>
                                 <Box sx={{
@@ -1434,7 +1347,7 @@ function UpdateStrategy({ id }) {
                                 </Box>
 
                                 {/* Stock Trades Table */}
-                                {stockTrades.length > 0 && (
+                                {stockTrades.filter(trade => trade.status === 'OPEN').length > 0 && (
                                     <TableContainer component={Paper} sx={{ ...TABLE_STYLES.container, mb: 3 }}>
                                         <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
                                             Stock Trades
@@ -1456,21 +1369,18 @@ function UpdateStrategy({ id }) {
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {sortTrades(stockTrades).map((trade) => {
+                                                {sortTrades(stockTrades.filter(trade => trade.status === 'OPEN')).map((trade) => {
                                                     const unrealizedPL = calculateUnrealizedPL(trade);
                                                     return (
                                                         <TableRow
                                                             key={trade.tradeid}
                                                             onClick={() => handleTradeClick(trade)}
-                                                            sx={{
-                                                                ...TABLE_STYLES.row,
-                                                                backgroundColor: trade.status === 'CLOSED' ? '#f5f5f5' : '#fff'
-                                                            }}
+                                                            sx={TABLE_STYLES.row}
                                                         >
                                                             <TableCell>
                                                                 <Chip
                                                                     label={trade.status}
-                                                                    color={trade.status === 'OPEN' ? 'success' : 'default'}
+                                                                    color="success"
                                                                     size="small"
                                                                 />
                                                             </TableCell>
@@ -1493,9 +1403,7 @@ function UpdateStrategy({ id }) {
                                                                     fontWeight: 'bold'
                                                                 }}
                                                             >
-                                                                {trade.status === 'OPEN'
-                                                                    ? `${unrealizedPL >= 0 ? '+' : ''}${unrealizedPL.toFixed(2)}`
-                                                                    : '-'}
+                                                                {`${unrealizedPL >= 0 ? '+' : ''}${unrealizedPL.toFixed(2)}`}
                                                             </TableCell>
                                                             <TableCell
                                                                 sx={{
@@ -1522,7 +1430,7 @@ function UpdateStrategy({ id }) {
                                 )}
 
                                 {/* Option Trades Table */}
-                                {optionTrades.length > 0 && (
+                                {optionTrades.filter(trade => trade.status === 'OPEN').length > 0 && (
                                     <TableContainer component={Paper} sx={TABLE_STYLES.container}>
                                         <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
                                             Option Trades
@@ -1545,21 +1453,18 @@ function UpdateStrategy({ id }) {
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {sortTrades(optionTrades).map((trade) => {
+                                                {sortTrades(optionTrades.filter(trade => trade.status === 'OPEN')).map((trade) => {
                                                     const unrealizedPL = calculateUnrealizedPL(trade);
                                                     return (
                                                         <TableRow
                                                             key={trade.tradeid}
                                                             onClick={() => handleTradeClick(trade)}
-                                                            sx={{
-                                                                ...TABLE_STYLES.row,
-                                                                backgroundColor: trade.status === 'CLOSED' ? '#f5f5f5' : '#fff'
-                                                            }}
+                                                            sx={TABLE_STYLES.row}
                                                         >
                                                             <TableCell>
                                                                 <Chip
                                                                     label={trade.status}
-                                                                    color={trade.status === 'OPEN' ? 'success' : 'default'}
+                                                                    color="success"
                                                                     size="small"
                                                                 />
                                                             </TableCell>
@@ -1583,9 +1488,7 @@ function UpdateStrategy({ id }) {
                                                                     fontWeight: 'bold'
                                                                 }}
                                                             >
-                                                                {trade.status === 'OPEN'
-                                                                    ? `${unrealizedPL >= 0 ? '+' : ''}${unrealizedPL.toFixed(2)}`
-                                                                    : '-'}
+                                                                {`${unrealizedPL >= 0 ? '+' : ''}${unrealizedPL.toFixed(2)}`}
                                                             </TableCell>
                                                             <TableCell
                                                                 sx={{
@@ -1613,8 +1516,157 @@ function UpdateStrategy({ id }) {
                             </Box>
                         )}
 
-                        {/* Notes Tab */}
+                        {/* Closed Trades Tab */}
                         {activeTab === 1 && (
+                            <Box sx={{ p: 3 }}>
+                                {/* Stock Trades Table */}
+                                {stockTrades.filter(trade => trade.status === 'CLOSED').length > 0 && (
+                                    <TableContainer component={Paper} sx={{ ...TABLE_STYLES.container, mb: 3 }}>
+                                        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                                            Closed Stock Trades
+                                        </Typography>
+                                        <Table>
+                                            <TableHead sx={TABLE_STYLES.header}>
+                                                <TableRow>
+                                                    <TableCell>Status</TableCell>
+                                                    <TableCell>Entry Date</TableCell>
+                                                    <TableCell>Exit Date</TableCell>
+                                                    <TableCell>Asset</TableCell>
+                                                    <TableCell>Quantity</TableCell>
+                                                    <TableCell>Trade Type</TableCell>
+                                                    <TableCell>Entry Price</TableCell>
+                                                    <TableCell>Exit Price</TableCell>
+                                                    <TableCell>Overall P/L</TableCell>
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {sortTrades(stockTrades.filter(trade => trade.status === 'CLOSED')).map((trade) => (
+                                                    <TableRow
+                                                        key={trade.tradeid}
+                                                        onClick={() => handleTradeClick(trade)}
+                                                        sx={TABLE_STYLES.row}
+                                                    >
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={trade.status}
+                                                                color="default"
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{moment(trade.exitdate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{trade.asset}</TableCell>
+                                                        <TableCell>{trade.quantity}</TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={trade.tradetype}
+                                                                color={trade.tradetype === 'LONG' ? 'primary' : 'secondary'}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>{trade.entryprice}</TableCell>
+                                                        <TableCell>{trade.exitaverageprice}</TableCell>
+                                                        <TableCell
+                                                            sx={{
+                                                                color: trade.overallreturn >= 0 ? 'success.main' : 'error.main',
+                                                                fontWeight: 'bold'
+                                                            }}
+                                                        >
+                                                            {trade.overallreturn >= 0 ? '+' : ''}{trade.overallreturn}
+                                                        </TableCell>
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handleActionMenuClick(e, trade)}
+                                                            >
+                                                                <MoreVertIcon />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                )}
+
+                                {/* Option Trades Table */}
+                                {optionTrades.filter(trade => trade.status === 'CLOSED').length > 0 && (
+                                    <TableContainer component={Paper} sx={TABLE_STYLES.container}>
+                                        <Typography variant="h6" sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                                            Closed Option Trades
+                                        </Typography>
+                                        <Table>
+                                            <TableHead sx={TABLE_STYLES.header}>
+                                                <TableRow>
+                                                    <TableCell>Status</TableCell>
+                                                    <TableCell>Entry Date</TableCell>
+                                                    <TableCell>Exit Date</TableCell>
+                                                    <TableCell>Asset</TableCell>
+                                                    <TableCell>Strike Price</TableCell>
+                                                    <TableCell>Lots</TableCell>
+                                                    <TableCell>Trade Type</TableCell>
+                                                    <TableCell>Entry Price</TableCell>
+                                                    <TableCell>Exit Price</TableCell>
+                                                    <TableCell>Overall P/L</TableCell>
+                                                    <TableCell>Actions</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {sortTrades(optionTrades.filter(trade => trade.status === 'CLOSED')).map((trade) => (
+                                                    <TableRow
+                                                        key={trade.tradeid}
+                                                        onClick={() => handleTradeClick(trade)}
+                                                        sx={TABLE_STYLES.row}
+                                                    >
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={trade.status}
+                                                                color="default"
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{moment(trade.exitdate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{trade.asset}</TableCell>
+                                                        <TableCell>{trade.strikeprize}</TableCell>
+                                                        <TableCell>{trade.openquantity / trade.lotsize}</TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={trade.tradetype}
+                                                                color={trade.tradetype === 'LONG' ? 'primary' : 'secondary'}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>{trade.entryprice}</TableCell>
+                                                        <TableCell>{trade.exitaverageprice}</TableCell>
+                                                        <TableCell
+                                                            sx={{
+                                                                color: trade.overallreturn >= 0 ? 'success.main' : 'error.main',
+                                                                fontWeight: 'bold'
+                                                            }}
+                                                        >
+                                                            {trade.overallreturn >= 0 ? '+' : ''}{trade.overallreturn}
+                                                        </TableCell>
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => handleActionMenuClick(e, trade)}
+                                                            >
+                                                                <MoreVertIcon />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Notes Tab */}
+                        {activeTab === 2 && (
                             <Box p={3}>
                                 <NotesTable
                                     notes={notes}

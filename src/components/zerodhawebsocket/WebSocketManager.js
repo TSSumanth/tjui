@@ -104,7 +104,8 @@ const initPolling = () => {
         const interval = setInterval(() => {
             fetchStatus(); // Will be throttled internally
             fetchSubscriptions();
-        }, 30000); // Match portfolio polling interval
+            console.log('WebSocket polling interval:', interval);
+        }, 5000); // Match portfolio polling interval
 
         setState({ pollingInterval: interval });
         return interval;

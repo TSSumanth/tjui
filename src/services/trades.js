@@ -16,7 +16,6 @@ export const addNewStockTrade = async (tradeDetails) => {
 };
 
 export const updateStockTrade = async (e) => {
-    console.log(e)
     try {
         const response = await axios.patch(`${API_URLS.TRADES}/stock`, e, {
             params: {
@@ -33,7 +32,6 @@ export const updateStockTrade = async (e) => {
 };
 
 export const getStockTrades = async (params = {}) => {
-    console.log('Fetching stock trades with params:', params);
     try {
         const response = await axios.get(`${API_URLS.TRADES}/stock`, {
             params: {
@@ -46,7 +44,6 @@ export const getStockTrades = async (params = {}) => {
         });
 
         if (response.status === 200) {
-            console.log('Received trades:', response.data);
             return response.data;
         }
 
@@ -71,50 +68,22 @@ export const getStockTrades = async (params = {}) => {
     }
 };
 
-export const getStockTradesbyId = async (id, retries = 3) => {
-    const timeout = 30000; // 30 seconds timeout
-    let attempt = 0;
-
-    while (attempt < retries) {
-        try {
-            console.log(`Fetching stock trades for IDs (attempt ${attempt + 1}/${retries}):`, id);
-            const response = await axios.get(`${API_URLS.TRADES}/stock`, {
-                params: {
-                    id: Array.isArray(id) ? id : [id]
-                },
-                timeout: timeout
-            });
-
-            if (response.status === 200) {
-                console.log('Stock trades response:', response.data);
-                return response.data;
+export const getStockTradesbyId = async (id) => {
+    try {
+        const response = await axios.get(`${API_URLS.TRADES}/stock`, {
+            params: {
+                id: Array.isArray(id) ? id : [id]
             }
-            return [];
-        } catch (error) {
-            attempt++;
-            console.error(`Error fetching stock trades (attempt ${attempt}/${retries}):`, error);
-
-            if (error.code === 'ECONNABORTED') {
-                console.log(`Request timeout after ${timeout}ms`);
-            }
-
-            if (attempt === retries) {
-                if (error.response?.status === 504) {
-                    throw new Error("Server timeout - The request took too long to complete. Please try again.");
-                } else if (error.code === 'ECONNABORTED') {
-                    throw new Error("Request timeout - Please check your connection and try again.");
-                } else if (!error.response) {
-                    throw new Error("Network error - Unable to connect to the server. Please check your connection.");
-                } else {
-                    throw new Error(`Unable to get trades: ${error.response?.data?.message || error.message}`);
-                }
-            }
-
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt), 8000)));
+        });
+        if (response.status === 200) {
+            return response.data;
         }
+        return [];
+    } catch (error) {
+        console.error('Error fetching stock trades:', error);
     }
-};
+}
+
 
 export const deleteStockTrade = async (tradeid) => {
     try {
@@ -128,7 +97,7 @@ export const deleteStockTrade = async (tradeid) => {
         }
         else return false;
     } catch (e) {
-        console.log(e)
+        console.error(e)
     }
 };
 
@@ -147,7 +116,6 @@ export const addNewOptionTrade = async (tradeDetails) => {
 };
 
 export const getOptionTrades = async (e) => {
-    console.log(e)
     try {
         const response = await axios.get(`${API_URLS.TRADES}/option`, {
             params: {
@@ -157,7 +125,6 @@ export const getOptionTrades = async (e) => {
             }
         });
         if (response.status === 200) {
-            console.log(response.data)
             return response.data
         }
         return [];
@@ -168,14 +135,12 @@ export const getOptionTrades = async (e) => {
 
 export const getOptionTradesbyId = async (id) => {
     try {
-        console.log('Fetching option trades for IDs:', id);
         const response = await axios.get(`${API_URLS.TRADES}/option`, {
             params: {
                 id: Array.isArray(id) ? id : [id]
             }
         });
         if (response.status === 200) {
-            console.log('Option trades response:', response.data);
             return response.data;
         }
         return [];
@@ -197,12 +162,11 @@ export const deleteOptionTrade = async (tradeid) => {
         }
         else return false;
     } catch (e) {
-        console.log(e)
+        console.error(e)
     }
 };
 
 export const updateOptionTrade = async (e) => {
-    console.log(e)
     try {
         const response = await axios.patch(`${API_URLS.TRADES}/option`, e, {
             params: {

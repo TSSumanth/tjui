@@ -85,9 +85,7 @@ export const getOrders = async () => {
 
 export const getInstruments = async (params = {}) => {
     try {
-        console.log('Fetching instruments with params:', params);
         const response = await api.get('/api/zerodha/instruments', { params });
-        console.log('Instruments API response:', response.data);
         if (!response.data) {
             throw new Error('No data received from instruments API');
         }
@@ -106,7 +104,6 @@ export const getInstruments = async (params = {}) => {
 export const getAccountInfo = async () => {
     try {
         const response = await api.get('/api/zerodha/account');
-        console.log('Account info response:', response.data);
         if (response.data && response.data.success) {
             return response.data;
         } else {
