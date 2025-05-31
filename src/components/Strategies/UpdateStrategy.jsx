@@ -36,7 +36,7 @@ import {
     Stack,
     LinearProgress,
 } from "@mui/material";
-import { getStrategies, updateStrategy, getStrategyNotes, deleteStrategy, getOpenStrategies } from "../../services/strategies";
+import { getStrategies, updateStrategy, getStrategyNotes, deleteStrategy, getOpenStrategies, addStrategyNote } from "../../services/strategies";
 import { getStockTradesbyId, getOptionTradesbyId, addNewStockTrade, updateStockTrade, addNewOptionTrade, updateOptionTrade } from "../../services/trades";
 import { addActionItem, getActionItems } from "../../services/actionitems";
 import { StockTradeForm } from "../Trades/StockTradeForm";
@@ -140,6 +140,8 @@ function UpdateStrategy({ id }) {
     const [showRemoveTradeConfirmDialog, setShowRemoveTradeConfirmDialog] = useState(false);
     const [tradeToRemove, setTradeToRemove] = useState(null);
     const [breakEvenPoints, setBreakEvenPoints] = React.useState(null);
+    const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
+    const [newNoteContent, setNewNoteContent] = useState('');
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -759,6 +761,27 @@ function UpdateStrategy({ id }) {
         setTradeToRemove(selectedTradeForMenu);
         setShowRemoveTradeConfirmDialog(true);
         handleActionMenuClose();
+    };
+
+    const handleAddNote = async () => {
+        try {
+            await addStrategyNote(strategy.id, newNoteContent);
+            setNewNoteContent('');
+            setShowAddNoteDialog(false);
+            fetchNotes(strategy.id);
+            setSnackbar({
+                open: true,
+                message: 'Note added successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error adding note:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to add note',
+                severity: 'error'
+            });
+        }
     };
 
     useEffect(() => {
@@ -1668,6 +1691,15 @@ function UpdateStrategy({ id }) {
                         {/* Notes Tab */}
                         {activeTab === 2 && (
                             <Box p={3}>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setShowAddNoteDialog(true)}
+                                    >
+                                        Add Note
+                                    </Button>
+                                </Box>
                                 <NotesTable
                                     notes={notes}
                                     onUpdate={() => fetchNotes(strategy.id)}
@@ -1948,6 +1980,40 @@ function UpdateStrategy({ id }) {
                     <Button onClick={() => setShowRemoveTradeConfirmDialog(false)}>Cancel</Button>
                     <Button onClick={handleRemoveTrade} color="error" variant="contained">
                         Remove
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Add Note Dialog */}
+            <Dialog
+                open={showAddNoteDialog}
+                onClose={() => setShowAddNoteDialog(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Add New Note</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Note Content"
+                        type="text"
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowAddNoteDialog(false)}>Cancel</Button>
+                    <Button
+                        onClick={handleAddNote}
+                        variant="contained"
+                        color="primary"
+                        disabled={!newNoteContent.trim()}
+                    >
+                        Add
                     </Button>
                 </DialogActions>
             </Dialog>
