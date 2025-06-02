@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box } from '@mui/material';
 import { getAlgoStrategies, updateAlgoStrategy } from '../../services/algoStrategies';
+import { getAutomatedOrderById } from '../../services/automatedOrders';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
@@ -10,6 +11,7 @@ const StrategyBox = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [editStates, setEditStates] = useState({});
     const [updating, setUpdating] = useState({});
+    const [ordersByStrategy, setOrdersByStrategy] = useState({});
 
     useEffect(() => {
         const fetchStrategies = async () => {
@@ -27,6 +29,23 @@ const StrategyBox = () => {
                     };
                 });
                 setEditStates(initialEdit);
+                // Fetch automated orders for each strategy
+                const ordersMap = {};
+                for (const s of data) {
+                    if (Array.isArray(s.automated_order_ids) && s.automated_order_ids.length > 0) {
+                        const orders = await Promise.all(
+                            s.automated_order_ids.map(async (orderId) => {
+                                try {
+                                    return await getAutomatedOrderById(orderId);
+                                } catch {
+                                    return null;
+                                }
+                            })
+                        );
+                        ordersMap[s.strategyid] = orders.filter(Boolean);
+                    }
+                }
+                setOrdersByStrategy(ordersMap);
             } catch (err) {
                 setStrategies([]);
                 setSnackbar({
@@ -101,7 +120,7 @@ const StrategyBox = () => {
                         <Card sx={{ mb: 3, minWidth: 400 }}>
                             <CardContent>
                                 <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-                                <TextField
+                                    <TextField
                                         label="Strategy Type"
                                         value={editStates[strategy.strategyid]?.strategy_type || ''}
                                         onChange={e => handleEditChange(strategy.strategyid, 'strategy_type', e.target.value)}
@@ -138,31 +157,76 @@ const StrategyBox = () => {
                                         {updating[strategy.strategyid] ? '...' : 'Update'}
                                     </Button>
                                 </Box>
-                                <Table size="small">
+                                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
+                                    Tracking Positions
+                                </Typography>
+                                <Table size="small" sx={{ mb: 1 }}>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell>Trading Symbol</TableCell>
-                                            <TableCell>Exchange</TableCell>
-                                            <TableCell>Instrument Token</TableCell>
-                                            <TableCell>Product</TableCell>
-                                            <TableCell>Quantity</TableCell>
-                                            <TableCell>Type</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
                                         {Array.isArray(strategy.instruments_details) && strategy.instruments_details.map((inst, idx) => (
                                             <TableRow key={idx}>
-                                                <TableCell>{inst.tradingsymbol}</TableCell>
-                                                <TableCell>{inst.exchange}</TableCell>
-                                                <TableCell>{inst.instrument_token}</TableCell>
-                                                <TableCell>{inst.product}</TableCell>
-                                                <TableCell>{inst.quantity}</TableCell>
-                                                <TableCell>{inst.transaction_type}</TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>{inst.tradingsymbol}</TableCell>
+                                                <TableCell
+                                                    sx={{
+                                                        p: 0.5,
+                                                        fontSize: 14,
+                                                        color: inst.quantity < 0 ? 'error.main' : 'text.primary',
+                                                        fontWeight: inst.quantity < 0 ? 700 : 500
+                                                    }}
+                                                >
+                                                    {inst.quantity}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'capitalize' }}>
+                                                    {inst.transaction_type}
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                 </Table>
-                                <Divider sx={{ my: 2 }} />
+                                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
+                                    Automated Orders
+                                </Typography>
+                                {/* Automated Orders Table */}
+                                {Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0 ? (
+                                    <>
+                                        {(ordersByStrategy[strategy.strategyid] && ordersByStrategy[strategy.strategyid].length > 0) ? (
+                                            <Table size="small" sx={{ mb: 1 }}>
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
+                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
+                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Status</TableCell>
+                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Order Type</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {ordersByStrategy[strategy.strategyid].map((order, idx) => (
+                                                        <TableRow key={order.id || idx}>
+                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.trading_symbol}</TableCell>
+                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.quantity}</TableCell>
+                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.status}</TableCell>
+                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.order_type}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        ) : (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                                No automated orders found for this strategy.
+                                            </Typography>
+                                        )}
+                                    </>
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        No automated orders found for this strategy.
+                                    </Typography>
+                                )}
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                                     Strategy ID: {strategy.strategyid}
                                 </Typography>
