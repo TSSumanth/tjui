@@ -100,8 +100,8 @@ const StrategyBox = () => {
                     <Grid item xs={12} md={6} key={strategy.strategyid}>
                         <Card sx={{ mb: 3, minWidth: 400 }}>
                             <CardContent>
-                                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                    <TextField
+                                <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                                <TextField
                                         label="Strategy Type"
                                         value={editStates[strategy.strategyid]?.strategy_type || ''}
                                         onChange={e => handleEditChange(strategy.strategyid, 'strategy_type', e.target.value)}
@@ -127,6 +127,16 @@ const StrategyBox = () => {
                                             <MenuItem key={opt} value={opt}>{opt}</MenuItem>
                                         ))}
                                     </TextField>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        size="small"
+                                        onClick={() => handleUpdate(strategy.strategyid)}
+                                        disabled={updating[strategy.strategyid]}
+                                        sx={{ minWidth: 80 }}
+                                    >
+                                        {updating[strategy.strategyid] ? '...' : 'Update'}
+                                    </Button>
                                 </Box>
                                 <Table size="small">
                                     <TableHead>
@@ -156,14 +166,6 @@ const StrategyBox = () => {
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                                     Strategy ID: {strategy.strategyid}
                                 </Typography>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={() => handleUpdate(strategy.strategyid)}
-                                    disabled={updating[strategy.strategyid]}
-                                >
-                                    {updating[strategy.strategyid] ? 'Updating...' : 'Update'}
-                                </Button>
                             </CardContent>
                         </Card>
                     </Grid>
