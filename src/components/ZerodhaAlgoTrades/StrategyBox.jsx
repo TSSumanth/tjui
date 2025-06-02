@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box } from '@mui/material';
 import { getAlgoStrategies, updateAlgoStrategy } from '../../services/algoStrategies';
 import { getAutomatedOrderById } from '../../services/automatedOrders';
+import AutomatedOrdersTable from './AutomatedOrdersTable';
+import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
@@ -12,51 +14,66 @@ const StrategyBox = () => {
     const [editStates, setEditStates] = useState({});
     const [updating, setUpdating] = useState({});
     const [ordersByStrategy, setOrdersByStrategy] = useState({});
+    const [showOrderPopup, setShowOrderPopup] = useState(false);
+    const [orderPopupPositions, setOrderPopupPositions] = useState([]);
+    const [orderPopupStrategyDetails, setOrderPopupStrategyDetails] = useState(null);
+
+    // Fetch orders for a strategy
+    const fetchOrdersForStrategy = async (strategy) => {
+        if (Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0) {
+            const orders = await Promise.all(
+                strategy.automated_order_ids.map(async (orderId) => {
+                    try {
+                        return await getAutomatedOrderById(orderId);
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+            return orders.filter(Boolean);
+        }
+        return [];
+    };
+
+    // Fetch all orders for all strategies
+    const refreshAllOrders = async (strategiesList) => {
+        const ordersMap = {};
+        for (const s of strategiesList) {
+            ordersMap[s.strategyid] = await fetchOrdersForStrategy(s);
+        }
+        setOrdersByStrategy(ordersMap);
+    };
+
+    // Fetch strategies and their orders
+    const fetchStrategiesAndOrders = async () => {
+        setLoading(true);
+        try {
+            const data = await getAlgoStrategies({ status: 'Open' });
+            setStrategies(data);
+            // Re-init edit states
+            const initialEdit = {};
+            data.forEach(s => {
+                initialEdit[s.strategyid] = {
+                    status: s.status,
+                    underlying_instrument: s.underlying_instrument,
+                    strategy_type: s.strategy_type
+                };
+            });
+            setEditStates(initialEdit);
+            await refreshAllOrders(data);
+        } catch (err) {
+            setStrategies([]);
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'An error occurred',
+                severity: 'error'
+            });
+        }
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const fetchStrategies = async () => {
-            setLoading(true);
-            try {
-                const data = await getAlgoStrategies({ status: 'Open' });
-                setStrategies(data);
-                // Initialize edit states
-                const initialEdit = {};
-                data.forEach(s => {
-                    initialEdit[s.strategyid] = {
-                        status: s.status,
-                        underlying_instrument: s.underlying_instrument,
-                        strategy_type: s.strategy_type
-                    };
-                });
-                setEditStates(initialEdit);
-                // Fetch automated orders for each strategy
-                const ordersMap = {};
-                for (const s of data) {
-                    if (Array.isArray(s.automated_order_ids) && s.automated_order_ids.length > 0) {
-                        const orders = await Promise.all(
-                            s.automated_order_ids.map(async (orderId) => {
-                                try {
-                                    return await getAutomatedOrderById(orderId);
-                                } catch {
-                                    return null;
-                                }
-                            })
-                        );
-                        ordersMap[s.strategyid] = orders.filter(Boolean);
-                    }
-                }
-                setOrdersByStrategy(ordersMap);
-            } catch (err) {
-                setStrategies([]);
-                setSnackbar({
-                    open: true,
-                    message: err?.response?.data?.error || err.message || 'An error occurred',
-                    severity: 'error'
-                });
-            }
-            setLoading(false);
-        };
-        fetchStrategies();
+        fetchStrategiesAndOrders();
     }, []);
 
     const handleEditChange = (id, field, value) => {
@@ -103,6 +120,17 @@ const StrategyBox = () => {
     };
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+    const handleOpenOrderPopup = (positions, strategyDetails) => {
+        setOrderPopupPositions(positions);
+        setOrderPopupStrategyDetails(strategyDetails);
+        console.log('strategyDetails:', strategyDetails);
+        setShowOrderPopup(true);
+    };
+
+    const handleOrderPopupSuccess = async () => {
+        await fetchStrategiesAndOrders();
+    };
 
     if (loading) {
         return <Typography>Loading strategies...</Typography>;
@@ -156,6 +184,15 @@ const StrategyBox = () => {
                                     >
                                         {updating[strategy.strategyid] ? '...' : 'Update'}
                                     </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="secondary"
+                                        size="small"
+                                        sx={{ minWidth: 120, mb: 1, ml: 1 }}
+                                        onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
+                                    >
+                                        Create Automated Orders
+                                    </Button>
                                 </Box>
                                 <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
                                     Tracking Positions
@@ -194,34 +231,14 @@ const StrategyBox = () => {
                                 </Typography>
                                 {/* Automated Orders Table */}
                                 {Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0 ? (
-                                    <>
-                                        {(ordersByStrategy[strategy.strategyid] && ordersByStrategy[strategy.strategyid].length > 0) ? (
-                                            <Table size="small" sx={{ mb: 1 }}>
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
-                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
-                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Status</TableCell>
-                                                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Order Type</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {ordersByStrategy[strategy.strategyid].map((order, idx) => (
-                                                        <TableRow key={order.id || idx}>
-                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.trading_symbol}</TableCell>
-                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.quantity}</TableCell>
-                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.status}</TableCell>
-                                                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.order_type}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        ) : (
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                                No automated orders found for this strategy.
-                                            </Typography>
-                                        )}
-                                    </>
+                                    <AutomatedOrdersTable
+                                        orders={ordersByStrategy[strategy.strategyid] || []}
+                                        onRefresh={async () => {
+                                            // Refresh orders for this strategy only
+                                            const orders = await fetchOrdersForStrategy(strategy);
+                                            setOrdersByStrategy(prev => ({ ...prev, [strategy.strategyid]: orders }));
+                                        }}
+                                    />
                                 ) : (
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                                         No automated orders found for this strategy.
@@ -245,6 +262,13 @@ const StrategyBox = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+            <CreateAutomatedOrderPopup
+                open={showOrderPopup}
+                onClose={() => setShowOrderPopup(false)}
+                positions={orderPopupPositions}
+                onSuccess={handleOrderPopupSuccess}
+                strategyDetails={orderPopupStrategyDetails}
+            />
         </>
     );
 };
