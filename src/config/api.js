@@ -15,5 +15,7 @@ export const API_URLS = {
     MANUAL_PL: `${BASE_URL}/manual-pl`,
     ORDER_PAIRS: `${BASE_URL}/order-pairs`,
     HOLIDAYS: `${BASE_URL}/holidays`,
-    ZERODHA_ACCOUNT: `${BASE_URL}/zerodha-account`
+    ZERODHA_ACCOUNT: `${BASE_URL}/zerodha-account`,
+    ALGO_STRATEGIES: `${BASE_URL}/algo-strategies`,
+    AUTOMATED_ORDERS: `${BASE_URL}/automated-orders`
 }; 

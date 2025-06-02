@@ -1,16 +1,18 @@
-import React from 'react';
-import { Box, Button, Typography, Paper } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Button, Paper } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import CreateAlgoStrategyPopup from './CreateAlgoStrategyPopup';
 
-const TradeTypes = ({ onStrategySelect }) => {
+
+
+const StrategyMenu = ({ onStrategySelect }) => {
+    const [showCreatePopup, setShowCreatePopup] = useState(false);
+
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-                Option Strategies
-            </Typography>
             <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
                 <Box sx={{
                     display: 'flex',
@@ -22,10 +24,10 @@ const TradeTypes = ({ onStrategySelect }) => {
                         variant="contained"
                         color="primary"
                         startIcon={<TrendingDownIcon />}
-                        onClick={() => onStrategySelect('Short Straddle')}
+                        onClick={() => setShowCreatePopup(true)}
                         sx={{ minWidth: 200 }}
                     >
-                        Short Straddle
+                        Create Nifty Straddle
                     </Button>
                     <Button
                         variant="contained"
@@ -56,8 +58,13 @@ const TradeTypes = ({ onStrategySelect }) => {
                     </Button>
                 </Box>
             </Paper>
+            <CreateAlgoStrategyPopup
+                open={showCreatePopup}
+                onClose={() => setShowCreatePopup(false)}
+                onSuccess={() => setShowCreatePopup(false)}
+            />
         </Box>
     );
 };
 
-export default TradeTypes;
+export default StrategyMenu;
