@@ -40,6 +40,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                 instrument_token: pos.instrument_token,
                 product: pos.product,
                 quantity: pos.quantity,
+                price: pos.quantity > 0 ? parseFloat(pos.buy_price) : parseFloat(pos.sell_price),
                 transaction_type: pos.quantity < 0 ? 'sell' : 'buy'
             }));
 
@@ -98,7 +99,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                                 primary={`${pos.tradingsymbol} (${pos.exchange})`}
                                 secondary={
                                     <>
-                                        <span>Token: {pos.instrument_token}</span> | <span>Product: {pos.product}</span> | <span>Qty: {pos.quantity}</span> | <span>Type: {pos.quantity < 0 ? 'sell' : 'buy'}</span>
+                                        <span>Token: {pos.instrument_token}</span> | <span>Product: {pos.product}</span> | <span>Qty: {pos.quantity}</span> | <span>Type: {pos.quantity < 0 ? 'sell' : 'buy'}  - {pos.quantity > 0 ? parseFloat(pos.buy_price) : parseFloat(pos.sell_price)}</span>
                                     </>
                                 }
                             />

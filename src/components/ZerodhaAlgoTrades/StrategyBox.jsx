@@ -25,14 +25,20 @@ const StrategyBox = () => {
             const data = await zerodhaWebSocket.getSubscriptions();
             console.log('Fetched WebSocket data:', data);
 
-            // Transform array into object with instrument_token as keys
-            const transformedData = data.reduce((acc, item) => {
-                acc[item.instrument_token] = item;
-                return acc;
-            }, {});
+            // Only transform if we have data
+            if (data && Array.isArray(data)) {
+                // Transform array into object with instrument_token as keys
+                const transformedData = data.reduce((acc, item) => {
+                    acc[item.instrument_token] = item;
+                    return acc;
+                }, {});
 
-            console.log('Transformed WebSocket data:', transformedData);
-            setZerodhaWebSocketData(transformedData);
+                console.log('Transformed WebSocket data:', transformedData);
+                setZerodhaWebSocketData(transformedData);
+            } else {
+                console.log('No WebSocket data available');
+                setZerodhaWebSocketData({});
+            }
         };
 
         // Initial fetch
@@ -157,8 +163,18 @@ const StrategyBox = () => {
         setShowOrderPopup(true);
     };
 
+    const handleCloseOrderPopup = () => {
+        setShowOrderPopup(false);
+        // Reset the states after dialog closes
+        setTimeout(() => {
+            setOrderPopupPositions([]);
+            setOrderPopupStrategyDetails(null);
+        }, 100);
+    };
+
     const handleOrderPopupSuccess = async () => {
         await fetchStrategiesAndOrders();
+        handleCloseOrderPopup();
     };
 
     if (loading) {
@@ -200,7 +216,9 @@ const StrategyBox = () => {
                                         sx={{ minWidth: 140 }}
                                     >
                                         {STATUS_OPTIONS.map(opt => (
-                                            <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                            <MenuItem key={opt} value={opt}>
+                                                {opt}
+                                            </MenuItem>
                                         ))}
                                     </TextField>
                                     <Button
@@ -232,9 +250,11 @@ const StrategyBox = () => {
                                         <TableRow>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Entry Price</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -249,6 +269,9 @@ const StrategyBox = () => {
                                                     {inst.transaction_type}
                                                 </TableCell>
                                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                                    {inst.price}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
                                                     {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
                                                 </TableCell>
                                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
@@ -256,6 +279,19 @@ const StrategyBox = () => {
                                                 </TableCell>
                                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
                                                     {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                                    {(() => {
+                                                        const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
+                                                        const price = inst.price;
+                                                        if (!ltp || !price) return '-';
+
+                                                        const pl = inst.quantity < 0
+                                                            ? (ltp - price) * inst.quantity
+                                                            : (price - ltp) * inst.quantity;
+
+                                                        return pl.toFixed(2);
+                                                    })()}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -299,7 +335,7 @@ const StrategyBox = () => {
             </Snackbar>
             <CreateAutomatedOrderPopup
                 open={showOrderPopup}
-                onClose={() => setShowOrderPopup(false)}
+                onClose={handleCloseOrderPopup}
                 positions={orderPopupPositions}
                 onSuccess={handleOrderPopupSuccess}
                 strategyDetails={orderPopupStrategyDetails}
