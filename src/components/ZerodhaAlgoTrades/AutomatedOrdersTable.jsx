@@ -4,6 +4,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { deleteAutomatedOrder, updateAutomatedOrder } from '../../services/automatedOrders';
+import { placeRegularOrder } from '../../services/zerodha/api';
 
 const ORDER_TYPES = ['LIMIT', 'MARKET'];
 
@@ -50,6 +51,38 @@ const AutomatedOrdersTable = ({ orders, onRefresh }) => {
         setLoading(false);
     };
 
+    const handleExecute = async (order) => {
+        setLoading(true);
+        try {
+            const orderParams = {
+                tradingsymbol: order.trading_symbol,
+                exchange: order.exchange,
+                transaction_type: order.transaction_type,
+                quantity: order.quantity,
+                product: order.product,
+                order_type: order.order_type,
+                validity: order.validity
+            };
+
+            // Only add price for LIMIT orders
+            if (order.order_type === 'LIMIT' && order.price !== null) {
+                orderParams.price = order.price;
+            }
+
+            const response = await placeRegularOrder(orderParams);
+            const zerodhaOrderId = response.order_id;
+            await updateAutomatedOrder(order.id, {
+                status: 'SENT TO ZERODHA',
+                zerodha_orderid: zerodhaOrderId
+            });
+            setSnackbar({ open: true, message: 'Order executed successfully', severity: 'success' });
+            onRefresh && onRefresh();
+        } catch (err) {
+            setSnackbar({ open: true, message: err?.response?.data?.error || err.message || 'Failed to execute order', severity: 'error' });
+        }
+        setLoading(false);
+    };
+
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
     const handleCloseEdit = () => setEditOrder(null);
 
@@ -65,27 +98,27 @@ const AutomatedOrdersTable = ({ orders, onRefresh }) => {
             <Table size="small" sx={{ mb: 1 }}>
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
-                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
-                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Status</TableCell>
+                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol (Qnty)</TableCell>
                         <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Order Type</TableCell>
                         <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Price</TableCell>
+                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Status</TableCell>
+                        <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Zerodha Order ID</TableCell>
                         <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {orders.map((order, idx) => (
                         <TableRow key={order.id || idx}>
-                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.trading_symbol}</TableCell>
-                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.quantity}</TableCell>
-                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.status}</TableCell>
+                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.trading_symbol} {"(" + order.quantity + ")"}</TableCell>
                             <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.order_type}</TableCell>
                             <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.price}</TableCell>
+                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.status}</TableCell>
+                            <TableCell sx={{ p: 0.5, fontSize: 14 }}>{order.zerodha_orderid}</TableCell>
                             <TableCell sx={{ p: 0.5 }}>
                                 <IconButton size="small" onClick={() => handleEdit(order)}>
                                     <EditIcon fontSize="small" />
                                 </IconButton>
-                                <IconButton size="small" onClick={() => {/* Placeholder for execute */ }}>
+                                <IconButton size="small" onClick={() => handleExecute(order)} disabled={loading}>
                                     <PlayArrowIcon fontSize="small" />
                                 </IconButton>
                                 <IconButton size="small" onClick={() => handleDelete(order)} disabled={loading}>

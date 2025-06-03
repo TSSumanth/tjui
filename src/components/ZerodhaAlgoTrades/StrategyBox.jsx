@@ -4,6 +4,7 @@ import { getAlgoStrategies, updateAlgoStrategy } from '../../services/algoStrate
 import { getAutomatedOrderById } from '../../services/automatedOrders';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
+import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
@@ -17,6 +18,34 @@ const StrategyBox = () => {
     const [showOrderPopup, setShowOrderPopup] = useState(false);
     const [orderPopupPositions, setOrderPopupPositions] = useState([]);
     const [orderPopupStrategyDetails, setOrderPopupStrategyDetails] = useState(null);
+    const [zerodhaWebSocketData, setZerodhaWebSocketData] = useState({});
+
+    useEffect(() => {
+        const fetchZerodhaWebSocketData = async () => {
+            const data = await zerodhaWebSocket.getSubscriptions();
+            console.log('Fetched WebSocket data:', data);
+
+            // Transform array into object with instrument_token as keys
+            const transformedData = data.reduce((acc, item) => {
+                acc[item.instrument_token] = item;
+                return acc;
+            }, {});
+
+            console.log('Transformed WebSocket data:', transformedData);
+            setZerodhaWebSocketData(transformedData);
+        };
+
+        // Initial fetch
+        fetchZerodhaWebSocketData();
+
+        // Set up interval for every 5 seconds
+        const intervalId = setInterval(() => {
+            fetchZerodhaWebSocketData();
+        }, 5000);
+
+        // Cleanup interval on component unmount
+        return () => clearInterval(intervalId);
+    }, []);
 
     // Fetch orders for a strategy
     const fetchOrdersForStrategy = async (strategy) => {
@@ -184,43 +213,49 @@ const StrategyBox = () => {
                                     >
                                         {updating[strategy.strategyid] ? '...' : 'Update'}
                                     </Button>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                    <Typography sx={{ fontWeight: 1000 }}>
+                                        Tracking Positions
+                                    </Typography>
                                     <Button
                                         variant="contained"
                                         color="secondary"
                                         size="small"
-                                        sx={{ minWidth: 120, mb: 1, ml: 1 }}
                                         onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
                                     >
-                                        Create Automated Orders
+                                        Create Orders
                                     </Button>
                                 </Box>
-                                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
-                                    Tracking Positions
-                                </Typography>
                                 <Table size="small" sx={{ mb: 1 }}>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
                                         {Array.isArray(strategy.instruments_details) && strategy.instruments_details.map((inst, idx) => (
                                             <TableRow key={idx}>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>{inst.tradingsymbol}</TableCell>
-                                                <TableCell
-                                                    sx={{
-                                                        p: 0.5,
-                                                        fontSize: 14,
-                                                        color: inst.quantity < 0 ? 'error.main' : 'text.primary',
-                                                        fontWeight: inst.quantity < 0 ? 700 : 500
-                                                    }}
-                                                >
-                                                    {inst.quantity}
-                                                </TableCell>
+                                                <TableCell sx={{
+                                                    p: 0.5, fontSize: 14,
+                                                    color: inst.quantity < 0 ? 'error.main' : 'text.primary',
+                                                    fontWeight: inst.quantity < 0 ? 700 : 500
+                                                }}>{inst.tradingsymbol} {"(" + inst.quantity + ")"}</TableCell>
                                                 <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'capitalize' }}>
                                                     {inst.transaction_type}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price}
+                                                </TableCell>
+                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
