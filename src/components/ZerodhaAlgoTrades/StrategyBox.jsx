@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Paper } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { getAlgoStrategies, updateAlgoStrategy } from '../../services/algoStrategies';
+import { updateAlgoStrategy } from '../../services/algoStrategies';
 import { getAutomatedOrderById } from '../../services/automatedOrders';
 import { getPositions } from '../../services/zerodha/api';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
@@ -11,57 +11,48 @@ import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
-const StrategyBox = () => {
-    const [strategies, setStrategies] = useState([]);
-    const [loading, setLoading] = useState(true);
+const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
+    const [loading, setLoading] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
-    const [editStates, setEditStates] = useState({});
-    const [updating, setUpdating] = useState({});
-    const [ordersByStrategy, setOrdersByStrategy] = useState({});
+    const [editState, setEditState] = useState({
+        status: strategy.status,
+        underlying_instrument: strategy.underlying_instrument,
+        strategy_type: strategy.strategy_type
+    });
+    const [updating, setUpdating] = useState(false);
+    const [orders, setOrders] = useState([]);
     const [showOrderPopup, setShowOrderPopup] = useState(false);
     const [orderPopupPositions, setOrderPopupPositions] = useState([]);
     const [orderPopupStrategyDetails, setOrderPopupStrategyDetails] = useState(null);
-    const [zerodhaWebSocketData, setZerodhaWebSocketData] = useState({});
     const [showAddPositionPopup, setShowAddPositionPopup] = useState(false);
-    const [selectedStrategy, setSelectedStrategy] = useState(null);
     const [openPositions, setOpenPositions] = useState([]);
     const [selectedPositions, setSelectedPositions] = useState([]);
+    const [totalPL, setTotalPL] = useState(0);
 
+    // Calculate total P/L for the strategy
     useEffect(() => {
-        const fetchZerodhaWebSocketData = async () => {
-            const data = await zerodhaWebSocket.getSubscriptions();
-            console.log('Fetched WebSocket data:', data);
+        const calculateTotalPL = () => {
+            if (!Array.isArray(strategy.instruments_details)) return 0;
 
-            // Only transform if we have data
-            if (data && Array.isArray(data)) {
-                // Transform array into object with instrument_token as keys
-                const transformedData = data.reduce((acc, item) => {
-                    acc[item.instrument_token] = item;
-                    return acc;
-                }, {});
+            return strategy.instruments_details.reduce((total, inst) => {
+                const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
+                const price = inst.price;
+                if (!ltp || !price) return total;
 
-                console.log('Transformed WebSocket data:', transformedData);
-                setZerodhaWebSocketData(transformedData);
-            } else {
-                console.log('No WebSocket data available');
-                setZerodhaWebSocketData({});
-            }
+                const pl = inst.quantity < 0
+                    ? (ltp - price) * inst.quantity
+                    : (price - ltp) * inst.quantity;
+
+                return total + pl;
+            }, 0);
         };
 
-        // Initial fetch
-        fetchZerodhaWebSocketData();
+        const total = calculateTotalPL();
+        setTotalPL(total);
+    }, [strategy, zerodhaWebSocketData]);
 
-        // Set up interval for every 5 seconds
-        const intervalId = setInterval(() => {
-            fetchZerodhaWebSocketData();
-        }, 5000);
-
-        // Cleanup interval on component unmount
-        return () => clearInterval(intervalId);
-    }, []);
-
-    // Fetch orders for a strategy
-    const fetchOrdersForStrategy = async (strategy) => {
+    // Fetch orders for the strategy
+    const fetchOrders = async () => {
         if (Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0) {
             const orders = await Promise.all(
                 strategy.automated_order_ids.map(async (orderId) => {
@@ -72,85 +63,31 @@ const StrategyBox = () => {
                     }
                 })
             );
-            return orders.filter(Boolean);
+            setOrders(orders.filter(Boolean));
         }
-        return [];
-    };
-
-    // Fetch all orders for all strategies
-    const refreshAllOrders = async (strategiesList) => {
-        const ordersMap = {};
-        for (const s of strategiesList) {
-            ordersMap[s.strategyid] = await fetchOrdersForStrategy(s);
-        }
-        setOrdersByStrategy(ordersMap);
-    };
-
-    // Fetch strategies and their orders
-    const fetchStrategiesAndOrders = async () => {
-        setLoading(true);
-        try {
-            const data = await getAlgoStrategies({ status: 'Open' });
-            setStrategies(data);
-            // Re-init edit states
-            const initialEdit = {};
-            data.forEach(s => {
-                initialEdit[s.strategyid] = {
-                    status: s.status,
-                    underlying_instrument: s.underlying_instrument,
-                    strategy_type: s.strategy_type
-                };
-            });
-            setEditStates(initialEdit);
-            await refreshAllOrders(data);
-        } catch (err) {
-            setStrategies([]);
-            setSnackbar({
-                open: true,
-                message: err?.response?.data?.error || err.message || 'An error occurred',
-                severity: 'error'
-            });
-        }
-        setLoading(false);
     };
 
     useEffect(() => {
-        fetchStrategiesAndOrders();
-    }, []);
+        fetchOrders();
+    }, [strategy]);
 
-    const handleEditChange = (id, field, value) => {
-        setEditStates(prev => ({
+    const handleEditChange = (field, value) => {
+        setEditState(prev => ({
             ...prev,
-            [id]: {
-                ...prev[id],
-                [field]: value
-            }
+            [field]: value
         }));
     };
 
-    const handleUpdate = async (id) => {
-        setUpdating(prev => ({ ...prev, [id]: true }));
+    const handleUpdate = async () => {
+        setUpdating(true);
         try {
-            const updates = editStates[id];
-            await updateAlgoStrategy(id, updates);
+            await updateAlgoStrategy(strategy.strategyid, editState);
             setSnackbar({
                 open: true,
                 message: 'Strategy updated successfully!',
                 severity: 'success'
             });
-            // Optionally, refresh strategies
-            const data = await getAlgoStrategies({ status: 'Open' });
-            setStrategies(data);
-            // Re-init edit states
-            const initialEdit = {};
-            data.forEach(s => {
-                initialEdit[s.strategyid] = {
-                    status: s.status,
-                    underlying_instrument: s.underlying_instrument,
-                    strategy_type: s.strategy_type
-                };
-            });
-            setEditStates(initialEdit);
+            onStrategyUpdate && onStrategyUpdate();
         } catch (err) {
             setSnackbar({
                 open: true,
@@ -158,7 +95,7 @@ const StrategyBox = () => {
                 severity: 'error'
             });
         }
-        setUpdating(prev => ({ ...prev, [id]: false }));
+        setUpdating(false);
     };
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
@@ -166,13 +103,11 @@ const StrategyBox = () => {
     const handleOpenOrderPopup = (positions, strategyDetails) => {
         setOrderPopupPositions(positions);
         setOrderPopupStrategyDetails(strategyDetails);
-        console.log('strategyDetails:', strategyDetails);
         setShowOrderPopup(true);
     };
 
     const handleCloseOrderPopup = () => {
         setShowOrderPopup(false);
-        // Reset the states after dialog closes
         setTimeout(() => {
             setOrderPopupPositions([]);
             setOrderPopupStrategyDetails(null);
@@ -180,20 +115,16 @@ const StrategyBox = () => {
     };
 
     const handleOrderPopupSuccess = async () => {
-        await fetchStrategiesAndOrders();
+        await fetchOrders();
         handleCloseOrderPopup();
     };
 
-    const handleOpenAddPosition = async (strategy) => {
-        setSelectedStrategy(strategy);
+    const handleOpenAddPosition = async () => {
         setShowAddPositionPopup(true);
         try {
-            getPositions().then(data => {
-                const openPositions = (data.data.net || []).filter(pos => pos.quantity !== 0);
-                console.log('Open positions:', openPositions);
-                console.log('data:', data.data);
-                setOpenPositions(openPositions);
-            });
+            const data = await getPositions();
+            const openPositions = (data.data.net || []).filter(pos => pos.quantity !== 0);
+            setOpenPositions(openPositions);
         } catch (err) {
             setSnackbar({
                 open: true,
@@ -205,16 +136,15 @@ const StrategyBox = () => {
 
     const handleCloseAddPosition = () => {
         setShowAddPositionPopup(false);
-        setSelectedStrategy(null);
         setSelectedPositions([]);
     };
 
     const handleAddPosition = async () => {
-        if (!selectedStrategy || selectedPositions.length === 0) return;
+        if (selectedPositions.length === 0) return;
 
         try {
             const updatedInstruments = [
-                ...(selectedStrategy.instruments_details || []),
+                ...(strategy.instruments_details || []),
                 ...selectedPositions.map(pos => ({
                     tradingsymbol: pos.tradingsymbol,
                     quantity: pos.quantity,
@@ -226,7 +156,7 @@ const StrategyBox = () => {
                 }))
             ];
 
-            await updateAlgoStrategy(selectedStrategy.strategyid, {
+            await updateAlgoStrategy(strategy.strategyid, {
                 instruments_details: updatedInstruments
             });
 
@@ -236,8 +166,7 @@ const StrategyBox = () => {
                 severity: 'success'
             });
 
-            // Refresh strategies
-            await fetchStrategiesAndOrders();
+            onStrategyUpdate && onStrategyUpdate();
             handleCloseAddPosition();
         } catch (err) {
             setSnackbar({
@@ -259,7 +188,7 @@ const StrategyBox = () => {
         });
     };
 
-    const handleDeletePosition = async (strategy, positionIndex) => {
+    const handleDeletePosition = async (positionIndex) => {
         try {
             const updatedInstruments = [...strategy.instruments_details];
             updatedInstruments.splice(positionIndex, 1);
@@ -274,8 +203,7 @@ const StrategyBox = () => {
                 severity: 'success'
             });
 
-            // Refresh strategies
-            await fetchStrategiesAndOrders();
+            onStrategyUpdate && onStrategyUpdate();
         } catch (err) {
             setSnackbar({
                 open: true,
@@ -286,169 +214,165 @@ const StrategyBox = () => {
     };
 
     if (loading) {
-        return <Typography>Loading strategies...</Typography>;
-    }
-
-    if (!strategies.length) {
-        return <Typography>No open strategies found.</Typography>;
+        return <Typography>Loading strategy...</Typography>;
     }
 
     return (
-        <>
-            <Grid container spacing={3}>
-                {strategies.map((strategy) => (
-                    <Grid item xs={12} md={6} key={strategy.strategyid}>
-                        <Card sx={{ mb: 3, minWidth: 400 }}>
-                            <CardContent>
-                                <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-                                    <TextField
-                                        label="Strategy Type"
-                                        value={editStates[strategy.strategyid]?.strategy_type || ''}
-                                        onChange={e => handleEditChange(strategy.strategyid, 'strategy_type', e.target.value)}
-                                        size="small"
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="Underlying Instrument"
-                                        value={editStates[strategy.strategyid]?.underlying_instrument || ''}
-                                        onChange={e => handleEditChange(strategy.strategyid, 'underlying_instrument', e.target.value)}
-                                        size="small"
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        select
-                                        label="Status"
-                                        value={editStates[strategy.strategyid]?.status || ''}
-                                        onChange={e => handleEditChange(strategy.strategyid, 'status', e.target.value)}
-                                        size="small"
-                                        sx={{ minWidth: 140 }}
-                                    >
-                                        {STATUS_OPTIONS.map(opt => (
-                                            <MenuItem key={opt} value={opt}>
-                                                {opt}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        size="small"
-                                        onClick={() => handleUpdate(strategy.strategyid)}
-                                        disabled={updating[strategy.strategyid]}
-                                        sx={{ minWidth: 80 }}
-                                    >
-                                        {updating[strategy.strategyid] ? '...' : 'Update'}
-                                    </Button>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                    <Typography sx={{ fontWeight: 1000 }}>
-                                        Tracking Positions
-                                    </Typography>
+        <Card sx={{ mb: 3, minWidth: 400 }}>
+            <CardContent>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                    <TextField
+                        label="Strategy Type"
+                        value={editState.strategy_type || ''}
+                        onChange={e => handleEditChange('strategy_type', e.target.value)}
+                        size="small"
+                        fullWidth
+                    />
+                    <TextField
+                        label="Underlying Instrument"
+                        value={editState.underlying_instrument || ''}
+                        onChange={e => handleEditChange('underlying_instrument', e.target.value)}
+                        size="small"
+                        fullWidth
+                    />
+                    <TextField
+                        select
+                        label="Status"
+                        value={editState.status || ''}
+                        onChange={e => handleEditChange('status', e.target.value)}
+                        size="small"
+                        sx={{ minWidth: 140 }}
+                    >
+                        {STATUS_OPTIONS.map(opt => (
+                            <MenuItem key={opt} value={opt}>
+                                {opt}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        onClick={handleUpdate}
+                        disabled={updating}
+                        sx={{ minWidth: 80 }}
+                    >
+                        {updating ? '...' : 'Update'}
+                    </Button>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Typography sx={{ fontWeight: 1000 }}>
+                        Tracking Positions
+                    </Typography>
+                    <IconButton
+                        size="small"
+                        onClick={handleOpenAddPosition}
+                        sx={{ color: 'primary.main' }}
+                    >
+                        <AddIcon />
+                    </IconButton>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        size="small"
+                        onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
+                    >
+                        Create Orders
+                    </Button>
+                </Box>
+                <Table size="small" sx={{ mb: 1 }}>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Entry Price</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {Array.isArray(strategy.instruments_details) && strategy.instruments_details.map((inst, idx) => (
+                            <TableRow key={idx}>
+                                <TableCell sx={{
+                                    p: 0.5, fontSize: 14,
+                                    color: inst.quantity < 0 ? 'error.main' : 'text.primary',
+                                    fontWeight: inst.quantity < 0 ? 700 : 500
+                                }}>{inst.tradingsymbol} {"(" + inst.quantity + ")"}</TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'capitalize' }}>
+                                    {inst.transaction_type}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {inst.price}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {(() => {
+                                        const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
+                                        const price = inst.price;
+                                        if (!ltp || !price) return '-';
+
+                                        const pl = inst.quantity < 0
+                                            ? (ltp - price) * inst.quantity
+                                            : (price - ltp) * inst.quantity;
+
+                                        return pl.toFixed(2);
+                                    })()}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5 }}>
                                     <IconButton
                                         size="small"
-                                        onClick={() => handleOpenAddPosition(strategy)}
-                                        sx={{ color: 'primary.main' }}
+                                        onClick={() => handleDeletePosition(idx)}
+                                        sx={{ color: 'error.main' }}
                                     >
-                                        <AddIcon />
+                                        <DeleteIcon fontSize="small" />
                                     </IconButton>
-                                    <Button
-                                        variant="contained"
-                                        color="secondary"
-                                        size="small"
-                                        onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
-                                    >
-                                        Create Orders
-                                    </Button>
-                                </Box>
-                                <Table size="small" sx={{ mb: 1 }}>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Entry Price</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
-                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {Array.isArray(strategy.instruments_details) && strategy.instruments_details.map((inst, idx) => (
-                                            <TableRow key={idx}>
-                                                <TableCell sx={{
-                                                    p: 0.5, fontSize: 14,
-                                                    color: inst.quantity < 0 ? 'error.main' : 'text.primary',
-                                                    fontWeight: inst.quantity < 0 ? 700 : 500
-                                                }}>{inst.tradingsymbol} {"(" + inst.quantity + ")"}</TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'capitalize' }}>
-                                                    {inst.transaction_type}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                                    {inst.price}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                                    {(() => {
-                                                        const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
-                                                        const price = inst.price;
-                                                        if (!ltp || !price) return '-';
-
-                                                        const pl = inst.quantity < 0
-                                                            ? (ltp - price) * inst.quantity
-                                                            : (price - ltp) * inst.quantity;
-
-                                                        return pl.toFixed(2);
-                                                    })()}
-                                                </TableCell>
-                                                <TableCell sx={{ p: 0.5 }}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleDeletePosition(strategy, idx)}
-                                                        sx={{ color: 'error.main' }}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
-                                    Automated Orders
-                                </Typography>
-                                {/* Automated Orders Table */}
-                                {Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0 ? (
-                                    <AutomatedOrdersTable
-                                        orders={ordersByStrategy[strategy.strategyid] || []}
-                                        onRefresh={async () => {
-                                            // Refresh orders for this strategy only
-                                            const orders = await fetchOrdersForStrategy(strategy);
-                                            setOrdersByStrategy(prev => ({ ...prev, [strategy.strategyid]: orders }));
-                                        }}
-                                        strategyId={strategy.strategyid}
-                                    />
-                                ) : (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                        No automated orders found for this strategy.
-                                    </Typography>
-                                )}
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                    Strategy ID: {strategy.strategyid}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        <TableRow>
+                            <TableCell colSpan={6} sx={{ p: 0.5, fontWeight: 600, textAlign: 'right' }}>
+                                Total P/L:
+                            </TableCell>
+                            <TableCell sx={{
+                                p: 0.5,
+                                fontWeight: 600,
+                                color: totalPL < 0 ? 'error.main' : 'success.main'
+                            }}>
+                                {totalPL?.toFixed(2) || '-'}
+                            </TableCell>
+                            <TableCell></TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
+                    Automated Orders
+                </Typography>
+                {Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0 ? (
+                    <AutomatedOrdersTable
+                        orders={orders}
+                        onRefresh={fetchOrders}
+                        strategyId={strategy.strategyid}
+                    />
+                ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        No automated orders found for this strategy.
+                    </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Strategy ID: {strategy.strategyid}
+                </Typography>
+            </CardContent>
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
@@ -466,7 +390,6 @@ const StrategyBox = () => {
                 onSuccess={handleOrderPopupSuccess}
                 strategyDetails={orderPopupStrategyDetails}
             />
-            {/* Add Position Dialog */}
             <Dialog
                 open={showAddPositionPopup}
                 onClose={handleCloseAddPosition}
@@ -540,7 +463,7 @@ const StrategyBox = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </>
+        </Card>
     );
 };
 
