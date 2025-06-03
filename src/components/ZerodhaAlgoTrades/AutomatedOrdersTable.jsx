@@ -5,10 +5,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { deleteAutomatedOrder, updateAutomatedOrder } from '../../services/automatedOrders';
 import { placeRegularOrder } from '../../services/zerodha/api';
+import { updateAlgoStrategy, getAlgoStrategies } from '../../services/algoStrategies';
 
 const ORDER_TYPES = ['LIMIT', 'MARKET'];
 
-const AutomatedOrdersTable = ({ orders, onRefresh }) => {
+const AutomatedOrdersTable = ({ orders, onRefresh, strategyId }) => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [editOrder, setEditOrder] = useState(null);
     const [editState, setEditState] = useState({ order_type: 'MARKET', price: '' });
@@ -17,7 +18,20 @@ const AutomatedOrdersTable = ({ orders, onRefresh }) => {
     const handleDelete = async (order) => {
         setLoading(true);
         try {
+            // Delete the automated order
             await deleteAutomatedOrder(order.id);
+
+            // Update the strategy to remove the order ID
+            if (strategyId) {
+                const strategy = await getAlgoStrategies({ strategyid: strategyId });
+                if (strategy && strategy.length > 0) {
+                    const updatedOrderIds = strategy[0].automated_order_ids.filter(id => id !== order.id);
+                    await updateAlgoStrategy(strategyId, {
+                        automated_order_ids: updatedOrderIds
+                    });
+                }
+            }
+
             setSnackbar({ open: true, message: 'Order deleted successfully', severity: 'success' });
             onRefresh && onRefresh();
         } catch (err) {

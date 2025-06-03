@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box } from '@mui/material';
+import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Paper } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { getAlgoStrategies, updateAlgoStrategy } from '../../services/algoStrategies';
 import { getAutomatedOrderById } from '../../services/automatedOrders';
+import { getPositions } from '../../services/zerodha/api';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
@@ -19,6 +22,10 @@ const StrategyBox = () => {
     const [orderPopupPositions, setOrderPopupPositions] = useState([]);
     const [orderPopupStrategyDetails, setOrderPopupStrategyDetails] = useState(null);
     const [zerodhaWebSocketData, setZerodhaWebSocketData] = useState({});
+    const [showAddPositionPopup, setShowAddPositionPopup] = useState(false);
+    const [selectedStrategy, setSelectedStrategy] = useState(null);
+    const [openPositions, setOpenPositions] = useState([]);
+    const [selectedPositions, setSelectedPositions] = useState([]);
 
     useEffect(() => {
         const fetchZerodhaWebSocketData = async () => {
@@ -177,6 +184,107 @@ const StrategyBox = () => {
         handleCloseOrderPopup();
     };
 
+    const handleOpenAddPosition = async (strategy) => {
+        setSelectedStrategy(strategy);
+        setShowAddPositionPopup(true);
+        try {
+            getPositions().then(data => {
+                const openPositions = (data.data.net || []).filter(pos => pos.quantity !== 0);
+                console.log('Open positions:', openPositions);
+                console.log('data:', data.data);
+                setOpenPositions(openPositions);
+            });
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to fetch positions',
+                severity: 'error'
+            });
+        }
+    };
+
+    const handleCloseAddPosition = () => {
+        setShowAddPositionPopup(false);
+        setSelectedStrategy(null);
+        setSelectedPositions([]);
+    };
+
+    const handleAddPosition = async () => {
+        if (!selectedStrategy || selectedPositions.length === 0) return;
+
+        try {
+            const updatedInstruments = [
+                ...(selectedStrategy.instruments_details || []),
+                ...selectedPositions.map(pos => ({
+                    tradingsymbol: pos.tradingsymbol,
+                    quantity: pos.quantity,
+                    transaction_type: pos.quantity > 0 ? 'BUY' : 'SELL',
+                    price: pos.average_price,
+                    instrument_token: pos.instrument_token,
+                    exchange: pos.exchange,
+                    product: pos.product
+                }))
+            ];
+
+            await updateAlgoStrategy(selectedStrategy.strategyid, {
+                instruments_details: updatedInstruments
+            });
+
+            setSnackbar({
+                open: true,
+                message: 'Positions added successfully!',
+                severity: 'success'
+            });
+
+            // Refresh strategies
+            await fetchStrategiesAndOrders();
+            handleCloseAddPosition();
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to add positions',
+                severity: 'error'
+            });
+        }
+    };
+
+    const handlePositionSelect = (position) => {
+        setSelectedPositions(prev => {
+            const isSelected = prev.some(p => p.tradingsymbol === position.tradingsymbol);
+            if (isSelected) {
+                return prev.filter(p => p.tradingsymbol !== position.tradingsymbol);
+            } else {
+                return [...prev, position];
+            }
+        });
+    };
+
+    const handleDeletePosition = async (strategy, positionIndex) => {
+        try {
+            const updatedInstruments = [...strategy.instruments_details];
+            updatedInstruments.splice(positionIndex, 1);
+
+            await updateAlgoStrategy(strategy.strategyid, {
+                instruments_details: updatedInstruments
+            });
+
+            setSnackbar({
+                open: true,
+                message: 'Position removed successfully!',
+                severity: 'success'
+            });
+
+            // Refresh strategies
+            await fetchStrategiesAndOrders();
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to remove position',
+                severity: 'error'
+            });
+        }
+    };
+
     if (loading) {
         return <Typography>Loading strategies...</Typography>;
     }
@@ -236,6 +344,13 @@ const StrategyBox = () => {
                                     <Typography sx={{ fontWeight: 1000 }}>
                                         Tracking Positions
                                     </Typography>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => handleOpenAddPosition(strategy)}
+                                        sx={{ color: 'primary.main' }}
+                                    >
+                                        <AddIcon />
+                                    </IconButton>
                                     <Button
                                         variant="contained"
                                         color="secondary"
@@ -255,6 +370,7 @@ const StrategyBox = () => {
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
                                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
+                                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -293,6 +409,15 @@ const StrategyBox = () => {
                                                         return pl.toFixed(2);
                                                     })()}
                                                 </TableCell>
+                                                <TableCell sx={{ p: 0.5 }}>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleDeletePosition(strategy, idx)}
+                                                        sx={{ color: 'error.main' }}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -309,6 +434,7 @@ const StrategyBox = () => {
                                             const orders = await fetchOrdersForStrategy(strategy);
                                             setOrdersByStrategy(prev => ({ ...prev, [strategy.strategyid]: orders }));
                                         }}
+                                        strategyId={strategy.strategyid}
                                     />
                                 ) : (
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -340,6 +466,80 @@ const StrategyBox = () => {
                 onSuccess={handleOrderPopupSuccess}
                 strategyDetails={orderPopupStrategyDetails}
             />
+            {/* Add Position Dialog */}
+            <Dialog
+                open={showAddPositionPopup}
+                onClose={handleCloseAddPosition}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Add Positions to Strategy</DialogTitle>
+                <DialogContent>
+                    <TableContainer component={Paper} sx={{ mt: 2 }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell padding="checkbox"></TableCell>
+                                    <TableCell>Trading Symbol</TableCell>
+                                    <TableCell>Quantity</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Average Price</TableCell>
+                                    <TableCell>LTP</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {openPositions.map((position) => {
+                                    const isSelected = selectedPositions.some(p => p.tradingsymbol === position.tradingsymbol);
+                                    return (
+                                        <TableRow
+                                            key={position.tradingsymbol}
+                                            hover
+                                            onClick={() => handlePositionSelect(position)}
+                                            sx={{
+                                                cursor: 'pointer',
+                                                backgroundColor: isSelected ? 'action.selected' : 'inherit'
+                                            }}
+                                        >
+                                            <TableCell padding="checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => handlePositionSelect(position)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </TableCell>
+                                            <TableCell>{position.tradingsymbol}</TableCell>
+                                            <TableCell sx={{
+                                                color: position.quantity < 0 ? 'error.main' : 'text.primary',
+                                                fontWeight: position.quantity < 0 ? 700 : 500
+                                            }}>
+                                                {position.quantity}
+                                            </TableCell>
+                                            <TableCell>
+                                                {position.quantity > 0 ? 'BUY' : 'SELL'}
+                                            </TableCell>
+                                            <TableCell>{position.average_price}</TableCell>
+                                            <TableCell>
+                                                {zerodhaWebSocketData?.[position.instrument_token]?.ltp}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseAddPosition}>Cancel</Button>
+                    <Button
+                        onClick={handleAddPosition}
+                        variant="contained"
+                        disabled={selectedPositions.length === 0}
+                    >
+                        Add Selected Positions
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 };
