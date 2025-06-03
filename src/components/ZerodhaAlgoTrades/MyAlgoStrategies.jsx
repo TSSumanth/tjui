@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Typography, Box } from '@mui/material';
+import { Typography, Box } from '@mui/material';
 import { getAlgoStrategies } from '../../services/algoStrategies';
-import StrategyBox from './StrategyBox';
 import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
+import StrategyRow from './StrategyRow';
 
 const MyAlgoStrategies = () => {
     const [strategies, setStrategies] = useState([]);
@@ -57,24 +57,16 @@ const MyAlgoStrategies = () => {
     }
 
     return (
-        <Grid container spacing={3}>
+        <Box>
             {strategies.map((strategy) => (
-                <Grid container item xs={12} spacing={3} key={strategy.strategyid}>
-                    <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <StrategyBox
-                            strategy={strategy}
-                            onStrategyUpdate={fetchStrategies}
-                            zerodhaWebSocketData={zerodhaWebSocketData}
-                        />
-                    </Grid>
-                    <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="h6" color="text.secondary">
-                            (Details panel or other component goes here)
-                        </Typography>
-                    </Grid>
-                </Grid>
+                <StrategyRow
+                    key={strategy.strategyid}
+                    strategy={strategy}
+                    onStrategyUpdate={fetchStrategies}
+                    zerodhaWebSocketData={zerodhaWebSocketData}
+                />
             ))}
-        </Grid>
+        </Box>
     );
 };
 

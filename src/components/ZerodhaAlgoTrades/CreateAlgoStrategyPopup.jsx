@@ -12,6 +12,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
     const [selected, setSelected] = useState([]);
     const [loading, setLoading] = useState(false);
     const [underlyingInstrument, setUnderlyingInstrument] = useState('');
+    const [expectedReturn, setExpectedReturn] = useState('');
 
     useEffect(() => {
         if (open) {
@@ -48,7 +49,8 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
             instruments_details,
             underlying_instrument: underlyingInstrument,
             status,
-            strategy_type: strategyType
+            strategy_type: strategyType,
+            expected_return: expectedReturn ? parseFloat(expectedReturn) : 0
         });
         setLoading(false);
         onSuccess && onSuccess();
@@ -84,6 +86,15 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                     onChange={e => setUnderlyingInstrument(e.target.value)}
                     fullWidth
                     margin="normal"
+                />
+                <TextField
+                    label="Expected Return"
+                    type="number"
+                    value={expectedReturn}
+                    onChange={e => setExpectedReturn(e.target.value)}
+                    fullWidth
+                    margin="normal"
+                    inputProps={{ min: 0, step: 0.01 }}
                 />
                 <Typography variant="subtitle1" sx={{ mt: 2 }}>Select Open Positions</Typography>
                 <List>

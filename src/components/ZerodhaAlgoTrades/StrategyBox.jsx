@@ -7,17 +7,16 @@ import { getAutomatedOrderById } from '../../services/automatedOrders';
 import { getPositions } from '../../services/zerodha/api';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
-import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
 const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
-    const [loading, setLoading] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [editState, setEditState] = useState({
         status: strategy.status,
         underlying_instrument: strategy.underlying_instrument,
-        strategy_type: strategy.strategy_type
+        strategy_type: strategy.strategy_type,
+        expected_return: strategy.expected_return ?? ''
     });
     const [updating, setUpdating] = useState(false);
     const [orders, setOrders] = useState([]);
@@ -28,6 +27,16 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [openPositions, setOpenPositions] = useState([]);
     const [selectedPositions, setSelectedPositions] = useState([]);
     const [totalPL, setTotalPL] = useState(0);
+
+    useEffect(() => {
+        if (totalPL > strategy.expected_return) {
+            setSnackbar({
+                open: true,
+                message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
+                severity: 'success'
+            });
+        }
+    }, [totalPL, strategy.expected_return])
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -213,10 +222,6 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     };
 
-    if (loading) {
-        return <Typography>Loading strategy...</Typography>;
-    }
-
     return (
         <Card sx={{ mb: 3, minWidth: 400 }}>
             <CardContent>
@@ -249,6 +254,16 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             </MenuItem>
                         ))}
                     </TextField>
+                    <TextField
+                        label="Expected Return"
+                        type="number"
+                        value={editState.expected_return}
+                        onChange={e => handleEditChange('expected_return', e.target.value)}
+                        size="small"
+                        fullWidth
+                        sx={{ maxWidth: 180 }}
+                        inputProps={{ min: 0, step: 0.01 }}
+                    />
                     <Button
                         variant="contained"
                         color="primary"
