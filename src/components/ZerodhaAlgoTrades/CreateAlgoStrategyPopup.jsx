@@ -41,7 +41,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                 instrument_token: pos.instrument_token,
                 product: pos.product,
                 quantity: pos.quantity,
-                price: pos.quantity > 0 ? parseFloat(pos.buy_price) : parseFloat(pos.sell_price),
+                price: pos.quantity > 0 ? parseFloat(pos.buy_price).toFixed(2) : parseFloat(pos.sell_price).toFixed(2),
                 transaction_type: pos.quantity < 0 ? 'sell' : 'buy'
             }));
 

@@ -28,10 +28,10 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [openPositions, setOpenPositions] = useState([]);
     const [selectedPositions, setSelectedPositions] = useState([]);
     const [totalPL, setTotalPL] = useState(0);
-
+    const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
     useEffect(() => {
         if (totalPL > strategy.expected_return) {
-            createStrategyNote({ strategyid: strategy.strategyid, notes: 'Total P/L is greater than expected return, Total PL is ' + totalPL});
+            createStrategyNote({ strategyid: strategy.strategyid, notes: 'Total P/L is greater than expected return, Total PL is ' + totalPL });
             setSnackbar({
                 open: true,
                 message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
@@ -47,12 +47,14 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
             return strategy.instruments_details.reduce((total, inst) => {
                 const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
+                const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
+                const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
                 const price = inst.price;
                 if (!ltp || !price) return total;
 
                 const pl = inst.quantity > 0
-                    ? (ltp - price) * inst.quantity
-                    : (price - ltp) * inst.quantity;
+                    ? (bidPrice - price) * inst.quantity
+                    : (price - askPrice) * inst.quantity;
 
                 return total + pl;
             }, 0);
@@ -80,6 +82,14 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     useEffect(() => {
         fetchOrders();
+        let underlyingInstrumentToken = "";
+        for (let key in zerodhaWebSocketData) {
+            if (zerodhaWebSocketData[key].tradingsymbol === strategy.underlying_instrument) {
+                underlyingInstrumentToken = key;
+                break;
+            }
+        }
+        setUnderlyingInstrumentToken(underlyingInstrumentToken);
     }, [strategy]);
 
     const handleEditChange = (field, value) => {
@@ -281,6 +291,9 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     <Typography sx={{ fontWeight: 1000 }}>
                         Tracking Positions
                     </Typography>
+                    <Typography sx={{ fontWeight: 1000 }}>
+                        LTP: {zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp}
+                    </Typography>
                     <IconButton
                         size="small"
                         onClick={handleOpenAddPosition}
@@ -307,6 +320,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L(MP)</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
@@ -342,6 +356,20 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                         const pl = inst.quantity > 0
                                             ? (ltp - price) * inst.quantity
                                             : (price - ltp) * inst.quantity;
+
+                                        return pl.toFixed(2);
+                                    })()}
+                                </TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                    {(() => {
+                                        const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
+                                        const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
+                                        const price = inst.price;
+                                        if (!askPrice || !price) return '-';
+
+                                        const pl = inst.quantity > 0
+                                            ? (bidPrice - price) * inst.quantity
+                                            : (price - askPrice) * inst.quantity;
 
                                         return pl.toFixed(2);
                                     })()}
