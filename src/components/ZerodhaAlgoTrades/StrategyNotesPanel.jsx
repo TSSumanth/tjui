@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Link, CircularProgress, Dialog, DialogTitle, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { getStrategyNotes } from '../../services/algoStrategies';
+import { getStrategyNoteById } from '../../services/algoStrategies';
 
 const StrategyNotesPanel = ({ strategyid }) => {
     const [notes, setNotes] = useState([]);
@@ -12,7 +12,7 @@ const StrategyNotesPanel = ({ strategyid }) => {
         const fetchNotes = async () => {
             setLoading(true);
             try {
-                const data = await getStrategyNotes(strategyid);
+                const data = await getStrategyNoteById(strategyid);
                 setNotes(data);
             } catch (err) {
                 setNotes([]);

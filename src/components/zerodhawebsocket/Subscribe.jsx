@@ -58,7 +58,7 @@ const Subscribe = ({ onSubscribeSuccess }) => {
                 onSubscribeSuccess();
             }
         } catch (err) {
-            setError('Failed to subscribe');
+            setError('Failed to subscribe: ' + err.message);
             setOpenError(true);
         } finally {
             setLoading(false);

@@ -7,6 +7,7 @@ import { getAutomatedOrderById } from '../../services/automatedOrders';
 import { getPositions } from '../../services/zerodha/api';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
+import { createStrategyNote } from '../../services/algoStrategies';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
@@ -30,6 +31,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     useEffect(() => {
         if (totalPL > strategy.expected_return) {
+            createStrategyNote({ strategyid: strategy.strategyid, notes: 'Total P/L is greater than expected return, Total PL is ' + totalPL});
             setSnackbar({
                 open: true,
                 message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
@@ -48,7 +50,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 const price = inst.price;
                 if (!ltp || !price) return total;
 
-                const pl = inst.quantity < 0
+                const pl = inst.quantity > 0
                     ? (ltp - price) * inst.quantity
                     : (price - ltp) * inst.quantity;
 
@@ -337,7 +339,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                         const price = inst.price;
                                         if (!ltp || !price) return '-';
 
-                                        const pl = inst.quantity < 0
+                                        const pl = inst.quantity > 0
                                             ? (ltp - price) * inst.quantity
                                             : (price - ltp) * inst.quantity;
 

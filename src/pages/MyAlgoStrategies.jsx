@@ -9,6 +9,7 @@ const MyAlgoStrategiesPage = () => {
         <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', py: 3, px: 2 }}>
             <ZerodhaSubHeader />
             <StrategyMenu />
+          
             <MyAlgoStrategies />
         </Box>
     );

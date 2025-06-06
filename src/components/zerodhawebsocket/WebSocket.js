@@ -13,6 +13,7 @@ class ZerodhaWebSocket {
 
         // Start fetching automatically when instantiated
         this.startFetching();
+        console.log('ZerodhaWebSocket instantiated');
     }
 
     async fetchSubscriptions() {

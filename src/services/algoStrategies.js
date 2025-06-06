@@ -29,24 +29,25 @@ export const deleteAlgoStrategy = async (id) => {
 
 // Create a new note for a strategy
 export const createStrategyNote = async ({ strategyid, notes }) => {
-    const response = await axios.post(`/api/algo-strategies/notes`, { strategyid, notes });
+    const response = await axios.post(`${API_URL}/notes`, { strategyid, notes });
     return response.data;
 };
 
 // Get all notes for a strategy
-export const getStrategyNotes = async (strategyid) => {
-    const response = await axios.get(`/api/algo-strategies/notes/${strategyid}`);
+export const getStrategyNotes = async (notesid) => {
+    const response = await axios.get(`${API_URL}/notes/${notesid}`);
     return response.data;
 };
 
 // Get a single note by id
-export const getStrategyNoteById = async (id) => {
-    const response = await axios.get(`/api/algo-strategies/notes/${id}`);
+export const getStrategyNoteById = async (strategyid) => {
+    const response = await axios.get(`${API_URL}/notes`, 
+        { params: { strategyid: strategyid } });
     return response.data;
 };
 
 // Delete a note by id
 export const deleteStrategyNote = async (id) => {
-    const response = await axios.delete(`/api/algo-strategies/notes/${id}`);
+    const response = await axios.delete(`${API_URL}/notes/${id}`);
     return response.data;
 };
