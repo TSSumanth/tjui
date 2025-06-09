@@ -179,12 +179,13 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
         try {
             const lots = lotSize > 0 ? Math.floor(order.quantity / lotSize) : order.quantity;
             if (isOption) {
+                console.log('Option order details: '+ order);
                 // Option/Future order
                 const orderPayload = {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
                     quantity: lots,
-                    price: order.average_price,
+                    price: order.order_type === "MARKET" ? order.average_price : order.price,
                     date: getFormattedDate(order.order_timestamp),
                     tradeid: selectedTradeId,
                     notes: 'Linked from Zerodha',
@@ -208,24 +209,24 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     if (tradeType.toUpperCase() === "LONG") {
                         if (order.ordertype.toUpperCase() === "BUY") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "SELL") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
                     } else if (tradeType.toUpperCase() === "SHORT") {
                         if (order.ordertype.toUpperCase() === "SELL") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "BUY") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
@@ -270,7 +271,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
                     quantity: order.quantity,
-                    price: order.price,
+                    price: order.order_type === "MARKET" ? order.average_price : order.price,
                     date: getFormattedDate(order.order_timestamp),
                     tradeid: selectedTradeId,
                     notes: 'Linked from Zerodha',
@@ -293,24 +294,24 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     if (tradeType.toUpperCase() === "LONG") {
                         if (order.ordertype.toUpperCase() === "BUY") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "SELL") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
                     } else if (tradeType.toUpperCase() === "SHORT") {
                         if (order.ordertype.toUpperCase() === "SELL") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "BUY") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
@@ -371,12 +372,13 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
             const newTradeId = uuidv4();
             let tradePayload;
             if (isOption) {
+                console.log('Option order details: '+ order);
                 // Option/Future order
                 const orderPayload = {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
                     quantity: lots,
-                    price: order.price,
+                    price: order.order_type === "MARKET" ? order.average_price : order.price,
                     date: getFormattedDate(order.order_timestamp),
                     tradeid: newTradeId,
                     notes: 'Linked from Zerodha',
@@ -398,24 +400,24 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     if (tradeType.toUpperCase() === "LONG") {
                         if (order.ordertype.toUpperCase() === "BUY") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "SELL") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
                     } else if (tradeType.toUpperCase() === "SHORT") {
                         if (order.ordertype.toUpperCase() === "SELL") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "BUY") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
@@ -451,7 +453,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     status,
                     notes: 'Created from Zerodha order',
                     tags: 'zerodha',
-                    ltp: order.price,
+                    ltp: order.order_type === "MARKET" ? order.average_price : order.price,
                     lotsize: lotSize,
                     strikeprize: tradeDetails?.strikePrice,
                     finalexitprice,
@@ -467,7 +469,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     asset: order.tradingsymbol,
                     ordertype: order.transaction_type,
                     quantity: order.quantity,
-                    price: order.price,
+                    price: order.order_type === "MARKET" ? order.average_price : order.price,
                     date: getFormattedDate(order.order_timestamp),
                     tradeid: newTradeId,
                     notes: 'Linked from Zerodha',
@@ -488,24 +490,24 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     if (tradeType.toUpperCase() === "LONG") {
                         if (order.ordertype.toUpperCase() === "BUY") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "SELL") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
                     } else if (tradeType.toUpperCase() === "SHORT") {
                         if (order.ordertype.toUpperCase() === "SELL") {
                             let newentryquantity = entryorderquantity + Number(order.quantity);
-                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.price))) / (entryorderquantity + Number(order.quantity))
+                            let newentryavgprice = ((entryavgprice * entryorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (entryorderquantity + Number(order.quantity))
                             entryavgprice = newentryavgprice
                             entryorderquantity = newentryquantity
                         } else if (order.ordertype.toUpperCase() === "BUY") {
                             let newexitavgquantity = exitorderquantity + Number(order.quantity);
-                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.price))) / (exitorderquantity + Number(order.quantity))
+                            let newexitavgprice = ((exitavgprice * exitorderquantity) + (Number(order.quantity) * Number(order.order_type === "MARKET" ? order.average_price : order.price))) / (exitorderquantity + Number(order.quantity))
                             exitavgprice = newexitavgprice
                             exitorderquantity = newexitavgquantity
                         }
@@ -540,7 +542,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                     status,
                     notes: 'Created from Zerodha order',
                     tags: 'zerodha',
-                    ltp: order.price,
+                    ltp: order.order_type === "MARKET" ? order.average_price : order.price,
                     finalexitprice,
                     capitalused,
                     overallreturn,
@@ -614,7 +616,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                             </Box>
                             <Box>
                                 <Typography variant="body2" color="text.secondary">Price</Typography>
-                                <Typography variant="body1" fontWeight={500}>₹{formatPrice(order.price)}</Typography>
+                                <Typography variant="body1" fontWeight={500}>₹{formatPrice(order.price || order.average_price)}</Typography>
                             </Box>
                             {tradeDetails && (
                                 <>
@@ -635,7 +637,7 @@ const LinkToTradePopup = ({ open, order, onClose, onSuccess }) => {
                                     {(tradeDetails.type === 'CE' || tradeDetails.type === 'PE') && (
                                         <Box>
                                             <Typography variant="body2" color="text.secondary">Strike Price</Typography>
-                                            <Typography variant="body1" fontWeight={500}>₹{formatPrice(tradeDetails.strikePrice)}</Typography>
+                                            <Typography variant="body1" fontWeight={500}>{tradeDetails.strikePrice}</Typography>
                                         </Box>
                                     )}
                                     {tradeDetails.expiry && (

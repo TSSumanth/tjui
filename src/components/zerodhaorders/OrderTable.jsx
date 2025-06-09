@@ -109,7 +109,7 @@ const OrderTable = ({
                                     />
                                 </TableCell>
                                 <TableCell>{order.quantity}</TableCell>
-                                <TableCell>{formatPrice(order.price)}</TableCell>
+                                <TableCell>{formatPrice(order.order_type === "MARKET" ? order.average_price : order.price)}</TableCell>
                                 <TableCell>{formatPrice(order.trigger_price)}</TableCell>
                                 <TableCell>{formatDateTime(order.order_timestamp)}</TableCell>
                                 <TableCell>{order.exchange}</TableCell>
