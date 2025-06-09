@@ -53,8 +53,8 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 if (!ltp || !price) return total;
 
                 const pl = inst.quantity > 0
-                    ? (bidPrice - price) * inst.quantity
-                    : (price - askPrice) * inst.quantity;
+                    ? (ltp - price) * inst.quantity
+                    : (ltp - price) * inst.quantity;
 
                 return total + pl;
             }, 0);
@@ -355,7 +355,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
                                         const pl = inst.quantity > 0
                                             ? (ltp - price) * inst.quantity
-                                            : (price - ltp) * inst.quantity;
+                                            : (ltp - price) * inst.quantity;
 
                                         return pl.toFixed(2);
                                     })()}
@@ -369,7 +369,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
                                         const pl = inst.quantity > 0
                                             ? (bidPrice - price) * inst.quantity
-                                            : (price - askPrice) * inst.quantity;
+                                            : (askPrice - price) * inst.quantity;
 
                                         return pl.toFixed(2);
                                     })()}
