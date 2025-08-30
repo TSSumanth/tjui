@@ -7,21 +7,19 @@ const StrategyRow = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => (
     <Box
         sx={{
             display: 'flex',
-            flexDirection: { xs: 'column', lg: 'row' },
+            flexDirection: 'column',
             bgcolor: 'background.paper',
             borderRadius: 2,
             boxShadow: 2,
             mb: 3,
-            minHeight: 400,
             overflow: 'hidden',
         }}
     >
+        {/* Strategy Box - Full Width */}
         <Box sx={{
-            flex: 1,
-            minWidth: 0,
-            borderRight: { lg: '1px solid #eee' },
+            width: '100%',
             border: '1px solid #ddd',
-            borderRadius: { xs: 2, lg: '16px 0 0 16px' },
+            borderRadius: '16px 16px 0 0',
             bgcolor: 'background.paper',
             boxSizing: 'border-box',
         }}>
@@ -31,14 +29,15 @@ const StrategyRow = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => (
                 zerodhaWebSocketData={zerodhaWebSocketData}
             />
         </Box>
+        
+        {/* Strategy Notes Panel - Below Strategy Box */}
         <Box sx={{
-            flex: 1,
-            minWidth: 0,
+            width: '100%',
             bgcolor: 'background.paper',
-            borderRadius: { xs: 2, lg: '0 16px 16px 0' },
+            borderRadius: '0 0 16px 16px',
             boxSizing: 'border-box',
-            ml: { xs: 0, lg: 1 }, // minimal horizontal space on desktop
-            mt: { xs: 1, lg: 0 }, // minimal vertical space on mobile
+            border: '1px solid #ddd',
+            borderTop: 'none',
         }}>
             <StrategyNotesPanel strategyid={strategy.strategyid} />
         </Box>

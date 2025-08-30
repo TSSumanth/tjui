@@ -31,10 +31,10 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
     useEffect(() => {
         if (totalPL > strategy.expected_return) {
-            createStrategyNote({ strategyid: strategy.strategyid, notes: 'Total P/L is greater than expected return, Total PL is ' + totalPL });
+            createStrategyNote({ strategyid: strategy.strategyid, notes: `Total P/L is greater than expected return, Total PL is ${totalPL.toFixed(2)}, Expected Return is ${strategy.expected_return.toFixed(2)}` });
             setSnackbar({
                 open: true,
-                message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
+                message: 'Total P/L is greater than expected return for strategy: ' + strategy.strategy_type,
                 severity: 'success'
             });
         }
@@ -235,9 +235,15 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     };
 
     return (
-        <Card sx={{ mb: 3, minWidth: 400 }}>
+        <Card sx={{ mb: 0, width: '100%' }}>
             <CardContent>
-                <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr 1fr auto' },
+                    gap: 1, 
+                    mb: 1, 
+                    alignItems: 'center' 
+                }}>
                     <TextField
                         label="Strategy Type"
                         value={editState.strategy_type || ''}
@@ -258,7 +264,7 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         value={editState.status || ''}
                         onChange={e => handleEditChange('status', e.target.value)}
                         size="small"
-                        sx={{ minWidth: 140 }}
+                        fullWidth
                     >
                         {STATUS_OPTIONS.map(opt => (
                             <MenuItem key={opt} value={opt}>
@@ -273,7 +279,6 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         onChange={e => handleEditChange('expected_return', e.target.value)}
                         size="small"
                         fullWidth
-                        sx={{ maxWidth: 180 }}
                         inputProps={{ min: 0, step: 0.01 }}
                     />
                     <Button
@@ -287,28 +292,37 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         {updating ? '...' : 'Update'}
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    alignItems: { xs: 'flex-start', sm: 'center' }, 
+                    gap: 2, 
+                    mb: 1,
+                    flexWrap: 'wrap'
+                }}>
                     <Typography sx={{ fontWeight: 1000 }}>
                         Tracking Positions
                     </Typography>
                     <Typography sx={{ fontWeight: 1000 }}>
                         LTP: {zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp}
                     </Typography>
-                    <IconButton
-                        size="small"
-                        onClick={handleOpenAddPosition}
-                        sx={{ color: 'primary.main' }}
-                    >
-                        <AddIcon />
-                    </IconButton>
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        size="small"
-                        onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
-                    >
-                        Create Orders
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
+                        <IconButton
+                            size="small"
+                            onClick={handleOpenAddPosition}
+                            sx={{ color: 'primary.main' }}
+                        >
+                            <AddIcon />
+                        </IconButton>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            size="small"
+                            onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
+                        >
+                            Create Orders
+                        </Button>
+                    </Box>
                 </Box>
                 <Table size="small" sx={{ mb: 1 }}>
                     <TableHead>

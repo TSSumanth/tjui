@@ -29,7 +29,7 @@ const StrategyNotesPanel = ({ strategyid }) => {
     const hasMore = notes.length > 5;
 
     return (
-        <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, minHeight: 400, height: '100%', boxShadow: 0 }}>
+        <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 0 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>
                 Strategy Notes
             </Typography>
