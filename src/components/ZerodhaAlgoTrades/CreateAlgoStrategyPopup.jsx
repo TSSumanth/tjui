@@ -12,7 +12,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
     const [selected, setSelected] = useState([]);
     const [loading, setLoading] = useState(false);
     const [underlyingInstrument, setUnderlyingInstrument] = useState('');
-    const [expectedReturn, setExpectedReturn] = useState('');
+
 
     useEffect(() => {
         if (open) {
@@ -42,15 +42,14 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                 product: pos.product,
                 quantity: pos.quantity,
                 price: pos.quantity > 0 ? parseFloat(pos.buy_price).toFixed(2) : parseFloat(pos.sell_price).toFixed(2),
-                transaction_type: pos.quantity < 0 ? 'sell' : 'buy'
+                transaction_type: pos.quantity < 0 ? 'SELL' : 'BUY'
             }));
 
         await createAlgoStrategy({
             instruments_details,
             underlying_instrument: underlyingInstrument,
             status,
-            strategy_type: strategyType,
-            expected_return: expectedReturn ? parseFloat(expectedReturn) : 0
+            strategy_type: strategyType
         });
         setLoading(false);
         onSuccess && onSuccess();
@@ -87,15 +86,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                     fullWidth
                     margin="normal"
                 />
-                <TextField
-                    label="Expected Return"
-                    type="number"
-                    value={expectedReturn}
-                    onChange={e => setExpectedReturn(e.target.value)}
-                    fullWidth
-                    margin="normal"
-                    inputProps={{ min: 0, step: 0.01 }}
-                />
+
                 <Typography variant="subtitle1" sx={{ mt: 2 }}>Select Open Positions</Typography>
                 <List>
                     {positions.length === 0 && (
@@ -110,7 +101,7 @@ const CreateAlgoStrategyPopup = ({ open, onClose, onSuccess }) => {
                                 primary={`${pos.tradingsymbol} (${pos.exchange})`}
                                 secondary={
                                     <>
-                                        <span>Token: {pos.instrument_token}</span> | <span>Product: {pos.product}</span> | <span>Qty: {pos.quantity}</span> | <span>Type: {pos.quantity < 0 ? 'sell' : 'buy'}  - {pos.quantity > 0 ? parseFloat(pos.buy_price) : parseFloat(pos.sell_price)}</span>
+                                        <span>Token: {pos.instrument_token}</span> | <span>Product: {pos.product}</span> | <span>Qty: {pos.quantity}</span> | <span>Type: {pos.quantity < 0 ? 'SELL' : 'BUY'}  - {pos.quantity > 0 ? parseFloat(pos.buy_price) : parseFloat(pos.sell_price)}</span>
                                     </>
                                 }
                             />

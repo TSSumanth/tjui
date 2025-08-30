@@ -102,7 +102,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                     exchange: order.exchange,
                     product: order.product,
                     quantity: Math.abs(order.quantity),
-                    transaction_type: order.transaction_type === "BUY" ? "SELL" : "BUY",
+                    transaction_type: order.transaction_type?.toUpperCase() === "BUY" ? "SELL" : "BUY",
                     validity: 'IOC',
                     order_type: order.order_type,
                     price: order.order_type === 'LIMIT' ? order.price : undefined,
@@ -400,9 +400,9 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                                 Transaction:
                                                             </Typography>
                                                             <Chip 
-                                                                label={pos.transaction_type === "BUY" ? "SELL" : "BUY"}
+                                                                label={pos.transaction_type?.toUpperCase() === "BUY" ? "SELL" : "BUY"}
                                                                 size="small"
-                                                                color={pos.transaction_type === "BUY" ? "error" : "success"}
+                                                                color={pos.transaction_type?.toUpperCase() === "BUY" ? "error" : "success"}
                                                                 sx={{ ml: 0.5 }}
                                                             />
                                                         </Box>

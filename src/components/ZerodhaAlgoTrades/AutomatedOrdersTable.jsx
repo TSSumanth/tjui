@@ -499,9 +499,20 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                                 <Typography variant="caption" color="text.secondary">
                                     Transaction Type:
                                 </Typography>
-                                <Typography variant="body2" fontWeight={500}>
+                                <Box sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    px: 1.5,
+                                    py: 0.5,
+                                    borderRadius: 1,
+                                    backgroundColor: editOrder?.transaction_type?.toUpperCase() === 'BUY' ? 'success.light' : 'error.light',
+                                    color: editOrder?.transaction_type?.toUpperCase() === 'BUY' ? 'success.dark' : 'error.dark',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    textTransform: 'uppercase'
+                                }}>
                                     {editOrder?.transaction_type}
-                                </Typography>
+                                </Box>
                             </Box>
                         </Box>
                     </Box>

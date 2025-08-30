@@ -86,7 +86,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [syncingPositions, setSyncingPositions] = useState(false);
     const [showClosedPositions, setShowClosedPositions] = useState(true);
     const [checkingOrderStatuses, setCheckingOrderStatuses] = useState(false);
-    const [targetAchievements, setTargetAchievements] = useState(new Map());
+    const [isTargetAchieved, setIsTargetAchieved] = useState(null); // null = loading, true/false = loaded
     const [strategyTarget, setStrategyTarget] = useState(null);
     const [strategyMaxLoss, setStrategyMaxLoss] = useState(null);
     const [maxLossTriggered, setMaxLossTriggered] = useState(false);
@@ -125,19 +125,21 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [deletingNotes, setDeletingNotes] = useState(false);
 
     // Fetch notes for the strategy
-    useEffect(() => {
-        const fetchNotes = async () => {
-            setNotesLoading(true);
-            try {
-                const data = await getStrategyNoteById(strategy.strategyid);
-                setNotes(data);
-            } catch (err) {
-                setNotes([]);
-            }
-            setNotesLoading(false);
-        };
-        if (strategy.strategyid) fetchNotes();
+    const fetchNotes = useCallback(async () => {
+        setNotesLoading(true);
+        try {
+            const data = await getStrategyNoteById(strategy.strategyid);
+            setNotes(data);
+        } catch (err) {
+            setNotes([]);
+        }
+        setNotesLoading(false);
     }, [strategy.strategyid]);
+
+    // Fetch notes when component mounts
+    useEffect(() => {
+        if (strategy.strategyid) fetchNotes();
+    }, [strategy.strategyid, fetchNotes]);
 
     // Fetch strategy target and max loss from database
     const fetchStrategyTargetAndMaxLoss = useCallback(async () => {
@@ -175,39 +177,49 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     }, [strategy.strategyid]);
 
-    // Check target achievements from database
-    const checkTargetAchievements = useCallback(async (targetValue) => {
-        try {
-            if (!targetValue) return;
 
-            const result = await checkTargetAchievement(strategy.strategyid, targetValue);
-            if (result.success) {
-                setTargetAchievements(prev => {
-                    const newMap = new Map(prev);
-                    newMap.set(targetValue, result.data.hasAchieved);
-                    return newMap;
-                });
-            }
-        } catch (err) {
-            console.error('Error checking target achievements:', err);
-        }
-    }, [strategy.strategyid]);
 
     // Load target achievements when component mounts and handle target changes
     useEffect(() => {
         fetchStrategyTargetAndMaxLoss();
     }, [strategy.strategyid, fetchStrategyTargetAndMaxLoss]);
 
-    // Handle target changes - check achievements and update editState
+    // Fetch target achievement status when strategyTarget is available
+    useEffect(() => {
+        const fetchAchievementStatus = async () => {
+            try {
+                if (strategy.strategyid && strategyTarget) {
+                    console.log('🔍 Fetching achievement status for strategy:', strategy.strategyid, 'target:', strategyTarget);
+                    const result = await checkTargetAchievement(strategy.strategyid, strategyTarget);
+                    console.log('📊 Achievement result:', result);
+                    
+                    if (result.success && result.data) {
+                        const hasAchieved = result.data.hasAchieved;
+                        setIsTargetAchieved(hasAchieved);
+                        console.log(`✅ Target achievement status loaded: ${hasAchieved ? 'ACHIEVED' : 'PENDING'}`);
+                    } else {
+                        console.log('⚠️ No achievement data found');
+                        setIsTargetAchieved(false);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching achievement status:', err);
+                setIsTargetAchieved(false);
+            }
+        };
+
+        fetchAchievementStatus();
+    }, [strategy.strategyid, strategyTarget]);
+
+    // Handle target changes - update editState
     useEffect(() => {
         if (strategyTarget) {
-            checkTargetAchievements(strategyTarget);
             setEditState(prev => ({
                 ...prev,
                 expected_return: strategyTarget.toString()
             }));
         }
-    }, [strategyTarget, checkTargetAchievements]);
+    }, [strategyTarget]);
 
     // Update editState when strategyMaxLoss changes
     useEffect(() => {
@@ -226,24 +238,36 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     // Strategy Box Functions
     useEffect(() => {
-        // Check if target has already been achieved to prevent spam
-        const hasAchieved = targetAchievements.get(strategyTarget);
+        // Only run this effect if we have both strategyTarget and isTargetAchieved properly loaded
+        if (!strategyTarget || isTargetAchieved === null || isTargetAchieved === true) {
+            return;
+        }
 
-        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !hasAchieved) {
+        // Debug logging
+        console.log('Target Achievement Check:', {
+            strategyTarget,
+            totalPL,
+            isTargetAchieved
+        });
+
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !isTargetAchieved) {
+            console.log('🎯 Creating target achievement...');
+            
             // Create achievement record in database
             createTargetAchievement(strategy.strategyid, strategyTarget)
                 .then(() => {
                     // Update local state
-                    setTargetAchievements(prev => {
-                        const newMap = new Map(prev);
-                        newMap.set(strategyTarget, true);
-                        return newMap;
-                    });
+                    setIsTargetAchieved(true);
 
                     // Create achievement note
                     createStrategyNote({
                         strategyid: strategy.strategyid,
                         notes: `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})`
+                    }).then(() => {
+                        // Refresh notes to show the new achievement note
+                        fetchNotes();
+                    }).catch(err => {
+                        console.error('Error creating achievement note:', err);
                     });
 
                     // Show success notification
@@ -259,14 +283,12 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
 
         // Reset achievement if P/L falls below target
-        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && hasAchieved) {
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && isTargetAchieved) {
+            console.log('🔄 Resetting target achievement...');
+            
             resetTargetAchievement(strategy.strategyid, strategyTarget)
                 .then(() => {
-                    setTargetAchievements(prev => {
-                        const newMap = new Map(prev);
-                        newMap.set(strategyTarget, false);
-                        return newMap;
-                    });
+                    setIsTargetAchieved(false);
                 })
                 .catch(err => {
                     console.error('Error resetting target achievement:', err);
@@ -284,6 +306,11 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     createStrategyNote({
                         strategyid: strategy.strategyid,
                         notes: `🚨 MAX LOSS TRIGGERED! Total P/L (${totalPL.toFixed(2)}) reached max loss limit (${strategyMaxLoss.toFixed(2)})`
+                    }).then(() => {
+                        // Refresh notes to show the new max loss note
+                        fetchNotes();
+                    }).catch(err => {
+                        console.error('Error creating max loss note:', err);
                     });
 
                     // Show warning notification
@@ -297,7 +324,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     console.error('Error triggering max loss:', err);
                 });
         }
-    }, [totalPL, strategyTarget, strategyMaxLoss, targetAchievements, maxLossTriggered, strategy.strategyid]);
+    }, [totalPL, strategyTarget, strategyMaxLoss, isTargetAchieved, maxLossTriggered, strategy.strategyid]);
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -1126,8 +1153,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         p: 1.25,
                         borderRadius: 2,
                         border: '2px solid',
-                        borderColor: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ?'error.main' : 'warning.main',
-                        bgcolor: targetAchievements.get(strategyTarget) ? 'success.50' : 'warning.50',
+                        borderColor: isTargetAchieved === null ? 'grey.400' : isTargetAchieved ? 'success.main' : totalPL < 0 ?'error.main' : 'warning.main',
+                        bgcolor: isTargetAchieved === null ? 'grey.100' : isTargetAchieved ? 'success.50' : 'warning.50',
                         boxShadow: 1
                     }}>
                         {/* Compact Header Row */}
@@ -1140,25 +1167,25 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         }}>
                             {/* Target Info */}
                             <Box>
-                                <Typography
-                                    variant="subtitle1"
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.3px',
-                                        fontSize: '1rem',
-                                        mb: 0.5
-                                    }}
-                                >
-                                    {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED!' : '🎯 TARGET PENDING'}
-                                </Typography>
+                                                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                            fontWeight: 700,
+                                            color: isTargetAchieved === null ? 'text.secondary' : isTargetAchieved ? 'success.main' : 'warning.main',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.3px',
+                                            fontSize: '1rem',
+                                            mb: 0.5
+                                        }}
+                                    >
+                                        {isTargetAchieved === null ? '🎯 Loading...' : isTargetAchieved ? '🎯 TARGET ACHIEVED! ₹' + strategyTarget?.toFixed(2) : '🎯 TARGET PENDING: ₹' + strategyTarget?.toFixed(2)}
+                                    </Typography>
                                 
                                 {/* Compact Info Row */}
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-                                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                                    {/* <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
                                         Target: ₹{strategyTarget?.toFixed(2)}
-                                    </Typography>
+                                    </Typography> */}
                                     
                                     {/* Max Loss Status - Inline */}
                                     {typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && (
@@ -1177,7 +1204,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             </Box>
 
                             {/* Progress Bar */}
-                            {!targetAchievements.get(strategyTarget) && (
+                            {isTargetAchieved !== null && !isTargetAchieved && (
                                 <Box sx={{ width: 120, minWidth: 120 }}>
                                     <Box sx={{ 
                                         display: 'flex', 
@@ -1215,7 +1242,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                     variant="h6"
                                     sx={{
                                         fontWeight: 900,
-                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
+                                        color: isTargetAchieved === null ? 'text.secondary' : isTargetAchieved ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
                                         lineHeight: 1
                                     }}
                                 >
@@ -1247,7 +1274,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         }}>
                             {/* Progress Bar */}
                             <Box sx={{ width: '100%' }}>
-                                {!targetAchievements.get(strategyTarget) && typeof strategyTarget === 'number' && strategyTarget > 0 && (
+                                {!isTargetAchieved && typeof strategyTarget === 'number' && strategyTarget > 0 && (
                                     <>
                                         <Box sx={{
                                             display: 'flex',
@@ -1410,7 +1437,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                 size="small"
                                 inputProps={{ min: 0, step: 0.01 }}
                                 placeholder="Enter max loss value"
-                                helperText="Positive value (e.g., 10000 = -₹10000 limit)"
                             />
                             <Button
                                 variant="contained"
@@ -1581,8 +1607,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                                 px: 1.5,
                                                 py: 0.5,
                                                 borderRadius: 1,
-                                                backgroundColor: inst.transaction_type === 'BUY' ? 'success.light' : 'error.light',
-                                                color: inst.transaction_type === 'BUY' ? 'success.dark' : 'error.dark',
+                                                backgroundColor: inst.transaction_type.toUpperCase() === 'BUY' ? 'success.light' : 'error.light',
+                                                color: inst.transaction_type.toUpperCase() === 'BUY' ? 'success.dark' : 'error.dark',
                                                 fontWeight: 600,
                                                 fontSize: '0.75rem',
                                                 textTransform: 'uppercase'

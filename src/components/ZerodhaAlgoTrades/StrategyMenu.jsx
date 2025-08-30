@@ -6,7 +6,7 @@ import CreateAlgoStrategyPopup from './CreateAlgoStrategyPopup';
 
 
 
-const StrategyMenu = () => {
+const StrategyMenu = ({ onStrategyCreated }) => {
     const [showCreatePopup, setShowCreatePopup] = useState(false);
 
     return (
@@ -42,7 +42,11 @@ const StrategyMenu = () => {
             <CreateAlgoStrategyPopup
                 open={showCreatePopup}
                 onClose={() => setShowCreatePopup(false)}
-                onSuccess={() => setShowCreatePopup(false)}
+                onSuccess={() => {
+                    setShowCreatePopup(false);
+                    // Trigger refresh of strategies list
+                    onStrategyCreated && onStrategyCreated();
+                }}
             />
         </Box>
     );
