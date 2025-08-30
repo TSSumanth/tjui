@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
     Box, 
     Card, 
@@ -30,8 +30,9 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote } from '../../services/algoStrategies';
-import { getAutomatedOrderById } from '../../services/automatedOrders';
-import { getPositions } from '../../services/zerodha/api';
+import { getAutomatedOrderById, updateAutomatedOrder } from '../../services/automatedOrders';
+import { getOrders, getPositions } from '../../services/zerodha/api';
+import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue } from '../../services/strategyTargetAchievements';
 import { isMarketOpen } from '../../services/zerodha/utils';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
@@ -39,13 +40,29 @@ import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
 const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
+    // Add CSS animation for pulse effect
+    React.useEffect(() => {
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
     // Strategy Box States
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [editState, setEditState] = useState({
         status: strategy.status,
         underlying_instrument: strategy.underlying_instrument,
         strategy_type: strategy.strategy_type,
-        expected_return: strategy.expected_return ?? ''
+        expected_return: ''
     });
     const [updating, setUpdating] = useState(false);
     const [orders, setOrders] = useState([]);
@@ -60,6 +77,17 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
     const [syncingPositions, setSyncingPositions] = useState(false);
     const [showClosedPositions, setShowClosedPositions] = useState(true);
+    const [checkingOrderStatuses, setCheckingOrderStatuses] = useState(false);
+    const [targetAchievements, setTargetAchievements] = useState(new Map());
+    const [strategyTarget, setStrategyTarget] = useState(null);
+
+    // Helper function for progress bar colors
+    const getProgressColors = useCallback((totalPL, expectedReturn) => {
+        if (totalPL < 0) return { main: 'error.main', light: 'error.50' }; // Red for negative P/L
+        const progress = (totalPL / expectedReturn) * 100;
+        if (progress < 50) return { main: 'warning.main', light: 'warning.50' }; // Orange for < 50%
+        return { main: 'success.main', light: 'success.50' }; // Green for ≥ 50%
+    }, []);
 
     // Strategy Notes States
     const [notes, setNotes] = useState([]);
@@ -83,17 +111,106 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         if (strategy.strategyid) fetchNotes();
     }, [strategy.strategyid]);
 
+    // Fetch strategy target from database
+    const fetchStrategyTarget = useCallback(async () => {
+        try {
+            const result = await getStrategyTarget(strategy.strategyid);
+            if (result.success && result.data && result.data.target_value) {
+                // Convert to number to ensure .toFixed() works
+                const targetValue = parseFloat(result.data.target_value);
+                setStrategyTarget(isNaN(targetValue) ? null : targetValue);
+            } else {
+                setStrategyTarget(null);
+            }
+        } catch (err) {
+            console.error('Error fetching strategy target:', err);
+            setStrategyTarget(null);
+        }
+    }, [strategy.strategyid]);
+
+    // Check target achievements from database
+    const checkTargetAchievements = useCallback(async (targetValue) => {
+        try {
+            if (!targetValue) return;
+            
+            const result = await checkTargetAchievement(strategy.strategyid, targetValue);
+            if (result.success) {
+                setTargetAchievements(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(targetValue, result.data.hasAchieved);
+                    return newMap;
+                });
+            }
+        } catch (err) {
+            console.error('Error checking target achievements:', err);
+        }
+    }, [strategy.strategyid]);
+
+    // Load target achievements when component mounts and handle target changes
+    useEffect(() => {
+        fetchStrategyTarget();
+    }, [strategy.strategyid, fetchStrategyTarget]);
+
+    // Handle target changes - check achievements and update editState
+    useEffect(() => {
+        if (strategyTarget) {
+            checkTargetAchievements(strategyTarget);
+            setEditState(prev => ({
+                ...prev,
+                expected_return: strategyTarget.toString()
+            }));
+        }
+    }, [strategyTarget, checkTargetAchievements]);
+
     // Strategy Box Functions
     useEffect(() => {
-        if (totalPL > strategy.expected_return) {
-            createStrategyNote({ strategyid: strategy.strategyid, notes: `Total P/L is greater than expected return, Total PL is ${totalPL.toFixed(2)}, Expected Return is ${strategy.expected_return.toFixed(2)}` });
-            setSnackbar({
-                open: true,
-                message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
-                severity: 'success'
-            });
+        // Check if target has already been achieved to prevent spam
+        const hasAchieved = targetAchievements.get(strategyTarget);
+        
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !hasAchieved) {
+            // Create achievement record in database
+            createTargetAchievement(strategy.strategyid, strategyTarget)
+                .then(() => {
+                    // Update local state
+                    setTargetAchievements(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(strategyTarget, true);
+                        return newMap;
+                    });
+                    
+                    // Create achievement note
+                    createStrategyNote({ 
+                        strategyid: strategy.strategyid, 
+                        notes: `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})` 
+                    });
+                    
+                    // Show success notification
+                    setSnackbar({
+                        open: true,
+                        message: `🎉 Strategy ${strategy.strategyid} exceeded target! P/L: ₹${totalPL.toFixed(2)} vs Target: ₹${strategyTarget.toFixed(2)}`,
+                        severity: 'success'
+                    });
+                })
+                .catch(err => {
+                    console.error('Error creating target achievement:', err);
+                });
         }
-    }, [totalPL, strategy.expected_return]);
+        
+        // Reset achievement if P/L falls below target
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && hasAchieved) {
+            resetTargetAchievement(strategy.strategyid, strategyTarget)
+                .then(() => {
+                    setTargetAchievements(prev => {
+                        const newMap = new Map(prev);
+                        newMap.set(strategyTarget, false);
+                        return newMap;
+                    });
+                })
+                .catch(err => {
+                    console.error('Error resetting target achievement:', err);
+                });
+        }
+    }, [totalPL, strategyTarget, targetAchievements, strategy.strategyid]);
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -133,6 +250,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }, 0);
         };
 
+        
+
         const total = calculateTotalPL();
         const totalMP = calculateTotalPLMP();
         setTotalPL(total);
@@ -163,6 +282,103 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     };
 
+    // Manual refresh function for order statuses
+    const handleManualStatusCheck = async () => {
+        try {
+            setCheckingOrderStatuses(true);
+            await checkOrderStatuses(true); // Show notification for manual checks
+        } catch (err) {
+            console.error('Manual status check failed:', err);
+        } finally {
+            setCheckingOrderStatuses(false);
+        }
+    };
+
+    // Check and update order statuses from Zerodha
+    const checkOrderStatuses = async (showNotification = true) => {
+        try {
+            // Only check if we have orders with 'SENT TO ZERODHA' status
+            const sentOrders = orders.filter(order => order.status === 'SENT TO ZERODHA' && order.zerodha_orderid);
+            
+            if (sentOrders.length === 0) {
+                return; // No orders to check
+            }
+
+            setCheckingOrderStatuses(true);
+            console.log(`Checking status for ${sentOrders.length} sent orders...`);
+            
+            // Get all orders from Zerodha
+            const zerodhaOrders = await getOrders();
+            if (!zerodhaOrders || !zerodhaOrders.data) {
+                console.log('No Zerodha orders data received');
+                return;
+            }
+
+            let statusUpdates = 0;
+            
+            // Check each sent order against Zerodha orders
+            for (const sentOrder of sentOrders) {
+                const zerodhaOrder = zerodhaOrders.data.find(
+                    zo => zo.order_id === sentOrder.zerodha_orderid
+                );
+                
+                if (zerodhaOrder) {
+                    let newStatus = sentOrder.status;
+                    
+                    // Map Zerodha status to our status
+                    switch (zerodhaOrder.status) {
+                        case 'COMPLETE':
+                            newStatus = 'COMPLETED';
+                            break;
+                        case 'CANCELLED':
+                            newStatus = 'CANCELLED';
+                            break;
+                        case 'REJECTED':
+                            newStatus = 'REJECTED';
+                            break;
+                        case 'OPEN':
+                            newStatus = 'SENT TO ZERODHA';
+                            break;
+                        default:
+                            newStatus = 'SENT TO ZERODHA';
+                    }
+                    
+                    // Update order if status changed
+                    if (newStatus !== sentOrder.status) {
+                        try {
+                            await updateAutomatedOrder(sentOrder.id, { status: newStatus });
+                            statusUpdates++;
+                            console.log(`Order ${sentOrder.id} status updated from ${sentOrder.status} to ${newStatus}`);
+                        } catch (err) {
+                            console.error(`Failed to update order ${sentOrder.id} status:`, err);
+                        }
+                    }
+                }
+            }
+            
+            // Refresh orders if any statuses were updated
+            if (statusUpdates > 0) {
+                console.log(`${statusUpdates} order statuses updated, refreshing orders...`);
+                await fetchOrders();
+                
+                // Show notification only if requested
+                if (showNotification) {
+                    setSnackbar({
+                        open: true,
+                        message: `${statusUpdates} order status${statusUpdates > 1 ? 'es' : ''} updated from Zerodha`,
+                        severity: 'info'
+                    });
+                }
+            }
+            
+        } catch (err) {
+            console.error('Error checking order statuses:', err);
+            // Don't show error to user for background status checks
+        } finally {
+            setCheckingOrderStatuses(false);
+        }
+    };
+
     useEffect(() => {
         fetchOrders();
         let underlyingInstrumentToken = "";
@@ -182,9 +398,32 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         
         // Debug logging
         console.log('Strategy underlying_instrument:', strategy.underlying_instrument);
-        console.log('Found token:', underlyingInstrumentToken);
         console.log('WebSocket data keys:', Object.keys(zerodhaWebSocketData || {}));
     }, [strategy, zerodhaWebSocketData]);
+
+    // Set up order status polling
+    useEffect(() => {
+        // Only start polling if we have orders with 'SENT TO ZERODHA' status
+        const hasSentOrders = orders.some(order => order.status === 'SENT TO ZERODHA');
+        
+        if (!hasSentOrders) {
+            return; // No need to poll
+        }
+
+        console.log('Starting order status polling...');
+        
+        // Initial check
+        checkOrderStatuses(false); // Don't show notification for background checks
+        
+        // Set up interval for every 2 minutes (120000ms)
+        const intervalId = setInterval(() => checkOrderStatuses(false), 120000);
+        
+        // Cleanup function
+        return () => {
+            console.log('Cleaning up order status polling...');
+            clearInterval(intervalId);
+        };
+    }, [orders]); // Re-run when orders change
 
 
 
@@ -195,16 +434,51 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }));
     };
 
-    const handleUpdate = async () => {
+        const handleUpdate = async () => {
         setUpdating(true);
         try {
-            await updateAlgoStrategy(strategy.strategyid, editState);
-            setSnackbar({
-                open: true,
-                message: 'Strategy updated successfully!',
-                severity: 'success'
-            });
-            onStrategyUpdate && onStrategyUpdate();
+            // Validate target value
+            if (!editState.expected_return || parseFloat(editState.expected_return) <= 0) {
+                setSnackbar({
+                    open: true,
+                    message: 'Please enter a valid positive target value',
+                    severity: 'error'
+                });
+                setUpdating(false);
+                return;
+            }
+
+            const newTargetValue = parseFloat(editState.expected_return);
+            
+            // Update target in the new system
+            try {
+                // Check if target already exists
+                const existingTarget = await getStrategyTarget(strategy.strategyid);
+                
+                if (existingTarget.success && existingTarget.data) {
+                    // Update existing target
+                    await updateTargetValue(strategy.strategyid, newTargetValue);
+                } else {
+                    // Create new target
+                    await createTargetAchievement(strategy.strategyid, newTargetValue);
+                }
+                
+                // Refresh target data
+                await fetchStrategyTarget();
+                
+                setSnackbar({
+                    open: true,
+                    message: 'Target updated successfully!',
+                    severity: 'success'
+                });
+            } catch (targetErr) {
+                console.error('Error updating target:', targetErr);
+                setSnackbar({
+                    open: true,
+                    message: 'Failed to update target',
+                    severity: 'error'
+                });
+            }
         } catch (err) {
             setSnackbar({
                 open: true,
@@ -494,10 +768,215 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     return (
         <Card sx={{ mb: 3, width: '100%' }}>
             <CardContent>
+                {/* Target Achievement Summary */}
+                {typeof strategyTarget === 'number' && strategyTarget > 0 ? (
+                    <Box sx={{ 
+                        mb: 2,
+                        p: 1.5,
+                        borderRadius: 2,
+                        border: '2px solid',
+                        borderColor: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                        bgcolor: targetAchievements.get(strategyTarget) ? 'success.50' : 'warning.50',
+                        boxShadow: 1
+                    }}>
+                        {/* Header Row */}
+                        <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            mb: 1.5
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Box sx={{
+                                    width: 16,
+                                    height: 16,
+                                    borderRadius: '50%',
+                                    bgcolor: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                                    animation: targetAchievements.get(strategyTarget) ? 'pulse 2s infinite' : 'none'
+                                }} />
+                                <Box>
+                                    <Typography 
+                                        variant="h6" 
+                                        sx={{ 
+                                            fontWeight: 800,
+                                            color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.5px',
+                                            fontSize: '1.1rem'
+                                        }}
+                                    >
+                                        {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED!' : '🎯 TARGET PENDING'}
+                                    </Typography>
+                                    <Typography 
+                                        variant="body2" 
+                                        sx={{ 
+                                            color: 'text.primary',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {targetAchievements.get(strategyTarget) 
+                                            ? `Congratulations! Your strategy has exceeded the expected return of ₹${typeof strategyTarget === 'number' ? strategyTarget.toFixed(2) : '0.00'}`
+                                            : `Working towards target: ₹${typeof strategyTarget === 'number' ? strategyTarget.toFixed(2) : '0.00'} | Current P/L: ₹${totalPL?.toFixed(2)}`
+                                        }
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            
+                            {/* Compact P/L Display */}
+                            <Box sx={{ textAlign: 'right' }}>
+                                <Typography 
+                                    variant="h5" 
+                                    sx={{ 
+                                        fontWeight: 900,
+                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                                        lineHeight: 1
+                                    }}
+                                >
+                                    ₹{totalPL?.toFixed(2)}
+                                </Typography>
+                                <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                        color: 'text.primary',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Current P/L
+                                </Typography>
+                            </Box>
+                        </Box>
+
+                        {/* Compact Target Management Row */}
+                        <Box sx={{ 
+                            display: 'grid',
+                            gridTemplateColumns: '1fr auto auto',
+                            gap: 2,
+                            alignItems: 'center',
+                            p: 1.5,
+                            bgcolor: 'grey.50',
+                            borderRadius: 1.5,
+                            border: '1px solid',
+                            borderColor: 'grey.200'
+                        }}>
+                            {/* Progress Bar */}
+                            <Box sx={{ width: '100%' }}>
+                                {!targetAchievements.get(strategyTarget) && typeof strategyTarget === 'number' && strategyTarget > 0 && (
+                                    <>
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center',
+                                            mb: 0.5
+                                        }}>
+                                            <Typography 
+                                                variant="caption" 
+                                                sx={{ 
+                                                    color: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'text.secondary',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Progress to Target
+                                            </Typography>
+                                            <Typography 
+                                                variant="caption" 
+                                                sx={{ 
+                                                    color: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'text.secondary',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                {typeof strategyTarget === 'number' && strategyTarget > 0 ? Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100)).toFixed(1) : '0.0'}%
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ 
+                                            width: '100%', 
+                                            height: 6, 
+                                            bgcolor: 'grey.300',
+                                            borderRadius: 3,
+                                            overflow: 'hidden'
+                                        }}>
+                                            <Box sx={{ 
+                                                width: `${typeof strategyTarget === 'number' && strategyTarget > 0 ? Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100)) : 0}%`,
+                                                height: '100%',
+                                                bgcolor: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'grey.400',
+                                                borderRadius: 3,
+                                                transition: 'width 0.5s ease-in-out'
+                                            }} />
+                                        </Box>
+                                    </>
+                                )}
+                            </Box>
+
+                            {/* Target Input */}
+                            <TextField
+                                label="Expected Return"
+                                type="number"
+                                value={editState.expected_return}
+                                onChange={e => handleEditChange('expected_return', e.target.value)}
+                                size="small"
+                                sx={{ minWidth: 120 }}
+                                inputProps={{ min: 0, step: 0.01 }}
+                                placeholder="Target value"
+                            />
+
+                            {/* Update Button */}
+                            <Button
+                                variant="outlined"
+                                color="primary"
+                                size="small"
+                                onClick={handleUpdate}
+                                disabled={updating}
+                                sx={{ minWidth: 80 }}
+                            >
+                                {updating ? '...' : 'Update'}
+                            </Button>
+                        </Box>
+                    </Box>
+                ) : (
+                    /* Set New Target Section */
+                    <Box sx={{ 
+                        mb: 2,
+                        p: 1.5,
+                        borderRadius: 2,
+                        border: '2px dashed',
+                        borderColor: 'grey.400',
+                        bgcolor: 'grey.50',
+                        textAlign: 'center'
+                    }}>
+                        <Typography variant="h6" sx={{ mb: 1.5, color: 'text.secondary', fontWeight: 600 }}>
+                            🎯 No Target Set
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 1.5, color: 'text.secondary' }}>
+                            Set a target to start tracking your strategy's performance
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', maxWidth: 350, mx: 'auto' }}>
+                            <TextField
+                                label="Expected Return"
+                                type="number"
+                                value={editState.expected_return}
+                                onChange={e => handleEditChange('expected_return', e.target.value)}
+                                size="small"
+                                sx={{ flexGrow: 1 }}
+                                inputProps={{ min: 0, step: 0.01 }}
+                                placeholder="Enter target value"
+                            />
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                size="small"
+                                onClick={handleUpdate}
+                                disabled={updating}
+                                sx={{ minWidth: 80 }}
+                            >
+                                {updating ? '...' : 'Set Target'}
+                            </Button>
+                        </Box>
+                    </Box>
+                )}
+                
                 {/* Strategy Configuration Section */}
                 <Box sx={{ 
                     display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr 1fr auto' },
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr auto' },
                     gap: 1, 
                     mb: 2, 
                     alignItems: 'center' 
@@ -530,15 +1009,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             </MenuItem>
                         ))}
                     </TextField>
-                    <TextField
-                        label="Expected Return"
-                        type="number"
-                        value={editState.expected_return}
-                        onChange={e => handleEditChange('expected_return', e.target.value)}
-                        size="small"
-                        fullWidth
-                        inputProps={{ min: 0, step: 0.01 }}
-                    />
                     <Button
                         variant="contained"
                         color="primary"
@@ -572,6 +1042,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                              (Market Closed)
                          </span>}
                     </Typography>
+
                     <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
                         <Button
                             variant="outlined"
@@ -804,13 +1275,42 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 </Table>
 
                 {/* Automated Orders Section */}
-                <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
-                    Automated Orders
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Typography sx={{ fontWeight: 1000 }}>
+                        Automated Orders
+                    </Typography>
+                    {/* Status Polling Indicator */}
+                    {orders.some(order => order.status === 'SENT TO ZERODHA') && (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1,
+                            px: 1.5,
+                            py: 0.5,
+                            bgcolor: 'info.50',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'info.200'
+                        }}>
+                            <Box sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                bgcolor: 'info.main',
+                                animation: 'pulse 2s infinite'
+                            }} />
+                            <Typography variant="caption" color="info.main" sx={{ fontWeight: 600 }}>
+                                Live Status Monitoring
+                            </Typography>
+                        </Box>
+                    )}
+                </Box>
                 {Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0 ? (
                     <AutomatedOrdersTable
                         orders={orders}
                         onRefresh={fetchOrders}
+                        onStatusCheck={handleManualStatusCheck}
+                        checkingStatus={checkingOrderStatuses}
                         strategyId={strategy.strategyid}
                     />
                 ) : (

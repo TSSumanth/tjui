@@ -421,12 +421,12 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                             <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
                                                                 Order Type:
                                                             </Typography>
-                                                            <TextField
-                                                                select
-                                                                value={orderStates[idx]?.order_type || 'MARKET'}
-                                                                onChange={e => handleOrderTypeChange(idx, e.target.value)}
-                                                                size="small"
-                                                                fullWidth
+                                <TextField
+                                    select
+                                    value={orderStates[idx]?.order_type || 'MARKET'}
+                                    onChange={e => handleOrderTypeChange(idx, e.target.value)}
+                                    size="small"
+                                    fullWidth
                                                                 disabled={!isSelected}
                                                                 sx={{ 
                                                                     '& .MuiOutlinedInput-root': {
@@ -438,11 +438,11 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                                         }
                                                                     }
                                                                 }}
-                                                            >
-                                                                {ORDER_TYPES.map(opt => (
-                                                                    <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                                                                ))}
-                                                            </TextField>
+                                >
+                                    {ORDER_TYPES.map(opt => (
+                                        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                    ))}
+                                </TextField>
                                                         </Box>
                                                         <Box sx={{ 
                                                             minWidth: 200,
@@ -453,11 +453,11 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                             <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
                                                                 Limit Price (optional):
                                                             </Typography>
-                                                            <TextField
-                                                                value={orderStates[idx]?.price || ''}
-                                                                onChange={e => handlePriceChange(idx, e.target.value)}
-                                                                size="small"
-                                                                fullWidth
+                                <TextField
+                                    value={orderStates[idx]?.price || ''}
+                                    onChange={e => handlePriceChange(idx, e.target.value)}
+                                    size="small"
+                                    fullWidth
                                                                 disabled={!isSelected || orderStates[idx]?.order_type !== 'LIMIT'}
                                                                 placeholder={orderStates[idx]?.order_type === 'LIMIT' ? 'Enter limit price' : 'Not required for market orders'}
                                                                 sx={{ 
@@ -476,7 +476,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                 </Box>
                                             </CardContent>
                                         </Card>
-                                    </Grid>
+                            </Grid>
                                 );
                             })}
                         </Grid>
@@ -500,7 +500,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                 <Typography variant="body2" color="text.secondary">
                                     Ready to create {selectedPositions.size} automated exit order{selectedPositions.size > 1 ? 's' : ''} for the selected position{selectedPositions.size > 1 ? 's' : ''}.
                                 </Typography>
-                            </Box>
+                    </Box>
                         )}
                     </>
                 )}

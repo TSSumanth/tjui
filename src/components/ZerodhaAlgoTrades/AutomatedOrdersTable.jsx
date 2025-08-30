@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Table, TableHead, TableRow, TableCell, TableBody, Typography, IconButton, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Box, Tooltip } from '@mui/material';
+import { Table, TableHead, TableRow, TableCell, TableBody, Typography, IconButton, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Box, Tooltip, CircularProgress } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { deleteAutomatedOrder, updateAutomatedOrder } from '../../services/automatedOrders';
 import { placeRegularOrder } from '../../services/zerodha/api';
 import { updateAlgoStrategy, getAlgoStrategies } from '../../services/algoStrategies';
 
 const ORDER_TYPES = ['LIMIT', 'MARKET'];
 
-const AutomatedOrdersTable = ({ orders, onRefresh, strategyId }) => {
+const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus, strategyId }) => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [editOrder, setEditOrder] = useState(null);
     const [editState, setEditState] = useState({ order_type: 'MARKET', price: '' });
@@ -72,7 +73,7 @@ const AutomatedOrdersTable = ({ orders, onRefresh, strategyId }) => {
                 tradingsymbol: order.trading_symbol,
                 exchange: order.exchange,
                 transaction_type: order.transaction_type,
-                quantity: order.quantity,
+                quantity: Math.abs(order.quantity),
                 product: order.product,
                 order_type: order.order_type,
                 validity: order.validity
@@ -124,9 +125,29 @@ const AutomatedOrdersTable = ({ orders, onRefresh, strategyId }) => {
         <>
             {/* Table Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                    {orders.length} Automated Order{orders.length !== 1 ? 's' : ''}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        {orders.length} Automated Order{orders.length !== 1 ? 's' : ''}
+                    </Typography>
+                    {/* Status Summary */}
+                    {orders.some(order => order.status === 'SENT TO ZERODHA') && (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1,
+                            px: 1.5,
+                            py: 0.5,
+                            bgcolor: 'warning.50',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'warning.200'
+                        }}>
+                            <Typography variant="caption" color="warning.main" sx={{ fontWeight: 600 }}>
+                                {orders.filter(o => o.status === 'SENT TO ZERODHA').length} Order{orders.filter(o => o.status === 'SENT TO ZERODHA').length > 1 ? 's' : ''} Pending
+                            </Typography>
+                        </Box>
+                    )}
+                </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Typography variant="caption" color="text.secondary">
                         Manage exit orders for your positions
@@ -146,6 +167,26 @@ const AutomatedOrdersTable = ({ orders, onRefresh, strategyId }) => {
                             Actions Available: OPEN orders only
                         </Typography>
                     </Box>
+                    {/* Manual Refresh Button */}
+                    {orders.some(order => order.status === 'SENT TO ZERODHA') && (
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={onStatusCheck}
+                            disabled={loading || checkingStatus}
+                            startIcon={checkingStatus ? <CircularProgress size={16} /> : <RefreshIcon />}
+                            sx={{
+                                borderColor: 'warning.main',
+                                color: 'warning.main',
+                                '&:hover': {
+                                    borderColor: 'warning.dark',
+                                    backgroundColor: 'warning.50'
+                                }
+                            }}
+                        >
+                            {checkingStatus ? 'Checking...' : 'Check Status'}
+                        </Button>
+                    )}
                 </Box>
             </Box>
             
