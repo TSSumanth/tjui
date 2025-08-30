@@ -32,6 +32,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote } from '../../services/algoStrategies';
 import { getAutomatedOrderById } from '../../services/automatedOrders';
 import { getPositions } from '../../services/zerodha/api';
+import { isMarketOpen } from '../../services/zerodha/utils';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 
@@ -56,6 +57,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [selectedPositions, setSelectedPositions] = useState([]);
     const [totalPL, setTotalPL] = useState(0);
     const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
+    const [syncingPositions, setSyncingPositions] = useState(false);
+    const [showClosedPositions, setShowClosedPositions] = useState(true);
 
     // Strategy Notes States
     const [notes, setNotes] = useState([]);
@@ -296,6 +299,110 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     };
 
+    const handleSyncPositions = async () => {
+        setSyncingPositions(true);
+        try {
+            // Fetch latest positions from Zerodha
+            const data = await getPositions();
+            const currentZerodhaPositions = data.data.net || [];
+            
+            // Create a map of current Zerodha positions by trading symbol
+            const zerodhaPositionMap = new Map();
+            currentZerodhaPositions.forEach(pos => {
+                if (pos.quantity !== 0) {
+                    zerodhaPositionMap.set(pos.tradingsymbol, pos);
+                }
+            });
+
+            // Get current strategy positions
+            const currentStrategyPositions = strategy.instruments_details || [];
+            
+            // Update strategy positions based on Zerodha data
+            const updatedInstruments = [];
+            const changes = [];
+
+            // Process each strategy position
+            currentStrategyPositions.forEach(strategyPos => {
+                const zerodhaPos = zerodhaPositionMap.get(strategyPos.tradingsymbol);
+                
+                if (zerodhaPos) {
+                    // Position still exists in Zerodha
+                    if (zerodhaPos.quantity !== strategyPos.quantity) {
+                        // Quantity changed
+                        const oldType = strategyPos.transaction_type;
+                        const newType = zerodhaPos.quantity > 0 ? 'BUY' : 'SELL';
+                        const typeChanged = oldType !== newType;
+                        
+                        if (typeChanged) {
+                            changes.push(`${strategyPos.tradingsymbol}: ${strategyPos.quantity}(${oldType}) → ${zerodhaPos.quantity}(${newType})`);
+                        } else {
+                            changes.push(`${strategyPos.tradingsymbol}: ${strategyPos.quantity} → ${zerodhaPos.quantity}`);
+                        }
+                        
+                        updatedInstruments.push({
+                            ...strategyPos,
+                            quantity: zerodhaPos.quantity,
+                            price: zerodhaPos.average_price, // Update average price too
+                            transaction_type: newType
+                        });
+                    } else {
+                        // No change, keep as is
+                        updatedInstruments.push(strategyPos);
+                    }
+                    // Remove from map to avoid duplicates
+                    zerodhaPositionMap.delete(strategyPos.tradingsymbol);
+                } else {
+                    // Position closed in Zerodha (quantity = 0)
+                    changes.push(`${strategyPos.tradingsymbol}: ${strategyPos.quantity} → CLOSED`);
+                    // Don't add to updatedInstruments (position is closed)
+                }
+            });
+
+            // Add new positions from Zerodha that weren't in strategy
+            zerodhaPositionMap.forEach((zerodhaPos, symbol) => {
+                changes.push(`NEW: ${symbol} (${zerodhaPos.quantity})`);
+                updatedInstruments.push({
+                    tradingsymbol: zerodhaPos.tradingsymbol,
+                    quantity: zerodhaPos.quantity,
+                    transaction_type: zerodhaPos.quantity > 0 ? 'BUY' : 'SELL',
+                    price: zerodhaPos.average_price,
+                    instrument_token: zerodhaPos.instrument_token,
+                    exchange: zerodhaPos.exchange,
+                    product: zerodhaPos.product
+                });
+            });
+
+            // Update strategy with new positions
+            await updateAlgoStrategy(strategy.strategyid, {
+                instruments_details: updatedInstruments
+            });
+
+            // Show summary of changes
+            if (changes.length > 0) {
+                setSnackbar({
+                    open: true,
+                    message: `Positions synced! Changes: ${changes.join(', ')}`,
+                    severity: 'success'
+                });
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: 'Positions are already in sync!',
+                    severity: 'info'
+                });
+            }
+
+            onStrategyUpdate && onStrategyUpdate();
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to sync positions',
+                severity: 'error'
+            });
+        }
+        setSyncingPositions(false);
+    };
+
     // Strategy Notes Functions
     const handleViewMoreNotes = () => setShowNotesDialog(true);
     const handleCloseNotesDialog = () => setShowNotesDialog(false);
@@ -419,6 +526,10 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ? 
                             zerodhaWebSocketData[underlyingInstrumentToken].ltp : 
                             'Loading...'}
+                        {!isMarketOpen() && 
+                         <span style={{ fontSize: '0.8em', color: 'orange', marginLeft: '8px' }}>
+                             (Market Closed)
+                         </span>}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
                         <IconButton
@@ -428,6 +539,15 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         >
                             <AddIcon />
                         </IconButton>
+                        <Button
+                            variant="outlined"
+                            color="primary"
+                            size="small"
+                            onClick={handleSyncPositions}
+                            disabled={syncingPositions}
+                        >
+                            {syncingPositions ? 'Syncing...' : 'Sync Positions'}
+                        </Button>
                         <Button
                             variant="contained"
                             color="secondary"
@@ -440,10 +560,26 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 </Box>
 
                 {/* Positions Table */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        {Array.isArray(strategy.instruments_details) ? 
+                            `${strategy.instruments_details.filter(inst => inst.quantity !== 0).length} Active, ${strategy.instruments_details.filter(inst => inst.quantity === 0).length} Closed` : 
+                            'No positions'}
+                    </Typography>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setShowClosedPositions(!showClosedPositions)}
+                        sx={{ fontSize: '0.75rem' }}
+                    >
+                        {showClosedPositions ? 'Hide Closed' : 'Show Closed'}
+                    </Button>
+                </Box>
                 <Table size="small" sx={{ mb: 2 }}>
                     <TableHead>
                         <TableRow>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
+                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Entry Price</TableCell>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
@@ -455,14 +591,28 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {Array.isArray(strategy.instruments_details) && strategy.instruments_details.map((inst, idx) => (
-                            <TableRow key={idx}>
+                        {Array.isArray(strategy.instruments_details) && 
+                         strategy.instruments_details
+                             .filter(inst => showClosedPositions || inst.quantity !== 0)
+                             .map((inst, idx) => (
+                            <TableRow key={idx} sx={{
+                                backgroundColor: inst.quantity === 0 ? 'grey.100' : 'inherit',
+                                opacity: inst.quantity === 0 ? 0.6 : 1
+                            }}>
                                 <TableCell sx={{
                                     p: 0.5, fontSize: 14,
-                                    color: inst.quantity < 0 ? 'error.main' : 'text.primary',
-                                    fontWeight: inst.quantity < 0 ? 700 : 500
-                                }}>{inst.tradingsymbol} {"(" + inst.quantity + ")"}</TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'capitalize' }}>
+                                    color: inst.quantity === 0 ? 'text.secondary' : 'text.primary',
+                                    fontWeight: 500,
+                                    textDecoration: inst.quantity === 0 ? 'line-through' : 'none'
+                                }}>{inst.tradingsymbol} {inst.quantity === 0 && '(CLOSED)'}</TableCell>
+                                <TableCell sx={{
+                                    p: 0.5, fontSize: 14,
+                                    color: inst.quantity === 0 ? 'text.secondary' : 
+                                           inst.quantity < 0 ? 'error.main' : 'success.main',
+                                    fontWeight: inst.quantity < 0 ? 700 : 600,
+                                    textAlign: 'center'
+                                }}>{inst.quantity}</TableCell>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'uppercase' }}>
                                     {inst.transaction_type}
                                 </TableCell>
                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
@@ -472,10 +622,12 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                     {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
                                 </TableCell>
                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price}
+                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price || 
+                                     (isMarketOpen() ? 'No Data' : 'Market Closed')}
                                 </TableCell>
                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
-                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price}
+                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price || 
+                                     (isMarketOpen() ? 'No Data' : 'Market Closed')}
                                 </TableCell>
                                 <TableCell sx={{ p: 0.5, fontSize: 14 }}>
                                     {(() => {
@@ -495,7 +647,10 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                         const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
                                         const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
                                         const price = inst.price;
-                                        if (!askPrice || !price) return '-';
+                                        
+                                        if (!askPrice || !bidPrice || !price) {
+                                            return isMarketOpen() ? 'No Data' : 'Market Closed';
+                                        }
 
                                         const pl = inst.quantity > 0
                                             ? (bidPrice - price) * inst.quantity
@@ -516,7 +671,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             </TableRow>
                         ))}
                         <TableRow>
-                            <TableCell colSpan={6} sx={{ p: 0.5, fontWeight: 600, textAlign: 'right' }}>
+                            <TableCell colSpan={8} sx={{ p: 0.5, fontWeight: 600, textAlign: 'right' }}>
                                 Total P/L:
                             </TableCell>
                             <TableCell sx={{

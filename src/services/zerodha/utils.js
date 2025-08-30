@@ -6,10 +6,20 @@ const isMarketHours = () => {
     const minutes = now.getMinutes();
     const currentTime = hours * 100 + minutes;
 
-    // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 4:00 PM
-    // return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1600;
+    // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 3:30 PM
+    // return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
     return true;
 };
+
+const isMarketOpen = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const currentTime = hours * 100 + minutes;
+    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
+};
+
 
 // Add this helper function at the top with other constants
 const isTokenExpired = (tokenTimestamp) => {
@@ -28,4 +38,4 @@ const isTokenExpired = (tokenTimestamp) => {
     return true;
 };
 
-export { isMarketHours, isTokenExpired };
+export { isMarketHours, isMarketOpen, isTokenExpired };
