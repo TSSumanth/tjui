@@ -904,49 +904,49 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             <CardContent>
 
                  {/* Strategy Configuration Section */}
-                 {/* Enhanced Strategy Configuration Box */}
+                 {/* Enhanced Strategy Configuration Box - Optimized */}
                 <Box sx={{
-                    p: 2,
-                    mb: 2,
+                    p: 1.5,
+                    mb: 1.5,
                     borderRadius: 2,
                     bgcolor: 'grey.50',
                     border: '1px solid',
                     borderColor: 'grey.200',
                     boxShadow: 1
                 }}>
-                    {/* Header */}
+                    {/* Header - More Compact */}
                     <Box sx={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
-                        mb: 2,
-                        pb: 1,
+                        mb: 1.5,
+                        pb: 0.75,
                         borderBottom: '1px solid',
                         borderColor: 'grey.200'
                     }}>
                         <Box sx={{
-                            width: 20,
-                            height: 20,
+                            width: 18,
+                            height: 18,
                             borderRadius: '50%',
                             bgcolor: 'primary.main',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                         }}>
-                            <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+                            <Typography variant="caption" sx={{ color: 'white', fontWeight: 600, fontSize: '0.7rem' }}>
                                 ⚙️
                             </Typography>
                         </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
                             Strategy Configuration
                         </Typography>
                     </Box>
 
-                    {/* Form Fields Grid */}
+                    {/* Form Fields Grid - Optimized */}
                     <Box sx={{
                         display: 'grid',
                         gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr auto' },
-                        gap: 2,
+                        gap: 1.5,
                         alignItems: 'end'
                     }}>
                         {/* Strategy Type Field */}
@@ -1102,88 +1102,117 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </Button>
                     </Box>
 
-                    {/* Helper Text */}
+                    {/* Helper Text - More Compact */}
                     <Box sx={{
-                        mt: 1.5,
-                        pt: 1.5,
+                        mt: 1,
+                        pt: 1,
                         borderTop: '1px solid',
                         borderColor: 'grey.200',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1
                     }}>
-                        <Box sx={{ color: 'info.main', fontSize: '0.875rem' }}>💡</Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                        <Box sx={{ color: 'info.main', fontSize: '0.75rem' }}>💡</Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', fontSize: '0.7rem' }}>
                             Update your strategy configuration settings here. Changes will be applied immediately.
                         </Typography>
                     </Box>
                 </Box>
                 
-                {/* Target Achievement Summary */}
+                {/* Target Achievement Summary - Optimized */}
                 {typeof strategyTarget === 'number' && strategyTarget > 0 ? (
                     <Box sx={{
-                        mb: 2,
-                        p: 1.5,
+                        mb: 1.5,
+                        p: 1.25,
                         borderRadius: 2,
                         border: '2px solid',
                         borderColor: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ?'error.main' : 'warning.main',
                         bgcolor: targetAchievements.get(strategyTarget) ? 'success.50' : 'warning.50',
                         boxShadow: 1
                     }}>
-                        {/* Header Row */}
+                        {/* Compact Header Row */}
                         <Box sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr auto auto',
+                            gap: 2,
                             alignItems: 'center',
-                            mb: 1.5
+                            mb: 1
                         }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Box>
-                                    <Typography
-                                        variant="h6"
-                                        sx={{
-                                            fontWeight: 800,
-                                            color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.5px',
-                                            fontSize: '1.1rem'
-                                        }}
-                                    >
-                                        {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED! ₹' + strategyTarget?.toFixed(2) : '🎯 TARGET PENDING: ₹' + strategyTarget?.toFixed(2)}
+                            {/* Target Info */}
+                            <Box>
+                                <Typography
+                                    variant="subtitle1"
+                                    sx={{
+                                        fontWeight: 700,
+                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.3px',
+                                        fontSize: '1rem',
+                                        mb: 0.5
+                                    }}
+                                >
+                                    {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED!' : '🎯 TARGET PENDING'}
+                                </Typography>
+                                
+                                {/* Compact Info Row */}
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                                        Target: ₹{strategyTarget?.toFixed(2)}
                                     </Typography>
-
-
-                                    {/* Max Loss Status */}
+                                    
+                                    {/* Max Loss Status - Inline */}
                                     {typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && (
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                color: maxLossTriggered ? 'error.main' : 'text.secondary',
-                                                fontWeight: 600,
-                                                mt: 0.5,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 1
-                                            }}
-                                        >
-                                            {maxLossTriggered ? (
-                                                <>
-                                                    🚨 Max Loss Triggered: ₹{Math.abs(strategyMaxLoss).toFixed(2)}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    ⚠️ Max Loss Limit: ₹{Math.abs(strategyMaxLoss).toFixed(2)}
-                                                </>
-                                            )}
+                                        <Typography variant="body2" sx={{ 
+                                            color: maxLossTriggered ? 'error.main' : 'text.primary',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 0.5
+                                        }}>
+                                            {maxLossTriggered ? `🚨 Max Loss Triggered: ₹${Math.abs(strategyMaxLoss).toFixed(2)}` : `⚠️ Max Loss Trigger Pending: ₹${Math.abs(strategyMaxLoss).toFixed(2)}`}
+                                            
                                         </Typography>
                                     )}
                                 </Box>
                             </Box>
 
-                            {/* Compact P/L Display */}
-                            <Box sx={{ textAlign: 'right' }}>
+                            {/* Progress Bar */}
+                            {!targetAchievements.get(strategyTarget) && (
+                                <Box sx={{ width: 120, minWidth: 120 }}>
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        mb: 0.5
+                                    }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                                            Progress
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                                            {Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100)).toFixed(1)}%
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ 
+                                        width: '100%', 
+                                        bgcolor: 'grey.300',
+                                        borderRadius: 3,
+                                        overflow: 'hidden'
+                                    }}>
+                                        <Box sx={{ 
+                                            width: `${Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100))}%`,
+                                            height: 5,
+                                            bgcolor: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'grey.400',
+                                            borderRadius: 3,
+                                            transition: 'width 0.5s ease-in-out'
+                                        }} />
+                                    </Box>
+                                </Box>
+                            )}
+
+                            {/* Current P/L Display */}
+                            <Box sx={{ textAlign: 'right', minWidth: 100 }}>
                                 <Typography
-                                    variant="h5"
+                                    variant="h6"
                                     sx={{
                                         fontWeight: 900,
                                         color: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
@@ -1204,13 +1233,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             </Box>
                         </Box>
 
-                        {/* Compact Target Management Row */}
+                        {/* Compact Target Management Row - Optimized */}
                         <Box sx={{
                             display: 'grid',
                             gridTemplateColumns: '1fr auto auto auto',
-                            gap: 2,
+                            gap: 1.5,
                             alignItems: 'center',
-                            p: 1.5,
+                            p: 1.25,
                             bgcolor: 'grey.50',
                             borderRadius: 1.5,
                             border: '1px solid',
@@ -1399,35 +1428,48 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
                
 
-                {/* Tracking Positions Section */}
+                {/* Tracking Positions Section - Optimized */}
                 <Box sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: { xs: 'flex-start', sm: 'center' },
-                    gap: 2,
-                    mb: 2,
-                    flexWrap: 'wrap'
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr auto' },
+                    gap: 1.5,
+                    mb: 1.5,
+                    alignItems: 'center',
+                    p: 1,
+                    bgcolor: 'grey.50',
+                    borderRadius: 1.5,
+                    border: '1px solid',
+                    borderColor: 'grey.200'
                 }}>
-                    <Typography sx={{ fontWeight: 1000 }}>
-                        Tracking Positions
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                        📊 Tracking Positions
                     </Typography>
-                    <Typography sx={{ fontWeight: 1000 }}>
-                        LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ?
-                            zerodhaWebSocketData[underlyingInstrumentToken].ltp :
-                            'Loading...'}
+                    
+                    <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1,
+                        justifyContent: { xs: 'flex-start', sm: 'center' }
+                    }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                            LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ?
+                                zerodhaWebSocketData[underlyingInstrumentToken].ltp :
+                                'Loading...'}
+                        </Typography>
                         {!isMarketOpen() &&
-                            <span style={{ fontSize: '0.8em', color: 'orange', marginLeft: '8px' }}>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'orange' }}>
                                 (Market Closed)
-                            </span>}
-                    </Typography>
+                            </Typography>}
+                    </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
                         <Button
                             variant="outlined"
                             color="primary"
                             size="small"
                             onClick={handleOpenAddPosition}
                             startIcon={<AddIcon />}
+                            sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
                         >
                             Add Position
                         </Button>
@@ -1437,6 +1479,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             size="small"
                             onClick={handleSyncPositions}
                             disabled={syncingPositions}
+                            sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
                         >
                             {syncingPositions ? 'Syncing...' : 'Sync Positions'}
                         </Button>
@@ -1445,6 +1488,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             color="secondary"
                             size="small"
                             onClick={() => handleOpenOrderPopup(strategy.instruments_details, strategy)}
+                            sx={{ fontSize: '0.75rem', py: 0.5, px: 1 }}
                         >
                             Create Orders
                         </Button>
