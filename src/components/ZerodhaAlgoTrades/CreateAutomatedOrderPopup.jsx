@@ -144,13 +144,13 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
         <Dialog 
             open={open} 
             onClose={onClose} 
-            maxWidth="lg" 
+            maxWidth="md" 
             fullWidth
             PaperProps={{
                 sx: {
                     borderRadius: 3,
                     boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                    minHeight: '60vh'
+                    maxHeight: '85vh'
                 }
             }}
         >
@@ -159,7 +159,8 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
-                borderBottom: '1px solid #e0e0e0'
+                borderBottom: '1px solid #e0e0e0',
+                mb: 0
             }}>
                 <Typography variant="h6" fontWeight={600}>
                     Create Automated Orders
@@ -169,7 +170,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                 </IconButton>
             </DialogTitle>
 
-            <DialogContent sx={{ p: 3 }}>
+            <DialogContent sx={{ p: 2 }}>
                 {loading && (
                     <Box sx={{ mb: 2 }}>
                         <LinearProgress />
@@ -201,7 +202,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                     </Box>
                 ) : (
                     <>
-                        <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                             <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                                 Strategy: {strategyDetails?.strategy_type || 'N/A'}
                             </Typography>
@@ -212,8 +213,8 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
 
                         {/* Selection Controls */}
                         <Box sx={{ 
-                            mb: 3, 
-                            p: 2, 
+                            mb: 2, 
+                            p: 1.5, 
                             bgcolor: 'grey.50', 
                             borderRadius: 2,
                             display: 'flex',
@@ -247,7 +248,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                             </Box>
                         </Box>
 
-                        <Grid container spacing={2}>
+                        <Grid container spacing={1.5}>
                             {openPositions.map((pos, idx) => {
                                 const isSelected = selectedPositions.has(idx);
                                 return (
@@ -266,13 +267,13 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                 transition: 'all 0.2s ease-in-out'
                                             }}
                                         >
-                                            <CardContent sx={{ p: 2 }}>
+                                            <CardContent sx={{ p: 1.5 }}>
                                                 {/* Header with Checkbox */}
                                                 <Box sx={{ 
                                                     display: 'flex', 
                                                     justifyContent: 'space-between', 
                                                     alignItems: 'center',
-                                                    mb: 2
+                                                    mb: 1.5
                                                 }}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                         <FormControlLabel
@@ -298,118 +299,130 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                     />
                                                 </Box>
 
-                                                <Divider sx={{ mb: 2 }} />
+                                                <Divider sx={{ mb: 1.5 }} />
 
-                                                {/* Position Details */}
-                                                <Grid container spacing={2} sx={{ mb: 2 }}>
-                                                    <Grid item xs={6} sm={3}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Instrument Token
-                                                        </Typography>
-                                                        <Typography variant="body2" fontWeight={500}>
-                                                            {pos.instrument_token}
-                                                        </Typography>
-                                                    </Grid>
-                                                    <Grid item xs={6} sm={3}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Exchange
-                                                        </Typography>
-                                                        <Typography variant="body2" fontWeight={500}>
-                                                            {pos.exchange}
-                                                        </Typography>
-                                                    </Grid>
-                                                    <Grid item xs={6} sm={3}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Product
-                                                        </Typography>
-                                                        <Typography variant="body2" fontWeight={500}>
-                                                            {pos.product}
-                                                        </Typography>
-                                                    </Grid>
-                                                    <Grid item xs={6} sm={3}>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            Validity
-                                                        </Typography>
-                                                        <Typography variant="body2" fontWeight={500}>
-                                                            IOC
-                                                        </Typography>
-                                                    </Grid>
-                                                </Grid>
-
-                                                {/* Current Position Info */}
+                                                {/* Position Details - Compact Layout with Current Position */}
                                                 <Box sx={{ 
-                                                    bgcolor: 'grey.50', 
-                                                    p: 2, 
-                                                    borderRadius: 1,
-                                                    mb: 2
+                                                    display: 'flex', 
+                                                    justifyContent: 'space-between', 
+                                                    alignItems: 'center',
+                                                    mb: 1.5,
+                                                    p: 1.5,
+                                                    bgcolor: 'grey.50',
+                                                    borderRadius: 1
                                                 }}>
-                                                    <Typography variant="subtitle2" gutterBottom>
-                                                        Current Position
-                                                    </Typography>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={6}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                Transaction Type
+                                                                Token:
+                                                            </Typography>
+                                                            <Typography variant="body2" fontWeight={500} sx={{ ml: 0.5 }}>
+                                                                {pos.instrument_token}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Exchange:
+                                                            </Typography>
+                                                            <Typography variant="body2" fontWeight={500} sx={{ ml: 0.5 }}>
+                                                                {pos.exchange}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Product:
+                                                            </Typography>
+                                                            <Typography variant="body2" fontWeight={500} sx={{ ml: 0.5 }}>
+                                                                {pos.product}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Validity:
+                                                            </Typography>
+                                                            <Typography variant="body2" fontWeight={500} sx={{ ml: 0.5 }}>
+                                                                IOC
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box sx={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: 0.5,
+                                                            pl: 2,
+                                                            borderLeft: '1px solid',
+                                                            borderColor: 'grey.300'
+                                                        }}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Transaction Type:
                                                             </Typography>
                                                             <Chip 
                                                                 label={pos.transaction_type}
                                                                 size="small"
                                                                 color={getTransactionTypeColor(pos.transaction_type)}
-                                                                sx={{ ml: 1 }}
+                                                                sx={{ ml: 0.5 }}
                                                             />
-                                                        </Grid>
-                                                        <Grid item xs={6}>
+                                                        </Box>
+                                                        <Box sx={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: 0.5,
+                                                            pl: 2,
+                                                            borderLeft: '1px solid',
+                                                            borderColor: 'grey.300'
+                                                        }}>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                Quantity
+                                                                Quantity:
                                                             </Typography>
                                                             <Chip 
                                                                 label={pos.quantity}
                                                                 size="small"
                                                                 color={getQuantityColor(pos.quantity)}
-                                                                sx={{ ml: 1 }}
+                                                                sx={{ ml: 0.5 }}
                                                             />
-                                                        </Grid>
-                                                    </Grid>
+                                                        </Box>
+                                                    </Box>
                                                 </Box>
 
                                                 {/* Exit Order Configuration */}
                                                 <Box sx={{ 
                                                     bgcolor: 'primary.50', 
-                                                    p: 2, 
+                                                    p: 1, 
                                                     borderRadius: 1,
                                                     border: '1px solid',
                                                     borderColor: 'primary.200'
                                                 }}>
-                                                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>
+                                                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main', mb: 1 }}>
                                                         Exit Order Configuration
                                                     </Typography>
-                                                    <Grid container spacing={2} alignItems="center">
-                                                        <Grid item xs={12} sm={4}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                Exit Transaction
+                                                                Transaction:
                                                             </Typography>
                                                             <Chip 
                                                                 label={pos.transaction_type === "BUY" ? "SELL" : "BUY"}
                                                                 size="small"
                                                                 color={pos.transaction_type === "BUY" ? "error" : "success"}
-                                                                sx={{ ml: 1 }}
+                                                                sx={{ ml: 0.5 }}
                                                             />
-                                                        </Grid>
-                                                        <Grid item xs={12} sm={4}>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                Exit Quantity
+                                                                Quantity:
                                                             </Typography>
                                                             <Chip 
                                                                 label={Math.abs(pos.quantity)}
                                                                 size="small"
                                                                 color="primary"
-                                                                sx={{ ml: 1 }}
+                                                                sx={{ ml: 0.5 }}
                                                             />
-                                                        </Grid>
-                                                        <Grid item xs={12} sm={4}>
+                                                        </Box>
+                                                        <Box sx={{ minWidth: 120 }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+                                                                Order Type:
+                                                            </Typography>
                                                             <TextField
                                                                 select
-                                                                label="Order Type"
                                                                 value={orderStates[idx]?.order_type || 'MARKET'}
                                                                 onChange={e => handleOrderTypeChange(idx, e.target.value)}
                                                                 size="small"
@@ -417,7 +430,12 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                                 disabled={!isSelected}
                                                                 sx={{ 
                                                                     '& .MuiOutlinedInput-root': {
-                                                                        bgcolor: 'white'
+                                                                        bgcolor: 'white',
+                                                                        height: 32,
+                                                                        '& .MuiSelect-select': {
+                                                                            py: 0.5,
+                                                                            fontSize: '0.875rem'
+                                                                        }
                                                                     }
                                                                 }}
                                                             >
@@ -425,10 +443,17 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                                     <MenuItem key={opt} value={opt}>{opt}</MenuItem>
                                                                 ))}
                                                             </TextField>
-                                                        </Grid>
-                                                        <Grid item xs={12}>
+                                                        </Box>
+                                                        <Box sx={{ 
+                                                            minWidth: 200,
+                                                            pl: 2,
+                                                            borderLeft: '1px solid',
+                                                            borderColor: 'primary.200'
+                                                        }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+                                                                Limit Price (optional):
+                                                            </Typography>
                                                             <TextField
-                                                                label="Limit Price (optional)"
                                                                 value={orderStates[idx]?.price || ''}
                                                                 onChange={e => handlePriceChange(idx, e.target.value)}
                                                                 size="small"
@@ -437,12 +462,17 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                                                                 placeholder={orderStates[idx]?.order_type === 'LIMIT' ? 'Enter limit price' : 'Not required for market orders'}
                                                                 sx={{ 
                                                                     '& .MuiOutlinedInput-root': {
-                                                                        bgcolor: 'white'
+                                                                        bgcolor: 'white',
+                                                                        height: 32,
+                                                                        '& .MuiInputBase-input': {
+                                                                            py: 0.5,
+                                                                            fontSize: '0.875rem'
+                                                                        }
                                                                     }
                                                                 }}
                                                             />
-                                                        </Grid>
-                                                    </Grid>
+                                                        </Box>
+                                                    </Box>
                                                 </Box>
                                             </CardContent>
                                         </Card>
@@ -454,8 +484,8 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                         {/* Summary */}
                         {selectedPositions.size > 0 && (
                             <Box sx={{ 
-                                mt: 3, 
-                                p: 2, 
+                                mt: 2, 
+                                p: 1.5, 
                                 bgcolor: 'success.50', 
                                 borderRadius: 2,
                                 border: '1px solid',
@@ -476,7 +506,7 @@ const CreateAutomatedOrderPopup = ({ open, onClose, positions = [], onSuccess, s
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ p: 3, pt: 0 }}>
+            <DialogActions sx={{ p: 2, pt: 0 }}>
                 <Button 
                     onClick={onClose} 
                     disabled={loading}

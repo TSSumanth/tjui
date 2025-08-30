@@ -141,17 +141,25 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     // Fetch orders for the strategy
     const fetchOrders = async () => {
-        if (Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0) {
-            const orders = await Promise.all(
-                strategy.automated_order_ids.map(async (orderId) => {
-                    try {
-                        return await getAutomatedOrderById(orderId);
-                    } catch {
-                        return null;
-                    }
-                })
-            );
-            setOrders(orders.filter(Boolean));
+        try {
+            if (Array.isArray(strategy.automated_order_ids) && strategy.automated_order_ids.length > 0) {
+                const orders = await Promise.all(
+                    strategy.automated_order_ids.map(async (orderId) => {
+                        try {
+                            return await getAutomatedOrderById(orderId);
+                        } catch (err) {
+                            console.warn(`Failed to fetch order ${orderId}:`, err);
+                            return null;
+                        }
+                    })
+                );
+                setOrders(orders.filter(Boolean));
+            } else {
+                setOrders([]);
+            }
+        } catch (err) {
+            console.error('Failed to fetch orders:', err);
+            setOrders([]);
         }
     };
 
@@ -177,6 +185,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         console.log('Found token:', underlyingInstrumentToken);
         console.log('WebSocket data keys:', Object.keys(zerodhaWebSocketData || {}));
     }, [strategy, zerodhaWebSocketData]);
+
+
 
     const handleEditChange = (field, value) => {
         setEditState(prev => ({
@@ -222,8 +232,18 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     };
 
     const handleOrderPopupSuccess = async () => {
+        // Refresh the strategy data to get updated automated_order_ids
+        onStrategyUpdate && onStrategyUpdate();
+        // Also fetch orders for immediate display
         await fetchOrders();
         handleCloseOrderPopup();
+        
+        // Show success message
+        setSnackbar({
+            open: true,
+            message: 'Automated orders created successfully!',
+            severity: 'success'
+        });
     };
 
     const handleOpenAddPosition = async () => {
