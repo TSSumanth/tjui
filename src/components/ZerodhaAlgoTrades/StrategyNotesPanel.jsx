@@ -1,12 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Link, CircularProgress, Dialog, DialogTitle, DialogContent, IconButton } from '@mui/material';
+import { 
+    Box, 
+    Typography, 
+    Link, 
+    CircularProgress, 
+    Dialog, 
+    DialogTitle, 
+    DialogContent, 
+    IconButton,
+    Button,
+    DialogActions,
+    Alert,
+    Snackbar
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { getStrategyNoteById } from '../../services/algoStrategies';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { getStrategyNoteById, deleteStrategyNote } from '../../services/algoStrategies';
 
-const StrategyNotesPanel = ({ strategyid }) => {
+const StrategyNotesPanel = ({ strategyid, onNotesUpdate }) => {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showDialog, setShowDialog] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
         const fetchNotes = async () => {
@@ -24,15 +41,80 @@ const StrategyNotesPanel = ({ strategyid }) => {
 
     const handleViewMore = () => setShowDialog(true);
     const handleCloseDialog = () => setShowDialog(false);
+    const handleDeleteAllNotes = () => setShowDeleteDialog(true);
+    const handleCloseDeleteDialog = () => setShowDeleteDialog(false);
+
+    const confirmDeleteAllNotes = async () => {
+        setShowDeleteDialog(false);
+        setDeleting(true);
+        
+        try {
+            if (notes && notes.length > 0) {
+                // Delete each note
+                const deletePromises = notes.map(note => deleteStrategyNote(note.id));
+                await Promise.all(deletePromises);
+                
+                setSnackbar({
+                    open: true,
+                    message: `Successfully deleted ${notes.length} note${notes.length > 1 ? 's' : ''}`,
+                    severity: 'success'
+                });
+                
+                // Clear notes locally
+                setNotes([]);
+                
+                // Notify parent component if callback provided
+                if (onNotesUpdate) {
+                    onNotesUpdate();
+                }
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: 'No notes found to delete',
+                    severity: 'info'
+                });
+            }
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to delete notes',
+                severity: 'error'
+            });
+        }
+        setDeleting(false);
+    };
+
+    const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
     const latestNotes = notes.slice(0, 5);
     const hasMore = notes.length > 5;
 
     return (
         <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 2, boxShadow: 0 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-                Strategy Notes
-            </Typography>
+            {/* Header with Delete Button */}
+            <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 2
+            }}>
+                <Typography variant="h6">
+                    Strategy Notes
+                </Typography>
+                {notes.length > 0 && (
+                    <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={handleDeleteAllNotes}
+                        disabled={deleting}
+                        startIcon={<DeleteIcon />}
+                    >
+                        {deleting ? 'Deleting...' : 'Delete All'}
+                    </Button>
+                )}
+            </Box>
+
             {loading ? (
                 <CircularProgress size={24} />
             ) : latestNotes.length === 0 ? (
@@ -54,6 +136,8 @@ const StrategyNotesPanel = ({ strategyid }) => {
                     )}
                 </>
             )}
+
+            {/* All Notes Dialog */}
             <Dialog open={showDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     All Notes
@@ -80,6 +164,55 @@ const StrategyNotesPanel = ({ strategyid }) => {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Delete All Notes Confirmation Dialog */}
+            <Dialog
+                open={showDeleteDialog}
+                onClose={handleCloseDeleteDialog}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ color: 'error.main' }}>
+                    Delete All Notes
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        Are you sure you want to delete all notes for this strategy?
+                    </Typography>
+                    <Typography variant="body2" color="error.main" sx={{ fontWeight: 500 }}>
+                        ⚠️ This action cannot be undone and will permanently remove all {notes.length} strategy note{notes.length > 1 ? 's' : ''}.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={handleCloseDeleteDialog}
+                        disabled={deleting}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={confirmDeleteAllNotes}
+                        variant="contained"
+                        color="error"
+                        disabled={deleting}
+                        startIcon={<DeleteIcon />}
+                    >
+                        {deleting ? 'Deleting...' : 'Delete All Notes'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Snackbar for feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

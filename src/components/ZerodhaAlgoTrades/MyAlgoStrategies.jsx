@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Box } from '@mui/material';
 import { getAlgoStrategies } from '../../services/algoStrategies';
 import zerodhaWebSocket from '../zerodhawebsocket/WebSocket';
-import StrategyRow from './StrategyRow';
+import StrategyCard from './StrategyCard';
 import Subscribe from '../zerodhawebsocket/Subscribe';
 import Unsubscribe from '../zerodhawebsocket/Unsubscribe';
 import { Stack } from '@mui/system';
@@ -69,7 +69,7 @@ const MyAlgoStrategies = () => {
 
             <Box>
                 {strategies.map((strategy) => (
-                    <StrategyRow
+                    <StrategyCard
                         key={strategy.strategyid}
                         strategy={strategy}
                         onStrategyUpdate={fetchStrategies}

@@ -1,17 +1,44 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody, Divider, Grid, Snackbar, Alert, TextField, MenuItem, Button, Box, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Paper } from '@mui/material';
+import { 
+    Box, 
+    Card, 
+    CardContent, 
+    Typography, 
+    Table, 
+    TableHead, 
+    TableRow, 
+    TableCell, 
+    TableBody, 
+    Divider, 
+    Grid, 
+    Snackbar, 
+    Alert, 
+    TextField, 
+    MenuItem, 
+    Button, 
+    IconButton, 
+    Dialog, 
+    DialogTitle, 
+    DialogContent, 
+    DialogActions, 
+    TableContainer, 
+    Paper,
+    Link,
+    CircularProgress
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { updateAlgoStrategy } from '../../services/algoStrategies';
+import CloseIcon from '@mui/icons-material/Close';
+import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote } from '../../services/algoStrategies';
 import { getAutomatedOrderById } from '../../services/automatedOrders';
 import { getPositions } from '../../services/zerodha/api';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
-import { createStrategyNote } from '../../services/algoStrategies';
 
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
-const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
+const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
+    // Strategy Box States
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [editState, setEditState] = useState({
         status: strategy.status,
@@ -29,16 +56,40 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [selectedPositions, setSelectedPositions] = useState([]);
     const [totalPL, setTotalPL] = useState(0);
     const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
+
+    // Strategy Notes States
+    const [notes, setNotes] = useState([]);
+    const [notesLoading, setNotesLoading] = useState(true);
+    const [showNotesDialog, setShowNotesDialog] = useState(false);
+    const [showDeleteNotesDialog, setShowDeleteNotesDialog] = useState(false);
+    const [deletingNotes, setDeletingNotes] = useState(false);
+
+    // Fetch notes for the strategy
+    useEffect(() => {
+        const fetchNotes = async () => {
+            setNotesLoading(true);
+            try {
+                const data = await getStrategyNoteById(strategy.strategyid);
+                setNotes(data);
+            } catch (err) {
+                setNotes([]);
+            }
+            setNotesLoading(false);
+        };
+        if (strategy.strategyid) fetchNotes();
+    }, [strategy.strategyid]);
+
+    // Strategy Box Functions
     useEffect(() => {
         if (totalPL > strategy.expected_return) {
             createStrategyNote({ strategyid: strategy.strategyid, notes: `Total P/L is greater than expected return, Total PL is ${totalPL.toFixed(2)}, Expected Return is ${strategy.expected_return.toFixed(2)}` });
             setSnackbar({
                 open: true,
-                message: 'Total P/L is greater than expected return for strategy: ' + strategy.strategy_type,
+                message: 'Total P/L is greater than expected return for id: ' + strategy.strategyid,
                 severity: 'success'
             });
         }
-    }, [totalPL, strategy.expected_return])
+    }, [totalPL, strategy.expected_return]);
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -83,14 +134,25 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     useEffect(() => {
         fetchOrders();
         let underlyingInstrumentToken = "";
-        for (let key in zerodhaWebSocketData) {
-            if (zerodhaWebSocketData[key].tradingsymbol === strategy.underlying_instrument) {
-                underlyingInstrumentToken = key;
-                break;
+        
+        // Only search if we have WebSocket data and strategy has underlying instrument
+        if (zerodhaWebSocketData && strategy.underlying_instrument) {
+            for (let key in zerodhaWebSocketData) {
+                if (zerodhaWebSocketData[key] && 
+                    zerodhaWebSocketData[key].tradingsymbol === strategy.underlying_instrument) {
+                    underlyingInstrumentToken = key;
+                    break;
+                }
             }
         }
+        
         setUnderlyingInstrumentToken(underlyingInstrumentToken);
-    }, [strategy]);
+        
+        // Debug logging
+        console.log('Strategy underlying_instrument:', strategy.underlying_instrument);
+        console.log('Found token:', underlyingInstrumentToken);
+        console.log('WebSocket data keys:', Object.keys(zerodhaWebSocketData || {}));
+    }, [strategy, zerodhaWebSocketData]);
 
     const handleEditChange = (field, value) => {
         setEditState(prev => ({
@@ -234,14 +296,62 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     };
 
+    // Strategy Notes Functions
+    const handleViewMoreNotes = () => setShowNotesDialog(true);
+    const handleCloseNotesDialog = () => setShowNotesDialog(false);
+    const handleDeleteAllNotes = () => setShowDeleteNotesDialog(true);
+    const handleCloseDeleteNotesDialog = () => setShowDeleteNotesDialog(false);
+
+    const confirmDeleteAllNotes = async () => {
+        setShowDeleteNotesDialog(false);
+        setDeletingNotes(true);
+        
+        try {
+            if (notes && notes.length > 0) {
+                // Delete each note
+                const deletePromises = notes.map(note => deleteStrategyNote(note.id));
+                await Promise.all(deletePromises);
+                
+                setSnackbar({
+                    open: true,
+                    message: `Successfully deleted ${notes.length} note${notes.length > 1 ? 's' : ''}`,
+                    severity: 'success'
+                });
+                
+                // Clear notes locally
+                setNotes([]);
+                
+                // Refresh strategy
+                onStrategyUpdate && onStrategyUpdate();
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: 'No notes found to delete',
+                    severity: 'info'
+                });
+            }
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err?.response?.data?.error || err.message || 'Failed to delete notes',
+                severity: 'error'
+            });
+        }
+        setDeletingNotes(false);
+    };
+
+    const latestNotes = notes.slice(0, 5);
+    const hasMoreNotes = notes.length > 5;
+
     return (
-        <Card sx={{ mb: 0, width: '100%' }}>
+        <Card sx={{ mb: 3, width: '100%' }}>
             <CardContent>
+                {/* Strategy Configuration Section */}
                 <Box sx={{ 
                     display: 'grid', 
                     gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr 1fr auto' },
                     gap: 1, 
-                    mb: 1, 
+                    mb: 2, 
                     alignItems: 'center' 
                 }}>
                     <TextField
@@ -292,19 +402,23 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         {updating ? '...' : 'Update'}
                     </Button>
                 </Box>
+
+                {/* Tracking Positions Section */}
                 <Box sx={{ 
                     display: 'flex', 
                     flexDirection: { xs: 'column', sm: 'row' },
                     alignItems: { xs: 'flex-start', sm: 'center' }, 
                     gap: 2, 
-                    mb: 1,
+                    mb: 2,
                     flexWrap: 'wrap'
                 }}>
                     <Typography sx={{ fontWeight: 1000 }}>
                         Tracking Positions
                     </Typography>
                     <Typography sx={{ fontWeight: 1000 }}>
-                        LTP: {zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp}
+                        LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ? 
+                            zerodhaWebSocketData[underlyingInstrumentToken].ltp : 
+                            'Loading...'}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
                         <IconButton
@@ -324,7 +438,9 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </Button>
                     </Box>
                 </Box>
-                <Table size="small" sx={{ mb: 1 }}>
+
+                {/* Positions Table */}
+                <Table size="small" sx={{ mb: 2 }}>
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol(Qnty)</TableCell>
@@ -414,6 +530,8 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </TableRow>
                     </TableBody>
                 </Table>
+
+                {/* Automated Orders Section */}
                 <Typography sx={{ mb: 0.5, fontWeight: 1000 }}>
                     Automated Orders
                 </Typography>
@@ -424,14 +542,65 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         strategyId={strategy.strategyid}
                     />
                 ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         No automated orders found for this strategy.
                     </Typography>
                 )}
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+
+                <Divider sx={{ my: 2 }} />
+
+                {/* Strategy Notes Section */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 2
+                }}>
+                    <Typography variant="h6">
+                        Strategy Notes
+                    </Typography>
+                    {notes.length > 0 && (
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            onClick={handleDeleteAllNotes}
+                            disabled={deletingNotes}
+                            startIcon={<DeleteIcon />}
+                        >
+                            {deletingNotes ? 'Deleting...' : 'Delete All'}
+                        </Button>
+                    )}
+                </Box>
+
+                {notesLoading ? (
+                    <CircularProgress size={24} />
+                ) : latestNotes.length === 0 ? (
+                    <Typography color="text.secondary">No notes yet.</Typography>
+                ) : (
+                    <>
+                        {latestNotes.map(note => (
+                            <Box key={note.id} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1, boxShadow: 1 }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
+                                    {new Date(note.timestamp).toLocaleString()}
+                                </Typography>
+                                <Typography variant="body1">{note.notes}</Typography>
+                            </Box>
+                        ))}
+                        {hasMoreNotes && (
+                            <Link component="button" onClick={handleViewMoreNotes} sx={{ mt: 1 }}>
+                                View More
+                            </Link>
+                        )}
+                    </>
+                )}
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                     Strategy ID: {strategy.strategyid}
                 </Typography>
             </CardContent>
+
+            {/* Snackbar */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
@@ -442,6 +611,8 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Create Automated Order Popup */}
             <CreateAutomatedOrderPopup
                 open={showOrderPopup}
                 onClose={handleCloseOrderPopup}
@@ -449,6 +620,8 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 onSuccess={handleOrderPopupSuccess}
                 strategyDetails={orderPopupStrategyDetails}
             />
+
+            {/* Add Position Popup */}
             <Dialog
                 open={showAddPositionPopup}
                 onClose={handleCloseAddPosition}
@@ -522,8 +695,73 @@ const StrategyBox = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* All Notes Dialog */}
+            <Dialog open={showNotesDialog} onClose={handleCloseNotesDialog} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    All Notes
+                    <IconButton
+                        aria-label="close"
+                        onClick={handleCloseNotesDialog}
+                        sx={{ position: 'absolute', right: 8, top: 8 }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ maxHeight: 500 }}>
+                    {notes.length === 0 ? (
+                        <Typography color="text.secondary">No notes yet.</Typography>
+                    ) : (
+                        notes.map(note => (
+                            <Box key={note.id} sx={{ mb: 2, p: 1, bgcolor: 'white', borderRadius: 1, boxShadow: 1 }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
+                                    {new Date(note.timestamp).toLocaleString()}
+                                </Typography>
+                                <Typography variant="body1">{note.notes}</Typography>
+                            </Box>
+                        ))
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete All Notes Confirmation Dialog */}
+            <Dialog
+                open={showDeleteNotesDialog}
+                onClose={handleCloseDeleteNotesDialog}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ color: 'error.main' }}>
+                    Delete All Notes
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        Are you sure you want to delete all notes for this strategy?
+                    </Typography>
+                    <Typography variant="body2" color="error.main" sx={{ fontWeight: 500 }}>
+                        ⚠️ This action cannot be undone and will permanently remove all {notes.length} strategy note{notes.length > 1 ? 's' : ''}.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={handleCloseDeleteNotesDialog}
+                        disabled={deletingNotes}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={confirmDeleteAllNotes}
+                        variant="contained"
+                        color="error"
+                        disabled={deletingNotes}
+                        startIcon={<DeleteIcon />}
+                    >
+                        {deletingNotes ? 'Deleting...' : 'Delete All Notes'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Card>
     );
 };
 
-export default StrategyBox;
+export default StrategyCard;

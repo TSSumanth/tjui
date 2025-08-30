@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import { Box, Button, Paper } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import CallSplitIcon from '@mui/icons-material/CallSplit';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CreateAlgoStrategyPopup from './CreateAlgoStrategyPopup';
 
 
 
-const StrategyMenu = ({ onStrategySelect }) => {
+const StrategyMenu = () => {
     const [showCreatePopup, setShowCreatePopup] = useState(false);
 
     return (
@@ -27,34 +25,17 @@ const StrategyMenu = ({ onStrategySelect }) => {
                         onClick={() => setShowCreatePopup(true)}
                         sx={{ minWidth: 200 }}
                     >
-                        Create Nifty Straddle
+                        Nifty Bear Call Spread
                     </Button>
+
                     <Button
                         variant="contained"
-                        color="secondary"
+                        color="primary"
                         startIcon={<TrendingUpIcon />}
-                        onClick={() => onStrategySelect('Short Strangle')}
+                        onClick={() => setShowCreatePopup(true)}
                         sx={{ minWidth: 200 }}
                     >
-                        Short Strangle
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="info"
-                        startIcon={<CallSplitIcon />}
-                        onClick={() => onStrategySelect('Iron Fly')}
-                        sx={{ minWidth: 200 }}
-                    >
-                        Iron Fly
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        startIcon={<CompareArrowsIcon />}
-                        onClick={() => onStrategySelect('Iron Condor')}
-                        sx={{ minWidth: 200 }}
-                    >
-                        Iron Condor
+                        Nifty Bull Put Spread
                     </Button>
                 </Box>
             </Paper>
