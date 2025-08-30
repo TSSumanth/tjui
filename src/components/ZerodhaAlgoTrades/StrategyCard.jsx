@@ -1,27 +1,27 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-    Box, 
-    Card, 
-    CardContent, 
-    Typography, 
-    Table, 
-    TableHead, 
-    TableRow, 
-    TableCell, 
-    TableBody, 
-    Divider, 
-    Grid, 
-    Snackbar, 
-    Alert, 
-    TextField, 
-    MenuItem, 
-    Button, 
-    IconButton, 
-    Dialog, 
-    DialogTitle, 
-    DialogContent, 
-    DialogActions, 
-    TableContainer, 
+import {
+    Box,
+    Card,
+    CardContent,
+    Typography,
+    Table,
+    TableHead,
+    TableRow,
+    TableCell,
+    TableBody,
+    Divider,
+    Grid,
+    Snackbar,
+    Alert,
+    TextField,
+    MenuItem,
+    Button,
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TableContainer,
     Paper,
     Link,
     CircularProgress
@@ -32,7 +32,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote } from '../../services/algoStrategies';
 import { getAutomatedOrderById, updateAutomatedOrder } from '../../services/automatedOrders';
 import { getOrders, getPositions } from '../../services/zerodha/api';
-import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue } from '../../services/strategyTargetAchievements';
+import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue, checkMaxLossTriggered, updateMaxLossValue, triggerMaxLoss, getStrategyTargetAndMaxLoss } from '../../services/strategyTargetAchievements';
 import { isMarketOpen } from '../../services/zerodha/utils';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
@@ -40,6 +40,13 @@ import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 const STATUS_OPTIONS = ['Open', 'Closed'];
 
 const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
+    // CSS animation for loading spinner
+    const spinAnimation = {
+        '@keyframes spin': {
+            '0%': { transform: 'rotate(0deg)' },
+            '100%': { transform: 'rotate(360deg)' }
+        }
+    };
     // Add CSS animation for pulse effect
     React.useEffect(() => {
         const style = document.createElement('style');
@@ -51,7 +58,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }
         `;
         document.head.appendChild(style);
-        
+
         return () => {
             document.head.removeChild(style);
         };
@@ -62,7 +69,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         status: strategy.status,
         underlying_instrument: strategy.underlying_instrument,
         strategy_type: strategy.strategy_type,
-        expected_return: ''
+        expected_return: '',
+        max_loss: ''
     });
     const [updating, setUpdating] = useState(false);
     const [orders, setOrders] = useState([]);
@@ -80,6 +88,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [checkingOrderStatuses, setCheckingOrderStatuses] = useState(false);
     const [targetAchievements, setTargetAchievements] = useState(new Map());
     const [strategyTarget, setStrategyTarget] = useState(null);
+    const [strategyMaxLoss, setStrategyMaxLoss] = useState(null);
+    const [maxLossTriggered, setMaxLossTriggered] = useState(false);
 
     // Helper function for progress bar colors
     const getProgressColors = useCallback((totalPL, expectedReturn) => {
@@ -87,6 +97,24 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         const progress = (totalPL / expectedReturn) * 100;
         if (progress < 50) return { main: 'warning.main', light: 'warning.50' }; // Orange for < 50%
         return { main: 'success.main', light: 'success.50' }; // Green for ≥ 50%
+    }, []);
+
+    // Helper function for max loss risk colors
+    const getMaxLossRiskColor = useCallback((riskLevel) => {
+        // For max loss, we want:
+        // 0% = at limit or positive P/L (safe) → Gray
+        // 1-45% = approaching limit (warning) → Orange
+        // 45-100% = very close to limit (danger) → Red
+
+        // The riskLevel is already a percentage, so we use it directly
+        const absoluteRisk = Math.abs(riskLevel);
+
+        // Debug logging
+        console.log('Risk Level:', riskLevel, 'Absolute Risk:', absoluteRisk);
+
+        if (absoluteRisk >= 45) return 'error.main';         // Red for high risk (45% to 100%)
+        if (absoluteRisk >= 1) return 'warning.main';        // Orange for moderate risk (1% to 45%)
+        return 'grey.600';                                    // Gray for safe zone (0%)
     }, []);
 
     // Strategy Notes States
@@ -111,20 +139,39 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         if (strategy.strategyid) fetchNotes();
     }, [strategy.strategyid]);
 
-    // Fetch strategy target from database
-    const fetchStrategyTarget = useCallback(async () => {
+    // Fetch strategy target and max loss from database
+    const fetchStrategyTargetAndMaxLoss = useCallback(async () => {
         try {
-            const result = await getStrategyTarget(strategy.strategyid);
-            if (result.success && result.data && result.data.target_value) {
-                // Convert to number to ensure .toFixed() works
-                const targetValue = parseFloat(result.data.target_value);
-                setStrategyTarget(isNaN(targetValue) ? null : targetValue);
+            const result = await getStrategyTargetAndMaxLoss(strategy.strategyid);
+            if (result.success && result.data) {
+                // Handle target value
+                if (result.data.target_value) {
+                    const targetValue = parseFloat(result.data.target_value);
+                    setStrategyTarget(isNaN(targetValue) ? null : targetValue);
+                } else {
+                    setStrategyTarget(null);
+                }
+
+                // Handle max loss value
+                if (result.data.max_loss_value) {
+                    const maxLossValue = parseFloat(result.data.max_loss_value);
+                    setStrategyMaxLoss(isNaN(maxLossValue) ? null : maxLossValue);
+                } else {
+                    setStrategyMaxLoss(null);
+                }
+
+                // Handle max loss triggered status
+                setMaxLossTriggered(result.data.max_loss_triggered || false);
             } else {
                 setStrategyTarget(null);
+                setStrategyMaxLoss(null);
+                setMaxLossTriggered(false);
             }
         } catch (err) {
-            console.error('Error fetching strategy target:', err);
+            console.error('Error fetching strategy target and max loss:', err);
             setStrategyTarget(null);
+            setStrategyMaxLoss(null);
+            setMaxLossTriggered(false);
         }
     }, [strategy.strategyid]);
 
@@ -132,7 +179,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const checkTargetAchievements = useCallback(async (targetValue) => {
         try {
             if (!targetValue) return;
-            
+
             const result = await checkTargetAchievement(strategy.strategyid, targetValue);
             if (result.success) {
                 setTargetAchievements(prev => {
@@ -148,8 +195,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     // Load target achievements when component mounts and handle target changes
     useEffect(() => {
-        fetchStrategyTarget();
-    }, [strategy.strategyid, fetchStrategyTarget]);
+        fetchStrategyTargetAndMaxLoss();
+    }, [strategy.strategyid, fetchStrategyTargetAndMaxLoss]);
 
     // Handle target changes - check achievements and update editState
     useEffect(() => {
@@ -162,11 +209,26 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
     }, [strategyTarget, checkTargetAchievements]);
 
+    // Update editState when strategyMaxLoss changes
+    useEffect(() => {
+        if (strategyMaxLoss) {
+            setEditState(prev => ({
+                ...prev,
+                max_loss: Math.abs(strategyMaxLoss).toString() // Show positive value to user
+            }));
+        } else {
+            setEditState(prev => ({
+                ...prev,
+                max_loss: '' // Clear field when no max loss is set
+            }));
+        }
+    }, [strategyMaxLoss]);
+
     // Strategy Box Functions
     useEffect(() => {
         // Check if target has already been achieved to prevent spam
         const hasAchieved = targetAchievements.get(strategyTarget);
-        
+
         if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !hasAchieved) {
             // Create achievement record in database
             createTargetAchievement(strategy.strategyid, strategyTarget)
@@ -177,13 +239,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         newMap.set(strategyTarget, true);
                         return newMap;
                     });
-                    
+
                     // Create achievement note
-                    createStrategyNote({ 
-                        strategyid: strategy.strategyid, 
-                        notes: `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})` 
+                    createStrategyNote({
+                        strategyid: strategy.strategyid,
+                        notes: `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})`
                     });
-                    
+
                     // Show success notification
                     setSnackbar({
                         open: true,
@@ -195,7 +257,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     console.error('Error creating target achievement:', err);
                 });
         }
-        
+
         // Reset achievement if P/L falls below target
         if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && hasAchieved) {
             resetTargetAchievement(strategy.strategyid, strategyTarget)
@@ -210,7 +272,32 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     console.error('Error resetting target achievement:', err);
                 });
         }
-    }, [totalPL, strategyTarget, targetAchievements, strategy.strategyid]);
+
+        // Check max loss triggered
+        if (typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered) {
+            // Mark max loss as triggered in database
+            triggerMaxLoss(strategy.strategyid, strategyMaxLoss)
+                .then(() => {
+                    setMaxLossTriggered(true);
+
+                    // Create max loss note
+                    createStrategyNote({
+                        strategyid: strategy.strategyid,
+                        notes: `🚨 MAX LOSS TRIGGERED! Total P/L (${totalPL.toFixed(2)}) reached max loss limit (${strategyMaxLoss.toFixed(2)})`
+                    });
+
+                    // Show warning notification
+                    setSnackbar({
+                        open: true,
+                        message: `⚠️ Strategy ${strategy.strategyid} reached max loss! P/L: ₹${totalPL.toFixed(2)} vs Max Loss: ₹${strategyMaxLoss.toFixed(2)}`,
+                        severity: 'warning'
+                    });
+                })
+                .catch(err => {
+                    console.error('Error triggering max loss:', err);
+                });
+        }
+    }, [totalPL, strategyTarget, strategyMaxLoss, targetAchievements, maxLossTriggered, strategy.strategyid]);
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -239,7 +326,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
                 const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
                 const price = inst.price;
-                
+
                 if (!askPrice || !bidPrice || !price) return total;
 
                 const pl = inst.quantity > 0
@@ -250,7 +337,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }, 0);
         };
 
-        
+
 
         const total = calculateTotalPL();
         const totalMP = calculateTotalPLMP();
@@ -299,14 +386,14 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         try {
             // Only check if we have orders with 'SENT TO ZERODHA' status
             const sentOrders = orders.filter(order => order.status === 'SENT TO ZERODHA' && order.zerodha_orderid);
-            
+
             if (sentOrders.length === 0) {
                 return; // No orders to check
             }
 
             setCheckingOrderStatuses(true);
             console.log(`Checking status for ${sentOrders.length} sent orders...`);
-            
+
             // Get all orders from Zerodha
             const zerodhaOrders = await getOrders();
             if (!zerodhaOrders || !zerodhaOrders.data) {
@@ -315,16 +402,16 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }
 
             let statusUpdates = 0;
-            
+
             // Check each sent order against Zerodha orders
             for (const sentOrder of sentOrders) {
                 const zerodhaOrder = zerodhaOrders.data.find(
                     zo => zo.order_id === sentOrder.zerodha_orderid
                 );
-                
+
                 if (zerodhaOrder) {
                     let newStatus = sentOrder.status;
-                    
+
                     // Map Zerodha status to our status
                     switch (zerodhaOrder.status) {
                         case 'COMPLETE':
@@ -342,7 +429,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         default:
                             newStatus = 'SENT TO ZERODHA';
                     }
-                    
+
                     // Update order if status changed
                     if (newStatus !== sentOrder.status) {
                         try {
@@ -355,12 +442,12 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     }
                 }
             }
-            
+
             // Refresh orders if any statuses were updated
             if (statusUpdates > 0) {
                 console.log(`${statusUpdates} order statuses updated, refreshing orders...`);
                 await fetchOrders();
-                
+
                 // Show notification only if requested
                 if (showNotification) {
                     setSnackbar({
@@ -370,7 +457,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     });
                 }
             }
-            
+
         } catch (err) {
             console.error('Error checking order statuses:', err);
             // Don't show error to user for background status checks
@@ -382,20 +469,20 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     useEffect(() => {
         fetchOrders();
         let underlyingInstrumentToken = "";
-        
+
         // Only search if we have WebSocket data and strategy has underlying instrument
         if (zerodhaWebSocketData && strategy.underlying_instrument) {
             for (let key in zerodhaWebSocketData) {
-                if (zerodhaWebSocketData[key] && 
+                if (zerodhaWebSocketData[key] &&
                     zerodhaWebSocketData[key].tradingsymbol === strategy.underlying_instrument) {
                     underlyingInstrumentToken = key;
                     break;
                 }
             }
         }
-        
+
         setUnderlyingInstrumentToken(underlyingInstrumentToken);
-        
+
         // Debug logging
         console.log('Strategy underlying_instrument:', strategy.underlying_instrument);
         console.log('WebSocket data keys:', Object.keys(zerodhaWebSocketData || {}));
@@ -405,19 +492,19 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     useEffect(() => {
         // Only start polling if we have orders with 'SENT TO ZERODHA' status
         const hasSentOrders = orders.some(order => order.status === 'SENT TO ZERODHA');
-        
+
         if (!hasSentOrders) {
             return; // No need to poll
         }
 
         console.log('Starting order status polling...');
-        
+
         // Initial check
         checkOrderStatuses(false); // Don't show notification for background checks
-        
+
         // Set up interval for every 2 minutes (120000ms)
         const intervalId = setInterval(() => checkOrderStatuses(false), 120000);
-        
+
         // Cleanup function
         return () => {
             console.log('Cleaning up order status polling...');
@@ -434,49 +521,96 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }));
     };
 
-        const handleUpdate = async () => {
+    const handleUpdate = async () => {
         setUpdating(true);
         try {
-            // Validate target value
-            if (!editState.expected_return || parseFloat(editState.expected_return) <= 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'Please enter a valid positive target value',
-                    severity: 'error'
-                });
-                setUpdating(false);
-                return;
+            let hasUpdates = false;
+            let updateMessages = [];
+
+            // Handle target value update
+            if (editState.expected_return && parseFloat(editState.expected_return) > 0) {
+                const newTargetValue = parseFloat(editState.expected_return);
+
+                if (newTargetValue !== strategyTarget) {
+                    try {
+                        // Check if target already exists
+                        const existingTarget = await getStrategyTarget(strategy.strategyid);
+
+                        if (existingTarget.success && existingTarget.data) {
+                            // Update existing target
+                            await updateTargetValue(strategy.strategyid, newTargetValue);
+                        } else {
+                            // Create new target
+                            await createTargetAchievement(strategy.strategyid, newTargetValue);
+                        }
+
+                        updateMessages.push('Target updated');
+                        hasUpdates = true;
+                    } catch (targetErr) {
+                        console.error('Error updating target:', targetErr);
+                        setSnackbar({
+                            open: true,
+                            message: 'Failed to update target',
+                            severity: 'error'
+                        });
+                        setUpdating(false);
+                        return;
+                    }
+                }
             }
 
-            const newTargetValue = parseFloat(editState.expected_return);
-            
-            // Update target in the new system
-            try {
-                // Check if target already exists
-                const existingTarget = await getStrategyTarget(strategy.strategyid);
-                
-                if (existingTarget.success && existingTarget.data) {
-                    // Update existing target
-                    await updateTargetValue(strategy.strategyid, newTargetValue);
-                } else {
-                    // Create new target
-                    await createTargetAchievement(strategy.strategyid, newTargetValue);
+            // Handle max loss value update
+            if (editState.max_loss && parseFloat(editState.max_loss) > 0) {
+                const newMaxLossValue = -parseFloat(editState.max_loss); // Convert to negative
+
+                if (newMaxLossValue !== strategyMaxLoss) {
+                    try {
+                        await updateMaxLossValue(strategy.strategyid, newMaxLossValue);
+                        updateMessages.push('Max loss updated');
+                        hasUpdates = true;
+                    } catch (maxLossErr) {
+                        console.error('Error updating max loss:', maxLossErr);
+                        setSnackbar({
+                            open: true,
+                            message: 'Failed to update max loss',
+                            severity: 'error'
+                        });
+                        setUpdating(false);
+                        return;
+                    }
                 }
-                
-                // Refresh target data
-                await fetchStrategyTarget();
-                
+            } else if (editState.max_loss === '' && strategyMaxLoss) {
+                // Handle clearing max loss
+                try {
+                    await updateMaxLossValue(strategy.strategyid, null);
+                    updateMessages.push('Max loss cleared');
+                    hasUpdates = true;
+                } catch (maxLossErr) {
+                    console.error('Error clearing max loss:', maxLossErr);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to clear max loss',
+                        severity: 'error'
+                    });
+                    setUpdating(false);
+                    return;
+                }
+            }
+
+            if (hasUpdates) {
+                // Refresh data
+                await fetchStrategyTargetAndMaxLoss();
+
                 setSnackbar({
                     open: true,
-                    message: 'Target updated successfully!',
+                    message: updateMessages.join(', ') + ' successfully!',
                     severity: 'success'
                 });
-            } catch (targetErr) {
-                console.error('Error updating target:', targetErr);
+            } else {
                 setSnackbar({
                     open: true,
-                    message: 'Failed to update target',
-                    severity: 'error'
+                    message: 'No changes to update',
+                    severity: 'info'
                 });
             }
         } catch (err) {
@@ -511,7 +645,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         // Also fetch orders for immediate display
         await fetchOrders();
         handleCloseOrderPopup();
-        
+
         // Show success message
         setSnackbar({
             open: true,
@@ -620,7 +754,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             // Fetch latest positions from Zerodha
             const data = await getPositions();
             const currentZerodhaPositions = data.data.net || [];
-            
+
             // Create a map of current Zerodha positions by trading symbol
             const zerodhaPositionMap = new Map();
             currentZerodhaPositions.forEach(pos => {
@@ -631,7 +765,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
             // Get current strategy positions
             const currentStrategyPositions = strategy.instruments_details || [];
-            
+
             // Update strategy positions based on Zerodha data
             const updatedInstruments = [];
             const changes = [];
@@ -639,7 +773,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             // Process each strategy position
             currentStrategyPositions.forEach(strategyPos => {
                 const zerodhaPos = zerodhaPositionMap.get(strategyPos.tradingsymbol);
-                
+
                 if (zerodhaPos) {
                     // Position still exists in Zerodha
                     if (zerodhaPos.quantity !== strategyPos.quantity) {
@@ -647,13 +781,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         const oldType = strategyPos.transaction_type;
                         const newType = zerodhaPos.quantity > 0 ? 'BUY' : 'SELL';
                         const typeChanged = oldType !== newType;
-                        
+
                         if (typeChanged) {
                             changes.push(`${strategyPos.tradingsymbol}: ${strategyPos.quantity}(${oldType}) → ${zerodhaPos.quantity}(${newType})`);
                         } else {
                             changes.push(`${strategyPos.tradingsymbol}: ${strategyPos.quantity} → ${zerodhaPos.quantity}`);
                         }
-                        
+
                         updatedInstruments.push({
                             ...strategyPos,
                             quantity: zerodhaPos.quantity,
@@ -727,22 +861,22 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const confirmDeleteAllNotes = async () => {
         setShowDeleteNotesDialog(false);
         setDeletingNotes(true);
-        
+
         try {
             if (notes && notes.length > 0) {
                 // Delete each note
                 const deletePromises = notes.map(note => deleteStrategyNote(note.id));
                 await Promise.all(deletePromises);
-                
+
                 setSnackbar({
                     open: true,
                     message: `Successfully deleted ${notes.length} note${notes.length > 1 ? 's' : ''}`,
                     severity: 'success'
                 });
-                
+
                 // Clear notes locally
                 setNotes([]);
-                
+
                 // Refresh strategy
                 onStrategyUpdate && onStrategyUpdate();
             } else {
@@ -768,36 +902,246 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     return (
         <Card sx={{ mb: 3, width: '100%' }}>
             <CardContent>
+
+                 {/* Strategy Configuration Section */}
+                 {/* Enhanced Strategy Configuration Box */}
+                <Box sx={{
+                    p: 2,
+                    mb: 2,
+                    borderRadius: 2,
+                    bgcolor: 'grey.50',
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    boxShadow: 1
+                }}>
+                    {/* Header */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 2,
+                        pb: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'grey.200'
+                    }}>
+                        <Box sx={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            bgcolor: 'primary.main',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+                                ⚙️
+                            </Typography>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                            Strategy Configuration
+                        </Typography>
+                    </Box>
+
+                    {/* Form Fields Grid */}
+                    <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr auto' },
+                        gap: 2,
+                        alignItems: 'end'
+                    }}>
+                        {/* Strategy Type Field */}
+                        <Box sx={{ position: 'relative' }}>
+                            <TextField
+                                label="Strategy Type"
+                                value={editState.strategy_type || ''}
+                                onChange={e => handleEditChange('strategy_type', e.target.value)}
+                                size="small"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        bgcolor: 'white',
+                                        '&:hover': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                            }
+                                        },
+                                        '&.Mui-focused': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                                borderWidth: 2
+                                            }
+                                        }
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <Box sx={{ mr: 1, color: 'primary.main' }}>
+                                            📊
+                                        </Box>
+                                    )
+                                }}
+                            />
+                        </Box>
+
+                        {/* Underlying Instrument Field */}
+                        <Box sx={{ position: 'relative' }}>
+                            <TextField
+                                label="Underlying Instrument"
+                                value={editState.underlying_instrument || ''}
+                                onChange={e => handleEditChange('underlying_instrument', e.target.value)}
+                                size="small"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        bgcolor: 'white',
+                                        '&:hover': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                            }
+                                        },
+                                        '&.Mui-focused': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                                borderWidth: 2
+                                            }
+                                        }
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <Box sx={{ mr: 1, color: 'primary.main' }}>
+                                            🎯
+                                        </Box>
+                                    )
+                                }}
+                            />
+                        </Box>
+
+                        {/* Status Field */}
+                        <Box sx={{ position: 'relative' }}>
+                            <TextField
+                                select
+                                label="Status"
+                                value={editState.status || ''}
+                                onChange={e => handleEditChange('status', e.target.value)}
+                                size="small"
+                                fullWidth
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        bgcolor: 'white',
+                                        '&:hover': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                            }
+                                        },
+                                        '&.Mui-focused': {
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: 'primary.main',
+                                                borderWidth: 2
+                                            }
+                                        }
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <Box sx={{ mr: 1, color: 'primary.main' }}>
+                                            🔄
+                                        </Box>
+                                    )
+                                }}
+                            >
+                                {STATUS_OPTIONS.map(opt => (
+                                    <MenuItem key={opt} value={opt}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Box sx={{
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: '50%',
+                                                bgcolor: opt === 'ACTIVE' ? 'success.main' : 
+                                                         opt === 'PAUSED' ? 'warning.main' : 
+                                                         opt === 'INACTIVE' ? 'error.main' : 'grey.500'
+                                            }} />
+                                            {opt}
+                                        </Box>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
+
+                        {/* Update Button */}
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="medium"
+                            onClick={handleUpdate}
+                            disabled={updating}
+                            sx={{
+                                minWidth: 100,
+                                height: 40,
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                boxShadow: 2,
+                                '&:hover': {
+                                    boxShadow: 4,
+                                    transform: 'translateY(-1px)',
+                                    transition: 'all 0.2s ease-in-out'
+                                },
+                                '&:disabled': {
+                                    transform: 'none',
+                                    boxShadow: 1
+                                }
+                            }}
+                            startIcon={updating ? (
+                                <Box sx={{ width: 16, height: 16, border: '2px solid transparent', borderTop: '2px solid currentColor', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                            ) : (
+                                <Box sx={{ fontSize: '1.1rem' }}>💾</Box>
+                            )}
+                        >
+                            {updating ? 'Updating...' : 'Update'}
+                        </Button>
+                    </Box>
+
+                    {/* Helper Text */}
+                    <Box sx={{
+                        mt: 1.5,
+                        pt: 1.5,
+                        borderTop: '1px solid',
+                        borderColor: 'grey.200',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                    }}>
+                        <Box sx={{ color: 'info.main', fontSize: '0.875rem' }}>💡</Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                            Update your strategy configuration settings here. Changes will be applied immediately.
+                        </Typography>
+                    </Box>
+                </Box>
+                
                 {/* Target Achievement Summary */}
                 {typeof strategyTarget === 'number' && strategyTarget > 0 ? (
-                    <Box sx={{ 
+                    <Box sx={{
                         mb: 2,
                         p: 1.5,
                         borderRadius: 2,
                         border: '2px solid',
-                        borderColor: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                        borderColor: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ?'error.main' : 'warning.main',
                         bgcolor: targetAchievements.get(strategyTarget) ? 'success.50' : 'warning.50',
                         boxShadow: 1
                     }}>
                         {/* Header Row */}
-                        <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
+                        <Box sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             mb: 1.5
                         }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Box sx={{
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: '50%',
-                                    bgcolor: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
-                                    animation: targetAchievements.get(strategyTarget) ? 'pulse 2s infinite' : 'none'
-                                }} />
                                 <Box>
-                                    <Typography 
-                                        variant="h6" 
-                                        sx={{ 
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
                                             fontWeight: 800,
                                             color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
                                             textTransform: 'uppercase',
@@ -805,38 +1149,52 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                             fontSize: '1.1rem'
                                         }}
                                     >
-                                        {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED!' : '🎯 TARGET PENDING'}
+                                        {targetAchievements.get(strategyTarget) ? '🎯 TARGET ACHIEVED! ₹' + strategyTarget?.toFixed(2) : '🎯 TARGET PENDING: ₹' + strategyTarget?.toFixed(2)}
                                     </Typography>
-                                    <Typography 
-                                        variant="body2" 
-                                        sx={{ 
-                                            color: 'text.primary',
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        {targetAchievements.get(strategyTarget) 
-                                            ? `Congratulations! Your strategy has exceeded the expected return of ₹${typeof strategyTarget === 'number' ? strategyTarget.toFixed(2) : '0.00'}`
-                                            : `Working towards target: ₹${typeof strategyTarget === 'number' ? strategyTarget.toFixed(2) : '0.00'} | Current P/L: ₹${totalPL?.toFixed(2)}`
-                                        }
-                                    </Typography>
+
+
+                                    {/* Max Loss Status */}
+                                    {typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && (
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                color: maxLossTriggered ? 'error.main' : 'text.secondary',
+                                                fontWeight: 600,
+                                                mt: 0.5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}
+                                        >
+                                            {maxLossTriggered ? (
+                                                <>
+                                                    🚨 Max Loss Triggered: ₹{Math.abs(strategyMaxLoss).toFixed(2)}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    ⚠️ Max Loss Limit: ₹{Math.abs(strategyMaxLoss).toFixed(2)}
+                                                </>
+                                            )}
+                                        </Typography>
+                                    )}
                                 </Box>
                             </Box>
-                            
+
                             {/* Compact P/L Display */}
                             <Box sx={{ textAlign: 'right' }}>
-                                <Typography 
-                                    variant="h5" 
-                                    sx={{ 
+                                <Typography
+                                    variant="h5"
+                                    sx={{
                                         fontWeight: 900,
-                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : 'warning.main',
+                                        color: targetAchievements.get(strategyTarget) ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
                                         lineHeight: 1
                                     }}
                                 >
                                     ₹{totalPL?.toFixed(2)}
                                 </Typography>
-                                <Typography 
-                                    variant="caption" 
-                                    sx={{ 
+                                <Typography
+                                    variant="caption"
+                                    sx={{
                                         color: 'text.primary',
                                         fontWeight: 600
                                     }}
@@ -847,9 +1205,9 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </Box>
 
                         {/* Compact Target Management Row */}
-                        <Box sx={{ 
+                        <Box sx={{
                             display: 'grid',
-                            gridTemplateColumns: '1fr auto auto',
+                            gridTemplateColumns: '1fr auto auto auto',
                             gap: 2,
                             alignItems: 'center',
                             p: 1.5,
@@ -862,24 +1220,24 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             <Box sx={{ width: '100%' }}>
                                 {!targetAchievements.get(strategyTarget) && typeof strategyTarget === 'number' && strategyTarget > 0 && (
                                     <>
-                                        <Box sx={{ 
-                                            display: 'flex', 
-                                            justifyContent: 'space-between', 
+                                        <Box sx={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
                                             alignItems: 'center',
                                             mb: 0.5
                                         }}>
-                                            <Typography 
-                                                variant="caption" 
-                                                sx={{ 
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
                                                     color: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'text.secondary',
                                                     fontWeight: 600
                                                 }}
                                             >
                                                 Progress to Target
                                             </Typography>
-                                            <Typography 
-                                                variant="caption" 
-                                                sx={{ 
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
                                                     color: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'text.secondary',
                                                     fontWeight: 600
                                                 }}
@@ -887,17 +1245,62 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                                 {typeof strategyTarget === 'number' && strategyTarget > 0 ? Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100)).toFixed(1) : '0.0'}%
                                             </Typography>
                                         </Box>
-                                        <Box sx={{ 
-                                            width: '100%', 
-                                            height: 6, 
+                                        <Box sx={{
+                                            width: '100%',
                                             bgcolor: 'grey.300',
                                             borderRadius: 3,
                                             overflow: 'hidden'
                                         }}>
-                                            <Box sx={{ 
+                                            <Box sx={{
                                                 width: `${typeof strategyTarget === 'number' && strategyTarget > 0 ? Math.min(100, Math.max(0, (totalPL / strategyTarget) * 100)) : 0}%`,
-                                                height: '100%',
+                                                height: 6,
                                                 bgcolor: typeof strategyTarget === 'number' ? getProgressColors(totalPL, strategyTarget).main : 'grey.400',
+                                                borderRadius: 3,
+                                                transition: 'width 0.5s ease-in-out'
+                                            }} />
+                                        </Box>
+                                    </>
+                                )}
+
+                                {/* Max Loss Progress Bar */}
+                                {typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && (
+                                    <>
+                                        <Box sx={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            mb: 0.5,
+                                            mt: 1.5
+                                        }}>
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    color: getMaxLossRiskColor(totalPL < 0 ? Math.min(100, (((strategyMaxLoss - totalPL) / strategyMaxLoss) * 100) - 100) : 0),
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Risk Level
+                                            </Typography>
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    color: getMaxLossRiskColor(totalPL < 0 ? Math.min(100, Math.abs((((strategyMaxLoss - totalPL) / strategyMaxLoss) * 100) - 100)) : 0),
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                {totalPL < 0 ? Math.min(100, Math.abs((((strategyMaxLoss - totalPL) / strategyMaxLoss) * 100) - 100)).toFixed(1) : '0.0'}%
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{
+                                            width: '100%',
+                                            bgcolor: 'grey.300',
+                                            borderRadius: 3,
+                                            overflow: 'hidden'
+                                        }}>
+                                            <Box sx={{
+                                                width: `${totalPL < 0 ? Math.max(0, Math.abs((((strategyMaxLoss - totalPL) / strategyMaxLoss) * 100) - 100)) : 0}%`,
+                                                height: 6,
+                                                bgcolor: getMaxLossRiskColor(totalPL < 0 ? Math.min(100, Math.abs((((strategyMaxLoss - totalPL) / strategyMaxLoss) * 100) - 100)) : 0),
                                                 borderRadius: 3,
                                                 transition: 'width 0.5s ease-in-out'
                                             }} />
@@ -918,6 +1321,18 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                 placeholder="Target value"
                             />
 
+                            {/* Max Loss Input */}
+                            <TextField
+                                label="Max Loss"
+                                type="number"
+                                value={editState.max_loss}
+                                onChange={e => handleEditChange('max_loss', e.target.value)}
+                                size="small"
+                                sx={{ minWidth: 120 }}
+                                inputProps={{ step: 1 }}
+                                placeholder="Max loss value"
+                            />
+
                             {/* Update Button */}
                             <Button
                                 variant="outlined"
@@ -933,7 +1348,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     </Box>
                 ) : (
                     /* Set New Target Section */
-                    <Box sx={{ 
+                    <Box sx={{
                         mb: 2,
                         p: 1.5,
                         borderRadius: 2,
@@ -948,16 +1363,25 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         <Typography variant="body2" sx={{ mb: 1.5, color: 'text.secondary' }}>
                             Set a target to start tracking your strategy's performance
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', maxWidth: 350, mx: 'auto' }}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 2, alignItems: 'center', maxWidth: 500, mx: 'auto' }}>
                             <TextField
                                 label="Expected Return"
                                 type="number"
                                 value={editState.expected_return}
                                 onChange={e => handleEditChange('expected_return', e.target.value)}
                                 size="small"
-                                sx={{ flexGrow: 1 }}
                                 inputProps={{ min: 0, step: 0.01 }}
                                 placeholder="Enter target value"
+                            />
+                            <TextField
+                                label="Max Loss"
+                                type="number"
+                                value={editState.max_loss}
+                                onChange={e => handleEditChange('max_loss', e.target.value)}
+                                size="small"
+                                inputProps={{ min: 0, step: 0.01 }}
+                                placeholder="Enter max loss value"
+                                helperText="Positive value (e.g., 10000 = -₹10000 limit)"
                             />
                             <Button
                                 variant="contained"
@@ -972,61 +1396,15 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </Box>
                     </Box>
                 )}
-                
-                {/* Strategy Configuration Section */}
-                <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 2fr 1fr auto' },
-                    gap: 1, 
-                    mb: 2, 
-                    alignItems: 'center' 
-                }}>
-                    <TextField
-                        label="Strategy Type"
-                        value={editState.strategy_type || ''}
-                        onChange={e => handleEditChange('strategy_type', e.target.value)}
-                        size="small"
-                        fullWidth
-                    />
-                    <TextField
-                        label="Underlying Instrument"
-                        value={editState.underlying_instrument || ''}
-                        onChange={e => handleEditChange('underlying_instrument', e.target.value)}
-                        size="small"
-                        fullWidth
-                    />
-                    <TextField
-                        select
-                        label="Status"
-                        value={editState.status || ''}
-                        onChange={e => handleEditChange('status', e.target.value)}
-                        size="small"
-                        fullWidth
-                    >
-                        {STATUS_OPTIONS.map(opt => (
-                            <MenuItem key={opt} value={opt}>
-                                {opt}
-                            </MenuItem>
-                        ))}
-                    </TextField>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        size="small"
-                        onClick={handleUpdate}
-                        disabled={updating}
-                        sx={{ minWidth: 80 }}
-                    >
-                        {updating ? '...' : 'Update'}
-                    </Button>
-                </Box>
+
+               
 
                 {/* Tracking Positions Section */}
-                <Box sx={{ 
-                    display: 'flex', 
+                <Box sx={{
+                    display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: { xs: 'flex-start', sm: 'center' }, 
-                    gap: 2, 
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    gap: 2,
                     mb: 2,
                     flexWrap: 'wrap'
                 }}>
@@ -1034,13 +1412,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         Tracking Positions
                     </Typography>
                     <Typography sx={{ fontWeight: 1000 }}>
-                        LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ? 
-                            zerodhaWebSocketData[underlyingInstrumentToken].ltp : 
+                        LTP: {underlyingInstrumentToken && zerodhaWebSocketData?.[underlyingInstrumentToken]?.ltp ?
+                            zerodhaWebSocketData[underlyingInstrumentToken].ltp :
                             'Loading...'}
-                        {!isMarketOpen() && 
-                         <span style={{ fontSize: '0.8em', color: 'orange', marginLeft: '8px' }}>
-                             (Market Closed)
-                         </span>}
+                        {!isMarketOpen() &&
+                            <span style={{ fontSize: '0.8em', color: 'orange', marginLeft: '8px' }}>
+                                (Market Closed)
+                            </span>}
                     </Typography>
 
                     <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
@@ -1076,8 +1454,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 {/* Positions Table */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="subtitle2" color="text.secondary">
-                        {Array.isArray(strategy.instruments_details) ? 
-                            `${strategy.instruments_details.filter(inst => inst.quantity !== 0).length} Active, ${strategy.instruments_details.filter(inst => inst.quantity === 0).length} Closed` : 
+                        {Array.isArray(strategy.instruments_details) ?
+                            `${strategy.instruments_details.filter(inst => inst.quantity !== 0).length} Active, ${strategy.instruments_details.filter(inst => inst.quantity === 0).length} Closed` :
                             'No positions'}
                     </Typography>
                     <Button
@@ -1125,128 +1503,128 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {Array.isArray(strategy.instruments_details) && 
-                         strategy.instruments_details
-                             .filter(inst => showClosedPositions || inst.quantity !== 0)
-                             .map((inst, idx) => (
-                            <TableRow key={idx} sx={{
-                                backgroundColor: inst.quantity === 0 ? 'grey.100' : 
-                                               idx % 2 === 0 ? 'grey.50' : 'white',
-                                opacity: inst.quantity === 0 ? 0.6 : 1,
-                                '&:hover': {
-                                    backgroundColor: inst.quantity === 0 ? 'grey.200' : 'grey.100',
-                                    transition: 'background-color 0.2s ease'
-                                }
-                            }}>
-                                <TableCell sx={{
-                                    p: 0.5, fontSize: 14,
-                                    color: inst.quantity === 0 ? 'text.secondary' : 'text.primary',
-                                    fontWeight: 500,
-                                    textDecoration: inst.quantity === 0 ? 'line-through' : 'none',
-                                    textAlign: 'left'
-                                }}>{inst.tradingsymbol} {inst.quantity === 0 && '(CLOSED)'}</TableCell>
-                                <TableCell sx={{
-                                    p: 0.5, fontSize: 14,
-                                    color: inst.quantity === 0 ? 'text.secondary' : 
-                                           inst.quantity < 0 ? 'error.main' : 'success.main',
-                                    fontWeight: inst.quantity < 0 ? 700 : 600,
-                                    textAlign: 'center'
-                                }}>{inst.quantity}</TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'center' }}>
-                                    <Box sx={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 1,
-                                        backgroundColor: inst.transaction_type === 'BUY' ? 'success.light' : 'error.light',
-                                        color: inst.transaction_type === 'BUY' ? 'success.dark' : 'error.dark',
-                                        fontWeight: 600,
-                                        fontSize: '0.75rem',
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        {inst.transaction_type}
-                                    </Box>
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {inst.price}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price || 
-                                     (isMarketOpen() ? 'No Data' : 'Market Closed')}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price || 
-                                     (isMarketOpen() ? 'No Data' : 'Market Closed')}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {(() => {
-                                        const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
-                                        const price = inst.price;
-                                        if (!ltp || !price) return '-';
-
-                                        const pl = inst.quantity > 0
-                                            ? (ltp - price) * inst.quantity
-                                            : (ltp - price) * inst.quantity;
-
-                                        return (
-                                            <Box sx={{
-                                                color: pl >= 0 ? 'success.main' : 'error.main',
-                                                fontWeight: 600,
-                                                fontSize: '0.875rem'
-                                            }}>
-                                                {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
-                                            </Box>
-                                        );
-                                    })()}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
-                                    {(() => {
-                                        const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
-                                        const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
-                                        const price = inst.price;
-                                        
-                                        if (!askPrice || !bidPrice || !price) {
-                                            return (
-                                                <Box sx={{
-                                                    color: 'text.secondary',
-                                                    fontSize: '0.75rem',
-                                                    fontStyle: 'italic'
-                                                }}>
-                                                    {isMarketOpen() ? 'No Data' : 'Market Closed'}
-                                                </Box>
-                                            );
+                        {Array.isArray(strategy.instruments_details) &&
+                            strategy.instruments_details
+                                .filter(inst => showClosedPositions || inst.quantity !== 0)
+                                .map((inst, idx) => (
+                                    <TableRow key={idx} sx={{
+                                        backgroundColor: inst.quantity === 0 ? 'grey.100' :
+                                            idx % 2 === 0 ? 'grey.50' : 'white',
+                                        opacity: inst.quantity === 0 ? 0.6 : 1,
+                                        '&:hover': {
+                                            backgroundColor: inst.quantity === 0 ? 'grey.200' : 'grey.100',
+                                            transition: 'background-color 0.2s ease'
                                         }
-
-                                        const pl = inst.quantity > 0
-                                            ? (bidPrice - price) * inst.quantity
-                                            : (askPrice - price) * inst.quantity;
-
-                                        return (
+                                    }}>
+                                        <TableCell sx={{
+                                            p: 0.5, fontSize: 14,
+                                            color: inst.quantity === 0 ? 'text.secondary' : 'text.primary',
+                                            fontWeight: 500,
+                                            textDecoration: inst.quantity === 0 ? 'line-through' : 'none',
+                                            textAlign: 'left'
+                                        }}>{inst.tradingsymbol} {inst.quantity === 0 && '(CLOSED)'}</TableCell>
+                                        <TableCell sx={{
+                                            p: 0.5, fontSize: 14,
+                                            color: inst.quantity === 0 ? 'text.secondary' :
+                                                inst.quantity < 0 ? 'error.main' : 'success.main',
+                                            fontWeight: inst.quantity < 0 ? 700 : 600,
+                                            textAlign: 'center'
+                                        }}>{inst.quantity}</TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'center' }}>
                                             <Box sx={{
-                                                color: pl >= 0 ? 'success.main' : 'error.main',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                px: 1.5,
+                                                py: 0.5,
+                                                borderRadius: 1,
+                                                backgroundColor: inst.transaction_type === 'BUY' ? 'success.light' : 'error.light',
+                                                color: inst.transaction_type === 'BUY' ? 'success.dark' : 'error.dark',
                                                 fontWeight: 600,
-                                                fontSize: '0.875rem'
+                                                fontSize: '0.75rem',
+                                                textTransform: 'uppercase'
                                             }}>
-                                                {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
+                                                {inst.transaction_type}
                                             </Box>
-                                        );
-                                    })()}
-                                </TableCell>
-                                <TableCell sx={{ p: 0.5, textAlign: 'center' }}>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleDeletePosition(idx)}
-                                        sx={{ color: 'error.main' }}
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {inst.price}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price ||
+                                                (isMarketOpen() ? 'No Data' : 'Market Closed')}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price ||
+                                                (isMarketOpen() ? 'No Data' : 'Market Closed')}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {(() => {
+                                                const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
+                                                const price = inst.price;
+                                                if (!ltp || !price) return '-';
+
+                                                const pl = inst.quantity > 0
+                                                    ? (ltp - price) * inst.quantity
+                                                    : (ltp - price) * inst.quantity;
+
+                                                return (
+                                                    <Box sx={{
+                                                        color: pl >= 0 ? 'success.main' : 'error.main',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.875rem'
+                                                    }}>
+                                                        {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
+                                                    </Box>
+                                                );
+                                            })()}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
+                                            {(() => {
+                                                const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
+                                                const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
+                                                const price = inst.price;
+
+                                                if (!askPrice || !bidPrice || !price) {
+                                                    return (
+                                                        <Box sx={{
+                                                            color: 'text.secondary',
+                                                            fontSize: '0.75rem',
+                                                            fontStyle: 'italic'
+                                                        }}>
+                                                            {isMarketOpen() ? 'No Data' : 'Market Closed'}
+                                                        </Box>
+                                                    );
+                                                }
+
+                                                const pl = inst.quantity > 0
+                                                    ? (bidPrice - price) * inst.quantity
+                                                    : (askPrice - price) * inst.quantity;
+
+                                                return (
+                                                    <Box sx={{
+                                                        color: pl >= 0 ? 'success.main' : 'error.main',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.875rem'
+                                                    }}>
+                                                        {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
+                                                    </Box>
+                                                );
+                                            })()}
+                                        </TableCell>
+                                        <TableCell sx={{ p: 0.5, textAlign: 'center' }}>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleDeletePosition(idx)}
+                                                sx={{ color: 'error.main' }}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                         <TableRow sx={{ backgroundColor: 'grey.100', borderTop: '2px solid', borderTopColor: 'primary.main' }}>
                             <TableCell colSpan={7} sx={{ p: 1, fontWeight: 700, textAlign: 'right', fontSize: '0.875rem' }}>
                                 Total P/L:
@@ -1281,9 +1659,9 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     </Typography>
                     {/* Status Polling Indicator */}
                     {orders.some(order => order.status === 'SENT TO ZERODHA') && (
-                        <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: 1,
                             px: 1.5,
                             py: 0.5,
@@ -1322,9 +1700,9 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 <Divider sx={{ my: 2 }} />
 
                 {/* Strategy Notes Section */}
-                <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
                     mb: 2
                 }}>
@@ -1515,13 +1893,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     </Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button 
+                    <Button
                         onClick={handleCloseDeleteNotesDialog}
                         disabled={deletingNotes}
                     >
                         Cancel
                     </Button>
-                    <Button 
+                    <Button
                         onClick={confirmDeleteAllNotes}
                         variant="contained"
                         color="error"
