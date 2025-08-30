@@ -56,6 +56,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [openPositions, setOpenPositions] = useState([]);
     const [selectedPositions, setSelectedPositions] = useState([]);
     const [totalPL, setTotalPL] = useState(0);
+    const [totalPLMP, setTotalPLMP] = useState(0);
     const [underlyingInstrumentToken, setUnderlyingInstrumentToken] = useState("");
     const [syncingPositions, setSyncingPositions] = useState(false);
     const [showClosedPositions, setShowClosedPositions] = useState(true);
@@ -114,8 +115,28 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }, 0);
         };
 
+        const calculateTotalPLMP = () => {
+            if (!Array.isArray(strategy.instruments_details)) return 0;
+
+            return strategy.instruments_details.reduce((total, inst) => {
+                const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
+                const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
+                const price = inst.price;
+                
+                if (!askPrice || !bidPrice || !price) return total;
+
+                const pl = inst.quantity > 0
+                    ? (bidPrice - price) * inst.quantity
+                    : (askPrice - price) * inst.quantity;
+
+                return total + pl;
+            }, 0);
+        };
+
         const total = calculateTotalPL();
+        const totalMP = calculateTotalPLMP();
         setTotalPL(total);
+        setTotalPLMP(totalMP);
     }, [strategy, zerodhaWebSocketData]);
 
     // Fetch orders for the strategy
@@ -532,13 +553,15 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                          </span>}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, ml: { xs: 0, sm: 'auto' } }}>
-                        <IconButton
+                        <Button
+                            variant="outlined"
+                            color="primary"
                             size="small"
                             onClick={handleOpenAddPosition}
-                            sx={{ color: 'primary.main' }}
+                            startIcon={<AddIcon />}
                         >
-                            <AddIcon />
-                        </IconButton>
+                            Add Position
+                        </Button>
                         <Button
                             variant="outlined"
                             color="primary"
@@ -575,19 +598,39 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         {showClosedPositions ? 'Hide Closed' : 'Show Closed'}
                     </Button>
                 </Box>
-                <Table size="small" sx={{ mb: 2 }}>
+                <Table size="small" sx={{ mb: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
                     <TableHead>
-                        <TableRow>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Trading Symbol</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Quantity</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Type</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Entry Price</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>LTP</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Ask Price</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Bid Price</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>P/L(MP)</TableCell>
-                            <TableCell sx={{ p: 0.5, fontWeight: 600 }}>Actions</TableCell>
+                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'left' }}>
+                                Trading Symbol
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'center' }}>
+                                Quantity
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'center' }}>
+                                Type
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                Entry Price
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                LTP
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                Ask Price
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                Bid Price
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                P/L
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'right' }}>
+                                P/L(MP)
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontWeight: 700, color: 'white', fontSize: '0.875rem', textAlign: 'center' }}>
+                                Actions
+                            </TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -596,14 +639,20 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                              .filter(inst => showClosedPositions || inst.quantity !== 0)
                              .map((inst, idx) => (
                             <TableRow key={idx} sx={{
-                                backgroundColor: inst.quantity === 0 ? 'grey.100' : 'inherit',
-                                opacity: inst.quantity === 0 ? 0.6 : 1
+                                backgroundColor: inst.quantity === 0 ? 'grey.100' : 
+                                               idx % 2 === 0 ? 'grey.50' : 'white',
+                                opacity: inst.quantity === 0 ? 0.6 : 1,
+                                '&:hover': {
+                                    backgroundColor: inst.quantity === 0 ? 'grey.200' : 'grey.100',
+                                    transition: 'background-color 0.2s ease'
+                                }
                             }}>
                                 <TableCell sx={{
                                     p: 0.5, fontSize: 14,
                                     color: inst.quantity === 0 ? 'text.secondary' : 'text.primary',
                                     fontWeight: 500,
-                                    textDecoration: inst.quantity === 0 ? 'line-through' : 'none'
+                                    textDecoration: inst.quantity === 0 ? 'line-through' : 'none',
+                                    textAlign: 'left'
                                 }}>{inst.tradingsymbol} {inst.quantity === 0 && '(CLOSED)'}</TableCell>
                                 <TableCell sx={{
                                     p: 0.5, fontSize: 14,
@@ -612,24 +661,37 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                     fontWeight: inst.quantity < 0 ? 700 : 600,
                                     textAlign: 'center'
                                 }}>{inst.quantity}</TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14, textTransform: 'uppercase' }}>
-                                    {inst.transaction_type}
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'center' }}>
+                                    <Box sx={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        px: 1.5,
+                                        py: 0.5,
+                                        borderRadius: 1,
+                                        backgroundColor: inst.transaction_type === 'BUY' ? 'success.light' : 'error.light',
+                                        color: inst.transaction_type === 'BUY' ? 'success.dark' : 'error.dark',
+                                        fontWeight: 600,
+                                        fontSize: '0.75rem',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        {inst.transaction_type}
+                                    </Box>
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {inst.price}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {zerodhaWebSocketData?.[inst.instrument_token]?.ltp}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price || 
                                      (isMarketOpen() ? 'No Data' : 'Market Closed')}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price || 
                                      (isMarketOpen() ? 'No Data' : 'Market Closed')}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {(() => {
                                         const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
                                         const price = inst.price;
@@ -639,27 +701,51 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                             ? (ltp - price) * inst.quantity
                                             : (ltp - price) * inst.quantity;
 
-                                        return pl.toFixed(2);
+                                        return (
+                                            <Box sx={{
+                                                color: pl >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 600,
+                                                fontSize: '0.875rem'
+                                            }}>
+                                                {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
+                                            </Box>
+                                        );
                                     })()}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5, fontSize: 14 }}>
+                                <TableCell sx={{ p: 0.5, fontSize: 14, textAlign: 'right' }}>
                                     {(() => {
                                         const askPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_ask_price;
                                         const bidPrice = zerodhaWebSocketData?.[inst.instrument_token]?.tick_current_bid_price;
                                         const price = inst.price;
                                         
                                         if (!askPrice || !bidPrice || !price) {
-                                            return isMarketOpen() ? 'No Data' : 'Market Closed';
+                                            return (
+                                                <Box sx={{
+                                                    color: 'text.secondary',
+                                                    fontSize: '0.75rem',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    {isMarketOpen() ? 'No Data' : 'Market Closed'}
+                                                </Box>
+                                            );
                                         }
 
                                         const pl = inst.quantity > 0
                                             ? (bidPrice - price) * inst.quantity
                                             : (askPrice - price) * inst.quantity;
 
-                                        return pl.toFixed(2);
+                                        return (
+                                            <Box sx={{
+                                                color: pl >= 0 ? 'success.main' : 'error.main',
+                                                fontWeight: 600,
+                                                fontSize: '0.875rem'
+                                            }}>
+                                                {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
+                                            </Box>
+                                        );
                                     })()}
                                 </TableCell>
-                                <TableCell sx={{ p: 0.5 }}>
+                                <TableCell sx={{ p: 0.5, textAlign: 'center' }}>
                                     <IconButton
                                         size="small"
                                         onClick={() => handleDeletePosition(idx)}
@@ -670,16 +756,27 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                 </TableCell>
                             </TableRow>
                         ))}
-                        <TableRow>
-                            <TableCell colSpan={8} sx={{ p: 0.5, fontWeight: 600, textAlign: 'right' }}>
+                        <TableRow sx={{ backgroundColor: 'grey.100', borderTop: '2px solid', borderTopColor: 'primary.main' }}>
+                            <TableCell colSpan={7} sx={{ p: 1, fontWeight: 700, textAlign: 'right', fontSize: '0.875rem' }}>
                                 Total P/L:
                             </TableCell>
                             <TableCell sx={{
-                                p: 0.5,
-                                fontWeight: 600,
-                                color: totalPL < 0 ? 'error.main' : 'success.main'
+                                p: 1,
+                                fontWeight: 700,
+                                color: totalPL < 0 ? 'error.main' : 'success.main',
+                                fontSize: '1rem',
+                                textAlign: 'center'
                             }}>
-                                {totalPL?.toFixed(2) || '-'}
+                                {totalPL >= 0 ? '+' : ''}{totalPL?.toFixed(2) || '-'}
+                            </TableCell>
+                            <TableCell sx={{
+                                p: 1,
+                                fontWeight: 700,
+                                color: totalPLMP < 0 ? 'error.main' : 'success.main',
+                                fontSize: '1rem',
+                                textAlign: 'center'
+                            }}>
+                                {totalPLMP >= 0 ? '+' : ''}{totalPLMP?.toFixed(2) || '-'}
                             </TableCell>
                             <TableCell></TableCell>
                         </TableRow>
