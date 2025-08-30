@@ -90,6 +90,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     const [strategyTarget, setStrategyTarget] = useState(null);
     const [strategyMaxLoss, setStrategyMaxLoss] = useState(null);
     const [maxLossTriggered, setMaxLossTriggered] = useState(false);
+    const [isUpdatingTargets, setIsUpdatingTargets] = useState(false);
 
     // Helper function for progress bar colors
     const getProgressColors = useCallback((totalPL, expectedReturn) => {
@@ -250,7 +251,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             isTargetAchieved
         });
 
-        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !isTargetAchieved) {
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !isTargetAchieved && !isUpdatingTargets) {
             console.log('🎯 Creating target achievement...');
             
             // Create achievement record in database
@@ -283,7 +284,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
 
         // Reset achievement if P/L falls below target
-        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && isTargetAchieved) {
+        if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && isTargetAchieved && !isUpdatingTargets) {
             console.log('🔄 Resetting target achievement...');
             
             resetTargetAchievement(strategy.strategyid, strategyTarget)
@@ -296,7 +297,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         }
 
         // Check max loss triggered
-        if (typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered) {
+        if (typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered && !isUpdatingTargets) {
             // Mark max loss as triggered in database
             triggerMaxLoss(strategy.strategyid, strategyMaxLoss)
                 .then(() => {
@@ -550,6 +551,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     const handleUpdate = async () => {
         setUpdating(true);
+        setIsUpdatingTargets(true); // Prevent immediate achievement checks
         try {
             let hasUpdates = false;
             let updateMessages = [];
@@ -566,6 +568,13 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         if (existingTarget.success && existingTarget.data) {
                             // Update existing target
                             await updateTargetValue(strategy.strategyid, newTargetValue);
+                            
+                            // Reset achievement status if target was already achieved
+                            if (isTargetAchieved) {
+                                await resetTargetAchievement(strategy.strategyid, newTargetValue);
+                                setIsTargetAchieved(false);
+                                console.log('🔄 Target value changed, resetting achievement status');
+                            }
                         } else {
                             // Create new target
                             await createTargetAchievement(strategy.strategyid, newTargetValue);
@@ -593,6 +602,15 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                 if (newMaxLossValue !== strategyMaxLoss) {
                     try {
                         await updateMaxLossValue(strategy.strategyid, newMaxLossValue);
+                        
+                        // Reset max loss triggered status if max loss was already triggered
+                        if (maxLossTriggered) {
+                            // We need to reset the max loss triggered status in the database
+                            // This will be handled by the backend when updating the max loss value
+                            setMaxLossTriggered(false);
+                            console.log('🔄 Max loss value changed, resetting triggered status');
+                        }
+                        
                         updateMessages.push('Max loss updated');
                         hasUpdates = true;
                     } catch (maxLossErr) {
@@ -648,6 +666,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             });
         }
         setUpdating(false);
+        setIsUpdatingTargets(false); // Re-enable achievement checks
     };
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
