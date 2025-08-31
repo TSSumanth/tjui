@@ -556,6 +556,58 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             let hasUpdates = false;
             let updateMessages = [];
 
+            // Handle basic strategy field updates
+            if (editState.status !== strategy.status) {
+                try {
+                    await updateAlgoStrategy(strategy.strategyid, { status: editState.status });
+                    updateMessages.push('Status updated');
+                    hasUpdates = true;
+                } catch (statusErr) {
+                    console.error('Error updating status:', statusErr);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to update status',
+                        severity: 'error'
+                    });
+                    setUpdating(false);
+                    return;
+                }
+            }
+
+            if (editState.strategy_type !== strategy.strategy_type) {
+                try {
+                    await updateAlgoStrategy(strategy.strategyid, { strategy_type: editState.strategy_type });
+                    updateMessages.push('Strategy type updated');
+                    hasUpdates = true;
+                } catch (strategyTypeErr) {
+                    console.error('Error updating strategy type:', strategyTypeErr);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to update strategy type',
+                        severity: 'error'
+                    });
+                    setUpdating(false);
+                    return;
+                }
+            }
+
+            if (editState.underlying_instrument !== strategy.underlying_instrument) {
+                try {
+                    await updateAlgoStrategy(strategy.strategyid, { underlying_instrument: editState.underlying_instrument });
+                    updateMessages.push('Underlying instrument updated');
+                    hasUpdates = true;
+                } catch (underlyingErr) {
+                    console.error('Error updating underlying instrument:', underlyingErr);
+                    setSnackbar({
+                        open: true,
+                        message: 'Failed to update underlying instrument',
+                        severity: 'error'
+                    });
+                    setUpdating(false);
+                    return;
+                }
+            }
+
             // Handle target value update
             if (editState.expected_return && parseFloat(editState.expected_return) > 0) {
                 const newTargetValue = parseFloat(editState.expected_return);
@@ -645,6 +697,11 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             if (hasUpdates) {
                 // Refresh data
                 await fetchStrategyTargetAndMaxLoss();
+                
+                // Refresh strategy data to reflect updates
+                if (onStrategyUpdate) {
+                    onStrategyUpdate();
+                }
 
                 setSnackbar({
                     open: true,
@@ -1779,6 +1836,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         onStatusCheck={handleManualStatusCheck}
                         checkingStatus={checkingOrderStatuses}
                         strategyId={strategy.strategyid}
+                        onStrategyUpdate={onStrategyUpdate}
                     />
                 ) : (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

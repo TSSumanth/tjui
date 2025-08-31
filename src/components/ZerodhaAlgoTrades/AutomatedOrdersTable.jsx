@@ -6,11 +6,11 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deleteAutomatedOrder, updateAutomatedOrder } from '../../services/automatedOrders';
 import { placeRegularOrder } from '../../services/zerodha/api';
-import { updateAlgoStrategy, getAlgoStrategies } from '../../services/algoStrategies';
+import { updateAlgoStrategy, getAlgoStrategyById } from '../../services/algoStrategies';
 
 const ORDER_TYPES = ['LIMIT', 'MARKET'];
 
-const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus, strategyId }) => {
+const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus, strategyId, onStrategyUpdate }) => {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [editOrder, setEditOrder] = useState(null);
     const [editState, setEditState] = useState({ order_type: 'MARKET', price: '' });
@@ -19,22 +19,57 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
     const handleDelete = async (order) => {
         setLoading(true);
         try {
+            console.log(`🗑️ Starting delete for order ${order.id} in strategy ${strategyId}`);
+            
             // Delete the automated order
             await deleteAutomatedOrder(order.id);
+            console.log(`✅ Order ${order.id} deleted successfully`);
 
-            // Update the strategy to remove the order ID
+            // Update the strategy to remove the order ID from automated_order_ids array
             if (strategyId) {
-                const strategy = await getAlgoStrategies({ strategyid: strategyId });
-                if (strategy && strategy.length > 0) {
-                    const updatedOrderIds = strategy[0].automated_order_ids.filter(id => id !== order.id);
-                    await updateAlgoStrategy(strategyId, {
-                        automated_order_ids: updatedOrderIds
-                    });
+                console.log(`🔄 Updating strategy ${strategyId} to remove order ${order.id}`);
+                try {
+                    const strategy = await getAlgoStrategyById(strategyId);
+                    console.log(`📊 Strategy data received:`, strategy);
+                    
+                    // Handle both response formats: { success: true, data: {...} } and direct object
+                    if (strategy && (strategy.success ? strategy.data : strategy)) {
+                        const strategyData = strategy.success ? strategy.data : strategy;
+                        const currentOrderIds = strategyData.automated_order_ids || [];
+                        console.log(`📋 Current automated_order_ids:`, currentOrderIds);
+                        
+                        const updatedOrderIds = currentOrderIds.filter(id => id !== order.id);
+                        console.log(`🔄 Filtered automated_order_ids:`, updatedOrderIds);
+                        
+                        console.log(`💾 Calling updateAlgoStrategy with:`, { automated_order_ids: updatedOrderIds });
+                        await updateAlgoStrategy(strategyId, {
+                            automated_order_ids: updatedOrderIds
+                        });
+                        
+                        console.log(`✅ Strategy ${strategyId} updated successfully. Removed order ${order.id}. New automated_order_ids:`, updatedOrderIds);
+                    } else {
+                        console.warn(`⚠️ Strategy data not found or invalid:`, strategy);
+                    }
+                } catch (strategyUpdateErr) {
+                    console.error('❌ Error updating strategy automated_order_ids:', strategyUpdateErr);
+                    // Don't fail the entire delete operation if strategy update fails
+                    // The order is already deleted, so we just log the error
                 }
+            } else {
+                console.warn(`⚠️ No strategyId provided, skipping strategy update`);
             }
 
             setSnackbar({ open: true, message: 'Order deleted successfully', severity: 'success' });
-            onRefresh && onRefresh();
+            
+            // Refresh both the orders and the strategy data
+            if (onRefresh) {
+                onRefresh();
+            }
+            
+            // Also trigger a strategy refresh to update automated_order_ids
+            if (onStrategyUpdate) {
+                onStrategyUpdate();
+            }
         } catch (err) {
             setSnackbar({ open: true, message: err?.response?.data?.error || err.message || 'Failed to delete order', severity: 'error' });
         }
