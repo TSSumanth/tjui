@@ -161,54 +161,65 @@ const TradeCombinationsTable = ({
     }
 
     return (
-        <Box sx={{ mt: 3 }}>
-            <Card sx={{ mb: 2, bgcolor: 'primary.50' }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                        🎯 Trade Combinations Analysis
+        <Box sx={{ mt: 2 }}>
+            {/* Compact Header */}
+            <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1,
+                p: 1,
+                bgcolor: 'primary.50',
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'primary.200',
+                mb: 1.5
+            }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                        🎯 {strategyType === 'PE' ? 'Bull Put' : 'Bear Call'} Analysis
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        {strategyType === 'PE' ? 'Bull Put Spread' : 'Bear Call Spread'}: 
-                        Analyzing {combinations.length} potential combinations
+                    <Chip 
+                        label={`${combinations.length} combinations`} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                    />
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                        📊 Lot: {realInstruments.length > 0 ? (realInstruments[0]?.lot_size || 50) : 50}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mt: 0.5, alignItems: 'center' }}>
-                        <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
-                            📊 Lot Size: {realInstruments.length > 0 ? (realInstruments[0]?.lot_size || 50) : 50} shares per lot
-                        </Typography>
-                        <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
-                            📈 Nifty CMP: ₹{niftyCMP ? parseFloat(niftyCMP).toLocaleString() : 'N/A'}
-                        </Typography>
-                    </Box>
+                    <Typography variant="caption" color="success.main" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                        📈 Nifty: ₹{niftyCMP ? parseFloat(niftyCMP).toLocaleString() : 'N/A'}
+                    </Typography>
                     
-                    {/* Undervalued Options Summary */}
+                    {/* Compact Undervalued Indicator */}
                     {(() => {
-                        const undervaluedOptions = [];
-                        combinations.forEach(combo => {
-                            if (isOptionUndervalued(combo.buyStrike, strategyType)) {
-                                undervaluedOptions.push({ strike: combo.buyStrike, type: 'BUY' });
-                            }
-                            if (isOptionUndervalued(combo.sellStrike, strategyType)) {
-                                undervaluedOptions.push({ strike: combo.sellStrike, type: 'SELL' });
-                            }
-                        });
+                        const undervaluedCount = combinations.reduce((count, combo) => {
+                            if (isOptionUndervalued(combo.buyStrike, strategyType)) count++;
+                            if (isOptionUndervalued(combo.sellStrike, strategyType)) count++;
+                            return count;
+                        }, 0);
                         
-                        if (undervaluedOptions.length > 0) {
+                        if (undervaluedCount > 0) {
                             return (
-                                <Box sx={{ mt: 1.5, p: 1, bgcolor: 'error.50', borderRadius: 1, border: '1px solid', borderColor: 'error.200' }}>
-                                    <Typography variant="body2" color="error.main" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                        🔥 Undervalued Options Detected!
-                                    </Typography>
-                                    <Typography variant="caption" color="error.main">
-                                        {undervaluedOptions.length} option(s) trading below intrinsic value - 
-                                        potential arbitrage opportunities
-                                    </Typography>
-                                </Box>
+                                <Chip
+                                    label={`🔥 ${undervaluedCount} undervalued`}
+                                    size="small"
+                                    color="error"
+                                    variant="filled"
+                                    sx={{ fontSize: '0.65rem', height: 20 }}
+                                />
                             );
                         }
                         return null;
                     })()}
-                </CardContent>
-            </Card>
+                </Box>
+            </Box>
 
             <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
                 <Table stickyHeader size="small">
@@ -217,6 +228,8 @@ const TradeCombinationsTable = ({
                             <TableCell sx={{ fontWeight: 600 }}>Strategy</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>BUY Strike</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>SELL Strike</TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>BUY Instrument</TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>SELL Instrument</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>BUY Premium (per share)</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>SELL Premium (per share)</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>Intrinsic Value (per share)</TableCell>
@@ -238,6 +251,14 @@ const TradeCombinationsTable = ({
                             const sellDiscount = getDiscountPercentage(combo.sellStrike, strategyType, cmp, sellPremium);
                             const buyLotSize = getLotSize(combo.buyStrike, strategyType);
                             const sellLotSize = getLotSize(combo.sellStrike, strategyType);
+                            
+                            // Get instrument details for buy and sell strikes
+                            const buyInstrument = realInstruments.find(instr => 
+                                instr.strike === combo.buyStrike && instr.instrument_type === strategyType
+                            );
+                            const sellInstrument = realInstruments.find(instr => 
+                                instr.strike === combo.sellStrike && instr.instrument_type === strategyType
+                            );
                             
                             // Use consistent lot size for the strategy (usually all instruments have same lot size)
                             const strategyLotSize = Math.max(buyLotSize, sellLotSize) || 50;
@@ -316,6 +337,26 @@ const TradeCombinationsTable = ({
                                                     sx={{ fontSize: '0.6rem', height: 18, mt: 0.5 }}
                                                 />
                                             )}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Box>
+                                            <Typography variant="caption" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                                                {buyInstrument?.tradingsymbol || 'N/A'}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block' }}>
+                                                Token: {buyInstrument?.instrument_token || 'N/A'}
+                                            </Typography>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Box>
+                                            <Typography variant="caption" color="text.primary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                                                {sellInstrument?.tradingsymbol || 'N/A'}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block' }}>
+                                                Token: {sellInstrument?.instrument_token || 'N/A'}
+                                            </Typography>
                                         </Box>
                                     </TableCell>
                                     <TableCell>

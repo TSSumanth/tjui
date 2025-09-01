@@ -400,153 +400,171 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                     </Box>
                 </Box>
                 
-                {/* Strategy-specific explanation */}
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                    {type === 'PE' ? (
-                        '💡 Bull Put Spread: Sell Put at higher strikes (ITM: 24500→25000), Buy Put at lower strikes (OTM: 24450→24400)'
-                    ) : (
-                        '💡 Bear Call Spread: Sell Call at lower strikes (ITM: 24500→24000), Buy Call at higher strikes (OTM: 24550→25000)'
-                    )}
-                </Typography>
-                <Grid container spacing={1}>
-                                                        {strikes.map((strike, index) => {
-                        // Find matching real instrument data for this strike
-                        const realInstrument = realInstruments.find(instr => 
-                            instr.strike === strike
-                        );
-                        
-                        // Calculate undervalued option detection
-                        const cmp = parseFloat(niftyCMP);
-                        const currentLTP = realInstrument ? 
-                            (ltpData[realInstrument.tradingsymbol] || realInstrument.last_price) : null;
-                        const premium = currentLTP ? parseFloat(currentLTP) : null;
-                        
-                        const intrinsicValue = calculateIntrinsicValue(strike, type, cmp);
-                        const isUndervalued = premium ? isOptionUndervalued(strike, type, cmp, premium) : false;
-                        const discountPercentage = premium ? getDiscountPercentage(strike, type, cmp, premium) : null;
-                        
-                        return (
-                            <Grid item xs={6} sm={4} md={3} lg={2} key={strike}>
-                                <Card 
+                {/* Compact Horizontal Strike Display */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 1,
+                    border: '1px solid',
+                    borderColor: 'grey.300',
+                    borderRadius: 2,
+                    p: 1.5,
+                    bgcolor: 'grey.50'
+                }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        📊 Strike Prices & Market Data
+                    </Typography>
+                    
+                    {/* Horizontal Scrollable Container */}
+                    <Box sx={{ 
+                        display: 'flex', 
+                        gap: 1.5, 
+                        overflowX: 'auto',
+                        pb: 1,
+                        '&::-webkit-scrollbar': {
+                            height: 6,
+                        },
+                        '&::-webkit-scrollbar-track': {
+                            bgcolor: 'grey.100',
+                            borderRadius: 3,
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                            bgcolor: 'primary.main',
+                            borderRadius: 3,
+                        }
+                    }}>
+                        {strikes.map((strike, index) => {
+                            // Find matching real instrument data for this strike
+                            const realInstrument = realInstruments.find(instr => 
+                                instr.strike === strike
+                            );
+                            
+                            // Calculate undervalued option detection
+                            const cmp = parseFloat(niftyCMP);
+                            const currentLTP = realInstrument ? 
+                                (ltpData[realInstrument.tradingsymbol] || realInstrument.last_price) : null;
+                            const premium = currentLTP ? parseFloat(currentLTP) : null;
+                            
+                            const intrinsicValue = calculateIntrinsicValue(strike, type, cmp);
+                            const isUndervalued = premium ? isOptionUndervalued(strike, type, cmp, premium) : false;
+                            const discountPercentage = premium ? getDiscountPercentage(strike, type, cmp, premium) : null;
+                            
+                            return (
+                                <Box
+                                    key={strike}
                                     sx={{ 
+                                        minWidth: 120,
                                         cursor: 'pointer',
                                         transition: 'all 0.2s',
                                         '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: 2
+                                            transform: 'translateY(-1px)',
+                                            boxShadow: 1
                                         },
-                                        border: isUndervalued ? '2px solid' : (strike === nearestStrike ? '2px solid' : '1px solid'),
+                                        border: '1px solid',
                                         borderColor: isUndervalued ? 'error.main' : (strike === nearestStrike ? 'primary.main' : 'grey.300'),
-                                        // Highlight based on data availability and undervalued status
-                                        bgcolor: isUndervalued ? 'error.50' : (realInstrument ? 'blue.50' : 'white')
+                                        borderRadius: 1.5,
+                                        p: 1,
+                                        bgcolor: isUndervalued ? 'error.50' : (realInstrument ? 'white' : 'grey.100'),
+                                        borderWidth: isUndervalued || strike === nearestStrike ? 2 : 1
                                     }}
                                     onClick={() => handleStrikeClick(strike)}
                                 >
-                                <CardContent sx={{ py: 1.5, px: 1.5, textAlign: 'center' }}>
-                                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    {/* Strike Price */}
+                                    <Typography variant="subtitle2" sx={{ 
+                                        fontWeight: 700, 
+                                        textAlign: 'center',
+                                        color: strike === nearestStrike ? 'primary.main' : 'text.primary'
+                                    }}>
                                         ₹{strike.toLocaleString()}
                                     </Typography>
-                                   
-                                    <Chip 
-                                        label={getStrikeLabel(strike)}
-                                        size="small"
-                                        color={getStrikeColor(strike)}
-                                        variant={strike === nearestStrike ? 'filled' : 'outlined'}
-                                        sx={{ fontSize: '0.7rem', mb: 0.5 }}
-                                    />
                                     
-                                    {/* Undervalued Option Indicator */}
-                                    {isUndervalued && (
-                                        <Chip
-                                            label={`🔥 ${discountPercentage?.toFixed(1)}% off`}
+                                    {/* Strike Type & Undervalued Chips */}
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5, alignItems: 'center' }}>
+                                        <Chip 
+                                            label={getStrikeLabel(strike)}
                                             size="small"
-                                            color="error"
-                                            variant="filled"
-                                            sx={{ 
-                                                fontSize: '0.6rem', 
-                                                height: 18, 
-                                                mb: 0.5,
-                                                display: 'block'
-                                            }}
+                                            color={getStrikeColor(strike)}
+                                            variant={strike === nearestStrike ? 'filled' : 'outlined'}
+                                            sx={{ fontSize: '0.65rem', height: 18 }}
                                         />
-                                    )}
+                                        
+                                        {isUndervalued && (
+                                            <Chip
+                                                label={`🔥 ${discountPercentage?.toFixed(1)}%`}
+                                                size="small"
+                                                color="error"
+                                                variant="filled"
+                                                sx={{ fontSize: '0.6rem', height: 16 }}
+                                            />
+                                        )}
+                                    </Box>
                                     
-                                    {/* Real Market Data */}
+                                    {/* Market Data */}
                                     {realInstrument ? (
-                                        <Box sx={{ mt: 0.5, p: 0.5, bgcolor: 'blue.100', borderRadius: 1, border: '1px solid', borderColor: 'blue.200' }}>
-                                            {/* Real-time LTP from fetchLTPs */}
-                                            {ltpData[realInstrument.tradingsymbol] ? (
-                                                <Box>
-                                                    <Typography variant="caption" color="green.800" sx={{ display: 'block', fontWeight: 700, fontSize: '0.75rem' }}>
-                                                        🚀 CMP: ₹{parseFloat(ltpData[realInstrument.tradingsymbol]).toFixed(2)}
-                                                    </Typography>
-                                                </Box>
-                                            ) : (
-                                                <Typography variant="caption" color="blue.800" sx={{ display: 'block', fontWeight: 600, fontSize: '0.7rem' }}>
-                                                    💰 LTP: ₹{realInstrument.last_price ? parseFloat(realInstrument.last_price).toFixed(2) : 'N/A'}
-                                                </Typography>
-                                            )}
-                                            
-                                            <Typography variant="caption" color="blue.700" sx={{ fontSize: '0.65rem', display: 'block' }}>
-                                                📊 {realInstrument.tradingsymbol}
+                                        <Box sx={{ mt: 0.5, textAlign: 'center' }}>
+                                            <Typography variant="caption" color="success.main" sx={{ 
+                                                display: 'block', 
+                                                fontWeight: 600, 
+                                                fontSize: '0.7rem' 
+                                            }}>
+                                                💰 ₹{currentLTP ? parseFloat(currentLTP).toFixed(2) : 'N/A'}
                                             </Typography>
-                                            {realInstrument.lot_size && (
-                                                <Typography variant="caption" color="blue.600" sx={{ fontSize: '0.6rem', display: 'block' }}>
-                                                    📦 Lot: {realInstrument.lot_size}
-                                                </Typography>
-                                            )}
+                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                fontSize: '0.6rem',
+                                                display: 'block',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}>
+                                                📦 {realInstrument.lot_size || 50}
+                                            </Typography>
                                         </Box>
                                     ) : (
-                                        <Box sx={{ mt: 0.5, p: 0.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }}>
-                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontStyle: 'italic' }}>
-                                                📊 No market data
-                                            </Typography>
-                                        </Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ 
+                                            fontSize: '0.6rem',
+                                            textAlign: 'center',
+                                            display: 'block',
+                                            mt: 0.5,
+                                            fontStyle: 'italic'
+                                        }}>
+                                            No data
+                                        </Typography>
                                     )}
-                                    
-                                    {/* ATM Indicator */}
-                                    {strike === nearestStrike && (
-                                        <Box sx={{ mt: 0.5 }}>
-                                            <LockIcon fontSize="small" color="primary" />
-                                        </Box>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    );
-                    })}
-                </Grid>
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                    
+                    {/* Strategy Tips */}
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', fontStyle: 'italic' }}>
+                        💡 {type === 'PE' ? 'Bull Put: Sell higher strikes (ITM), Buy lower strikes (OTM)' : 'Bear Call: Sell lower strikes (ITM), Buy higher strikes (OTM)'}
+                    </Typography>
+                </Box>
             </Box>
 
 
 
-            {/* Legend */}
-            <Box sx={{ mt: 2, p: 1.5, bgcolor: 'grey.100', borderRadius: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                    <strong>Legend:</strong>
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Chip label="ATM" size="small" color="primary" variant="filled" />
-                        <Typography variant="caption">At-The-Money (Nearest)</Typography>
+            {/* Compact Legend */}
+            <Box sx={{ mt: 1.5, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        Legend:
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <Chip label="ATM" size="small" color="primary" variant="filled" sx={{ fontSize: '0.6rem', height: 18 }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Nearest</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Chip label="ITM" size="small" color="success" variant="outlined" />
-                        <Typography variant="caption">
-                            {type === 'PE' ? 'In-The-Money (Higher strikes for puts)' : 'In-The-Money (Lower strikes for calls)'}
-                        </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <Chip label="ITM" size="small" color="success" variant="outlined" sx={{ fontSize: '0.6rem', height: 18 }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>In-The-Money</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Chip label="OTM" size="small" color="warning" variant="outlined" />
-                        <Typography variant="caption">
-                            {type === 'PE' ? 'Out-The-Money (Lower strikes for puts)' : 'Out-The-Money (Higher strikes for calls)'}
-                        </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <Chip label="OTM" size="small" color="warning" variant="outlined" sx={{ fontSize: '0.6rem', height: 18 }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Out-The-Money</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Chip label="🔥 X% off" size="small" color="error" variant="filled" />
-                        <Typography variant="caption">
-                            Undervalued (LTP &lt; Intrinsic Value)
-                        </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <Chip label="🔥 % off" size="small" color="error" variant="filled" sx={{ fontSize: '0.6rem', height: 18 }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Undervalued</Typography>
                     </Box>
                 </Box>
             </Box>
