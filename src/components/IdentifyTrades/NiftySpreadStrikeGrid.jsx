@@ -14,7 +14,12 @@ import {
     TrendingDown as TrendingDownIcon,
     Lock as LockIcon
 } from '@mui/icons-material';
-import { getNearestStrike } from './utils';
+import { 
+    getNearestStrike, 
+    calculateIntrinsicValue, 
+    isOptionUndervalued, 
+    getDiscountPercentage 
+} from './utils';
 import { getNiftyOptions, fetchLTPs } from '../../services/zerodha/api';
 import TradeCombinationsTable from './TradeCombinationsTable';
 
@@ -404,11 +409,21 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                     )}
                 </Typography>
                 <Grid container spacing={1}>
-                    {strikes.map((strike, index) => {
+                                                        {strikes.map((strike, index) => {
                         // Find matching real instrument data for this strike
                         const realInstrument = realInstruments.find(instr => 
                             instr.strike === strike
                         );
+                        
+                        // Calculate undervalued option detection
+                        const cmp = parseFloat(niftyCMP);
+                        const currentLTP = realInstrument ? 
+                            (ltpData[realInstrument.tradingsymbol] || realInstrument.last_price) : null;
+                        const premium = currentLTP ? parseFloat(currentLTP) : null;
+                        
+                        const intrinsicValue = calculateIntrinsicValue(strike, type, cmp);
+                        const isUndervalued = premium ? isOptionUndervalued(strike, type, cmp, premium) : false;
+                        const discountPercentage = premium ? getDiscountPercentage(strike, type, cmp, premium) : null;
                         
                         return (
                             <Grid item xs={6} sm={4} md={3} lg={2} key={strike}>
@@ -420,10 +435,10 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                                             transform: 'translateY(-2px)',
                                             boxShadow: 2
                                         },
-                                        border: strike === nearestStrike ? '2px solid' : '1px solid',
-                                        borderColor: strike === nearestStrike ? 'primary.main' : 'grey.300',
-                                        // Highlight if real data is available
-                                        bgcolor: realInstrument ? 'blue.50' : 'white'
+                                        border: isUndervalued ? '2px solid' : (strike === nearestStrike ? '2px solid' : '1px solid'),
+                                        borderColor: isUndervalued ? 'error.main' : (strike === nearestStrike ? 'primary.main' : 'grey.300'),
+                                        // Highlight based on data availability and undervalued status
+                                        bgcolor: isUndervalued ? 'error.50' : (realInstrument ? 'blue.50' : 'white')
                                     }}
                                     onClick={() => handleStrikeClick(strike)}
                                 >
@@ -439,6 +454,22 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                                         variant={strike === nearestStrike ? 'filled' : 'outlined'}
                                         sx={{ fontSize: '0.7rem', mb: 0.5 }}
                                     />
+                                    
+                                    {/* Undervalued Option Indicator */}
+                                    {isUndervalued && (
+                                        <Chip
+                                            label={`🔥 ${discountPercentage?.toFixed(1)}% off`}
+                                            size="small"
+                                            color="error"
+                                            variant="filled"
+                                            sx={{ 
+                                                fontSize: '0.6rem', 
+                                                height: 18, 
+                                                mb: 0.5,
+                                                display: 'block'
+                                            }}
+                                        />
+                                    )}
                                     
                                     {/* Real Market Data */}
                                     {realInstrument ? (
@@ -509,6 +540,12 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                         <Chip label="OTM" size="small" color="warning" variant="outlined" />
                         <Typography variant="caption">
                             {type === 'PE' ? 'Out-The-Money (Lower strikes for puts)' : 'Out-The-Money (Higher strikes for calls)'}
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Chip label="🔥 X% off" size="small" color="error" variant="filled" />
+                        <Typography variant="caption">
+                            Undervalued (LTP &lt; Intrinsic Value)
                         </Typography>
                     </Box>
                 </Box>
