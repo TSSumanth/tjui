@@ -46,7 +46,7 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
                     key: 'niftyCMP',
                     label: 'Nifty CMP',
                     type: 'smartCMP',
-                    assetName: 'Nifty',
+                    assetName: 'Nifty 50',
                     required: true,
                     width: 2.5
                 },
@@ -72,7 +72,7 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
                     key: 'niftyCMP',
                     label: 'Nifty CMP',
                     type: 'smartCMP',
-                    assetName: 'Nifty',
+                    assetName: 'Nifty 50',
                     required: true,
                     width: 2.5
                 },
@@ -279,7 +279,7 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
                                     console.log('WebSocket CMP received:', price);
                                     handleFieldChange(field.key, price.toString());
                                 }}
-                                assetName={field.assetName || 'Nifty'}
+                                assetName={field.assetName || 'Nifty 50'}
                                 label={field.label}
                             />
                         )}

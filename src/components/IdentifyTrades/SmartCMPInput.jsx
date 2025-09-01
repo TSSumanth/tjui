@@ -14,7 +14,7 @@ const SmartCMPInput = ({
     value, 
     onChange, 
     onWebSocketData, 
-    assetName = 'Nifty', // Default to Nifty for backward compatibility
+    assetName = 'Nifty 50', // Default to Nifty for backward compatibility
     label = null // Custom label, falls back to assetName + " CMP"
 }) => {
     const [isLoading, setIsLoading] = useState(true);
