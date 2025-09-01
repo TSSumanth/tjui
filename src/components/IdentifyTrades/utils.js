@@ -211,6 +211,198 @@ export const getNextStrikeBelow = (currentPrice, strikeIncrement = 50) => {
     return atmStrike;
 };
 
+/**
+ * Calculate intrinsic value for options
+ * @param {number} strike - Strike price of the option
+ * @param {string} optionType - Option type ('PE' or 'CE')
+ * @param {number} currentPrice - Current market price (Nifty CMP)
+ * @returns {number|null} Intrinsic value or null if invalid
+ */
+export const calculateIntrinsicValue = (strike, optionType, currentPrice) => {
+    if (typeof strike !== 'number' || typeof currentPrice !== 'number' || isNaN(strike) || isNaN(currentPrice)) {
+        return null;
+    }
+
+    if (optionType === 'PE') {
+        // For Put options: Intrinsic Value = Strike - CMP (if Strike > CMP)
+        return strike > currentPrice ? strike - currentPrice : 0;
+    } else if (optionType === 'CE') {
+        // For Call options: Intrinsic Value = CMP - Strike (if CMP > Strike)
+        return currentPrice > strike ? currentPrice - strike : 0;
+    }
+    return 0;
+};
+
+/**
+ * Check if an option is undervalued
+ * @param {number} strike - Strike price of the option
+ * @param {string} optionType - Option type ('PE' or 'CE')
+ * @param {number} currentPrice - Current market price (Nifty CMP)
+ * @param {number} ltp - Last traded price of the option
+ * @returns {boolean} True if option is undervalued
+ */
+export const isOptionUndervalued = (strike, optionType, currentPrice, ltp) => {
+    if (typeof ltp !== 'number' || isNaN(ltp)) return false;
+    
+    const intrinsicValue = calculateIntrinsicValue(strike, optionType, currentPrice);
+    if (intrinsicValue === null) return false;
+    
+    // Option is undervalued if LTP < Intrinsic Value
+    return ltp < intrinsicValue;
+};
+
+/**
+ * Calculate discount percentage for undervalued options
+ * @param {number} strike - Strike price of the option
+ * @param {string} optionType - Option type ('PE' or 'CE')
+ * @param {number} currentPrice - Current market price (Nifty CMP)
+ * @param {number} ltp - Last traded price of the option
+ * @returns {number|null} Discount percentage or null if not undervalued
+ */
+export const getDiscountPercentage = (strike, optionType, currentPrice, ltp) => {
+    if (typeof ltp !== 'number' || isNaN(ltp)) return null;
+    
+    const intrinsicValue = calculateIntrinsicValue(strike, optionType, currentPrice);
+    if (intrinsicValue === null || intrinsicValue === 0) return null;
+    
+    // Calculate discount percentage
+    const discount = ((intrinsicValue - ltp) / intrinsicValue) * 100;
+    return discount > 0 ? discount : null;
+};
+
+/**
+ * Calculate net premium for a spread strategy
+ * @param {number} buyPremium - Premium paid for buying option
+ * @param {number} sellPremium - Premium received from selling option
+ * @param {number} lotSize - Lot size for the option (default: 50 for Nifty)
+ * @returns {number|null} Net premium or null if invalid
+ */
+export const calculateNetPremium = (buyPremium, sellPremium, lotSize = 50) => {
+    if (typeof buyPremium !== 'number' || typeof sellPremium !== 'number' || 
+        isNaN(buyPremium) || isNaN(sellPremium)) {
+        return null;
+    }
+    
+    if (typeof lotSize !== 'number' || lotSize <= 0) {
+        return null;
+    }
+    
+    // Net Premium = (SELL Premium - BUY Premium) × Lot Size
+    return (sellPremium - buyPremium) * lotSize;
+};
+
+/**
+ * Calculate maximum risk for an options spread strategy
+ * @param {number} buyStrike - Strike price of bought option
+ * @param {number} sellStrike - Strike price of sold option
+ * @param {number} buyPremium - Premium paid for buying option
+ * @param {number} sellPremium - Premium received from selling option
+ * @param {number} lotSize - Lot size for the option (default: 50 for Nifty)
+ * @returns {number} Maximum risk considering premiums and lot size
+ */
+export const calculateMaxRisk = (buyStrike, sellStrike, buyPremium, sellPremium, lotSize = 50) => {
+    if (typeof buyStrike !== 'number' || typeof sellStrike !== 'number' || 
+        isNaN(buyStrike) || isNaN(sellStrike)) {
+        return 0;
+    }
+    
+    if (typeof buyPremium !== 'number' || typeof sellPremium !== 'number' || 
+        isNaN(buyPremium) || isNaN(sellPremium)) {
+        return 0;
+    }
+    
+    if (typeof lotSize !== 'number' || lotSize <= 0) {
+        return 0;
+    }
+    
+    // Max Risk occurs when options expire exactly at the buy strike price
+    // At expiration:
+    // - BUY option value = 0 (out of the money)
+    // - SELL option value = Intrinsic value - premium collected
+    // - Net loss = (0 - buyPremium) + (sellPremium - intrinsicValue)
+    
+    // Calculate intrinsic value at buy strike
+    let intrinsicValueAtBuyStrike;
+    if (buyStrike < sellStrike) {
+        // For Bull Put Spread: SELL is ITM at buy strike, intrinsic value = sellStrike - buyStrike
+        intrinsicValueAtBuyStrike = sellStrike - buyStrike;
+    } else {
+        // For Bear Call Spread: SELL is ITM at buy strike, intrinsic value = buyStrike - sellStrike
+        intrinsicValueAtBuyStrike = buyStrike - sellStrike;
+    }
+    
+    // Max Risk = (Buy Premium Paid) + (Intrinsic Value at Buy Strike - Sell Premium Collected)
+    const maxRisk = (buyPremium + (intrinsicValueAtBuyStrike - sellPremium)) * lotSize;
+    
+    return Math.max(0, maxRisk); // Risk cannot be negative
+};
+
+/**
+ * Calculate profit potential for a spread strategy
+ * @param {number} buyPremium - Premium paid for buying option
+ * @param {number} sellPremium - Premium received from selling option
+ * @param {number} lotSize - Lot size for the option (default: 50 for Nifty)
+ * @returns {number|null} Profit potential or null if invalid
+ */
+export const calculateProfitPotential = (buyPremium, sellPremium, lotSize = 50) => {
+    if (typeof buyPremium !== 'number' || typeof sellPremium !== 'number' || 
+        isNaN(buyPremium) || isNaN(sellPremium)) {
+        return null;
+    }
+    
+    if (typeof lotSize !== 'number' || lotSize <= 0) {
+        return null;
+    }
+    
+    // Best case scenario: Both options expire worthless (price = 0)
+    // In this case, we keep the sell premium and lose the buy premium
+    // Profit = Sell Premium - Buy Premium
+    const profitPerShare = sellPremium - buyPremium;
+    const profitPotential = profitPerShare * lotSize;
+    
+    return profitPotential; // Can be positive (profit) or negative (loss)
+};
+
+/**
+ * Get strike type classification (ATM/ITM/OTM)
+ * @param {number} strike - Strike price of the option
+ * @param {string} optionType - Option type ('PE' or 'CE')
+ * @param {number} currentPrice - Current market price (Nifty CMP)
+ * @returns {string} Strike type classification
+ */
+export const getStrikeType = (strike, optionType, currentPrice) => {
+    if (typeof strike !== 'number' || typeof currentPrice !== 'number' || 
+        isNaN(strike) || isNaN(currentPrice)) {
+        return 'Unknown';
+    }
+    
+    if (optionType === 'PE') {
+        return strike > currentPrice ? 'ITM' : strike < currentPrice ? 'OTM' : 'ATM';
+    } else if (optionType === 'CE') {
+        return strike < currentPrice ? 'ITM' : strike > currentPrice ? 'OTM' : 'ATM';
+    }
+    return 'Unknown';
+};
+
+/**
+ * Calculate total value for an option (premium × lot size)
+ * @param {number} premium - Premium per share
+ * @param {number} lotSize - Lot size for the option (default: 50 for Nifty)
+ * @returns {number|null} Total value or null if invalid
+ */
+export const calculateTotalValue = (premium, lotSize = 50) => {
+    if (typeof premium !== 'number' || isNaN(premium)) {
+        return null;
+    }
+    
+    if (typeof lotSize !== 'number' || lotSize <= 0) {
+        return null;
+    }
+    
+    // Total Value = Premium × Lot Size
+    return premium * lotSize;
+};
+
 export default {
     getNearestStrike,
     getATMStrike,
@@ -221,5 +413,13 @@ export default {
     getStrikeRange,
     isValidStrike,
     getNextStrikeAbove,
-    getNextStrikeBelow
+    getNextStrikeBelow,
+    calculateIntrinsicValue,
+    isOptionUndervalued,
+    getDiscountPercentage,
+    calculateNetPremium,
+    calculateMaxRisk,
+    calculateProfitPotential,
+    getStrikeType,
+    calculateTotalValue
 };

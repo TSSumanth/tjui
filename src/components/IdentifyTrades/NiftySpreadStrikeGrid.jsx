@@ -16,6 +16,7 @@ import {
 } from '@mui/icons-material';
 import { getNearestStrike } from './utils';
 import { getNiftyOptions, fetchLTPs } from '../../services/zerodha/api';
+import TradeCombinationsTable from './TradeCombinationsTable';
 
 /**
  * NiftySpreadStrikeGrid - Displays strike prices specifically for Nifty Bull Put Spread and Bear Call Spread strategies
@@ -512,6 +513,17 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
                     </Box>
                 </Box>
             </Box>
+
+            {/* Trade Combinations Analysis */}
+            {realInstruments.length > 0 && (
+                <TradeCombinationsTable
+                    strategyType={type}
+                    niftyCMP={niftyCMP}
+                    strikes={strikes}
+                    realInstruments={realInstruments}
+                    ltpData={ltpData}
+                />
+            )}
         </Box>
     );
 };
