@@ -14,6 +14,7 @@ import UpdateStrategyPage from './pages/UpdateStrategy';
 import TradingInstrumentsPage from './pages/TradingInstruments';
 import ActionItemsPage from './pages/ActionItems';
 import MyAlgoStrategiesPage from './pages/MyAlgoStrategies';
+import IdentifyTrades from './pages/IdentifyTrades';
 import Dashboard from './pages/DashBoardManagement';
 import TagManagement from './pages/TagManagement';
 import PairedOrdersPage from './pages/PairedOrdersPage';
@@ -45,6 +46,7 @@ function App() {
                     <Route path="/zerodha/orders" element={<ZerodhaOrders />} />
                     <Route path="/zerodha/trading-instruments" element={<TradingInstrumentsPage />} />
                     <Route path="/zerodha/algo-strategies" element={<MyAlgoStrategiesPage />} />
+                    <Route path="/zerodha/identify-trades" element={<IdentifyTrades />} />
                     <Route path="/marketanalysis" element={<MarketAnalysis />} />
                     <Route path="/trades" element={<Trades />} />
                     <Route path="/profitlossreport" element={<Report />} />

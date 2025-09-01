@@ -42,9 +42,9 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                         console.log(`🔄 Filtered automated_order_ids:`, updatedOrderIds);
                         
                         console.log(`💾 Calling updateAlgoStrategy with:`, { automated_order_ids: updatedOrderIds });
-                        await updateAlgoStrategy(strategyId, {
-                            automated_order_ids: updatedOrderIds
-                        });
+                    await updateAlgoStrategy(strategyId, {
+                        automated_order_ids: updatedOrderIds
+                    });
                         
                         console.log(`✅ Strategy ${strategyId} updated successfully. Removed order ${order.id}. New automated_order_ids:`, updatedOrderIds);
                     } else {
@@ -148,8 +148,8 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                 borderColor: 'grey.300'
             }}>
                 <Typography variant="body1" sx={{ mb: 1 }}>
-                    No automated orders found for this strategy.
-                </Typography>
+                No automated orders found for this strategy.
+            </Typography>
                 <Typography variant="body2" color="text.secondary">
                     Create automated orders to manage your position exits.
                 </Typography>
@@ -375,8 +375,8 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                                                     '&:disabled': { color: 'grey.400' }
                                                 }}
                                             >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
                                         </span>
                                     </Tooltip>
                                     <Tooltip 
@@ -408,8 +408,8 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                                                     '&:disabled': { color: 'grey.400' }
                                                 }}
                                             >
-                                                <PlayArrowIcon fontSize="small" />
-                                            </IconButton>
+                                    <PlayArrowIcon fontSize="small" />
+                                </IconButton>
                                         </span>
                                     </Tooltip>
                                     <Tooltip 
@@ -441,8 +441,8 @@ const AutomatedOrdersTable = ({ orders, onRefresh, onStatusCheck, checkingStatus
                                                     '&:disabled': { color: 'grey.400' }
                                                 }}
                                             >
-                                                <DeleteIcon fontSize="small" />
-                                        </IconButton>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
                                         </span>
                                     </Tooltip>
                                 </Box>

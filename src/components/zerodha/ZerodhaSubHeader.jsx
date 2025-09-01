@@ -240,6 +240,31 @@ const ZerodhaSubHeader = () => {
                     >
                         Algo Strategies
                     </Button>
+                    <Button
+                        component={Link}
+                        to="/zerodha/identify-trades"
+                        startIcon={<ShowChartIcon />}
+                        variant={isActive('/zerodha/identify-trades') ? 'contained' : 'text'}
+                        color="primary"
+                        size="small"
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            color: 'white',
+                            fontSize: '1rem',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            },
+                            '&.MuiButton-contained': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                                }
+                            }
+                        }}
+                    >
+                        Identify Trades
+                    </Button>
                 </Box>
 
                 {/* Right section - Session status and disconnect */}

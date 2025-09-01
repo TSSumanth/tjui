@@ -83,6 +83,34 @@ export const getOrders = async () => {
     return response.data;
 };
 
+/**
+ * Get instruments with advanced filtering
+ * 
+ * @param {Object} params - Query parameters
+ * @param {string} params.search - Search in tradingsymbol (case-insensitive)
+ * @param {string} params.name - Filter by instrument name (e.g., 'NIFTY', 'BANKNIFTY')
+ * @param {string} params.exchange - Filter by exchange (e.g., 'NFO', 'NSE')
+ * @param {string} params.type - Filter by instrument_type (e.g., 'CE', 'PE', 'FUT')
+ * @param {number} params.strike - Filter by exact strike value
+ * @param {number} params.strike_min - Minimum strike value for range
+ * @param {number} params.strike_max - Maximum strike value for range
+ * @param {string} params.expiry - Filter by expiry date (YYYY-MM-DD)
+ * @param {number} params.page - Pagination page number (default: 1)
+ * @param {number} params.pageSize - Results per page (default: 100)
+ * 
+ * @returns {Promise<Object>} Instruments data with pagination
+ * 
+ * @example
+ * // Get Nifty CE options for specific expiry and strike range
+ * getInstruments({
+ *   name: 'NIFTY',
+ *   exchange: 'NFO',
+ *   type: 'CE',
+ *   expiry: '2025-09-02',
+ *   strike_min: 24000,
+ *   strike_max: 25000
+ * })
+ */
 export const getInstruments = async (params = {}) => {
     try {
         const response = await api.get('/api/zerodha/instruments', { params });
@@ -99,6 +127,48 @@ export const getInstruments = async (params = {}) => {
         });
         throw error;
     }
+};
+
+/**
+ * Get Nifty options for a specific expiry and strike range
+ * 
+ * @param {string} expiry - Expiry date (YYYY-MM-DD)
+ * @param {number} strikeMin - Minimum strike value
+ * @param {number} strikeMax - Maximum strike value
+ * @param {string} type - Option type ('CE' or 'PE')
+ * 
+ * @returns {Promise<Object>} Nifty options data
+ */
+export const getNiftyOptions = async (expiry, strikeMin, strikeMax, type) => {
+    return getInstruments({
+        name: 'NIFTY',
+        exchange: 'NFO',
+        type: type,
+        expiry: expiry,
+        strike_min: strikeMin,
+        strike_max: strikeMax
+    });
+};
+
+/**
+ * Get Bank Nifty options for a specific expiry and strike range
+ * 
+ * @param {string} expiry - Expiry date (YYYY-MM-DD)
+ * @param {number} strikeMin - Minimum strike value
+ * @param {number} strikeMax - Maximum strike value
+ * @param {number} type - Option type ('CE' or 'PE')
+ * 
+ * @returns {Promise<Object>} Bank Nifty options data
+ */
+export const getBankNiftyOptions = async (expiry, strikeMin, strikeMax, type) => {
+    return getInstruments({
+        name: 'BANKNIFTY',
+        exchange: 'NFO',
+        type: type,
+        expiry: expiry,
+        strike_min: strikeMin,
+        strike_max: strikeMax
+    });
 };
 
 export const getAccountInfo = async () => {
