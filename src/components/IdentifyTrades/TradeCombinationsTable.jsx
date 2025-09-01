@@ -13,7 +13,9 @@ import {
     Card,
     CardContent,
     Grid,
-    Divider
+    Divider,
+    Tabs,
+    Tab
 } from '@mui/material';
 import {
     TrendingUp as TrendingUpIcon,
@@ -48,6 +50,49 @@ const TradeCombinationsTable = ({
     ltpData 
 }) => {
     const [combinations, setCombinations] = useState([]);
+    const [selectedTab, setSelectedTab] = useState(0);
+
+    // Group combinations by BUY strike price
+    const groupedCombinations = useMemo(() => {
+        if (combinations.length === 0) return {};
+        
+        const grouped = {};
+        combinations.forEach(combo => {
+            const buyStrike = combo.buyStrike;
+            if (!grouped[buyStrike]) {
+                grouped[buyStrike] = [];
+            }
+            grouped[buyStrike].push(combo);
+        });
+        
+        return grouped;
+    }, [combinations]);
+
+    // Get unique BUY strikes for tabs - ordered as ATM first, then ITM in descending order
+    const buyStrikes = useMemo(() => {
+        if (!niftyCMP || Object.keys(groupedCombinations).length === 0) return [];
+        
+        const cmp = parseFloat(niftyCMP);
+        const strikes = Object.keys(groupedCombinations).map(strike => parseFloat(strike));
+        
+        // Find ATM strike
+        const atmStrike = strikes.reduce((nearest, strike) => {
+            return Math.abs(strike - cmp) < Math.abs(nearest - cmp) ? strike : nearest;
+        });
+        
+        // Separate ATM and ITM strikes
+        const itmStrikes = strikes.filter(strike => strike !== atmStrike);
+        
+        // Sort ITM strikes in descending order
+        itmStrikes.sort((a, b) => b - a);
+        
+        // Return ATM first, then ITM in descending order
+        return [atmStrike, ...itmStrikes];
+    }, [groupedCombinations, niftyCMP]);
+
+    // Get combinations for selected tab
+    const selectedBuyStrike = buyStrikes[selectedTab];
+    const filteredCombinations = selectedBuyStrike ? groupedCombinations[selectedBuyStrike] || [] : [];
 
     // Calculate trade combinations when data changes
     useEffect(() => {
@@ -56,6 +101,13 @@ const TradeCombinationsTable = ({
             setCombinations(calculatedCombinations);
         }
     }, [strategyType, niftyCMP, strikes, realInstruments, ltpData]);
+
+    // Reset selected tab when combinations change
+    useEffect(() => {
+        if (buyStrikes.length > 0 && selectedTab >= buyStrikes.length) {
+            setSelectedTab(0);
+        }
+    }, [buyStrikes.length, selectedTab]);
 
     const calculateTradeCombinations = () => {
         const cmp = parseFloat(niftyCMP);
@@ -72,13 +124,37 @@ const TradeCombinationsTable = ({
         let itmStrikes = [];
         if (strategyType === 'PE') {
             // For PE: ITM strikes are HIGHER than current price
-            itmStrikes = strikes.filter(strike => strike > cmp).sort((a, b) => a - b).slice(0, 3);
+            // Exclude ATM strike to avoid duplicates
+            itmStrikes = strikes
+                .filter(strike => strike > cmp && strike !== atmStrike)
+                .sort((a, b) => a - b)
+                .slice(0, 3);
         } else if (strategyType === 'CE') {
             // For CE: ITM strikes are LOWER than current price
-            itmStrikes = strikes.filter(strike => strike < cmp).sort((a, b) => b - a).slice(0, 3);
+            // Select 3 nearest ITM strikes (closest to current price first)
+            // Exclude ATM strike to avoid duplicates
+            itmStrikes = strikes
+                .filter(strike => strike < cmp && strike !== atmStrike)
+                .sort((a, b) => b - a) // Sort descending (nearest to CMP first)
+                .slice(0, 3);
         }
         
-        buyStrikes = [atmStrike, ...itmStrikes];
+        // Combine ATM + ITM strikes (remove duplicates just in case)
+        buyStrikes = [atmStrike, ...itmStrikes].filter((strike, index, arr) => arr.indexOf(strike) === index);
+
+        // Debug logging
+        console.log('🔍 Trade Combination Debug:', {
+            cmp,
+            strategyType,
+            atmStrike,
+            itmStrikes,
+            buyStrikes,
+            totalStrikes: strikes.length,
+            availableStrikes: strikes,
+            itmCandidates: strategyType === 'CE' ? 
+                strikes.filter(strike => strike < cmp && strike !== atmStrike) :
+                strikes.filter(strike => strike > cmp && strike !== atmStrike)
+        });
 
         // Create combinations
         const combinations = [];
@@ -90,9 +166,11 @@ const TradeCombinationsTable = ({
                 // Bull Put Spread: SELL strikes higher than BUY strike
                 sellStrikes = strikes.filter(sellStrike => sellStrike > buyStrike);
             } else if (strategyType === 'CE') {
-                // Bear Call Spread: SELL strikes higher than BUY strike
-                sellStrikes = strikes.filter(sellStrike => sellStrike > buyStrike);
+                // Bear Call Spread: SELL strikes LOWER than BUY strike
+                sellStrikes = strikes.filter(sellStrike => sellStrike < buyStrike);
             }
+            
+            console.log(`🔍 For BUY ${buyStrike}: Found ${sellStrikes.length} SELL options:`, sellStrikes);
             
             sellStrikes.forEach(sellStrike => {
                 combinations.push({
@@ -181,7 +259,10 @@ const TradeCombinationsTable = ({
                         🎯 {strategyType === 'PE' ? 'Bull Put' : 'Bear Call'} Analysis
                     </Typography>
                     <Chip 
-                        label={`${combinations.length} combinations`} 
+                        label={buyStrikes.length > 0 ? 
+                            `${filteredCombinations.length} trades for ₹${selectedBuyStrike?.toLocaleString()}` : 
+                            `${combinations.length} combinations`
+                        } 
                         size="small" 
                         color="primary" 
                         variant="outlined"
@@ -199,9 +280,12 @@ const TradeCombinationsTable = ({
                     
                     {/* Compact Undervalued Indicator */}
                     {(() => {
-                        const undervaluedCount = combinations.reduce((count, combo) => {
-                            if (isOptionUndervalued(combo.buyStrike, strategyType)) count++;
-                            if (isOptionUndervalued(combo.sellStrike, strategyType)) count++;
+                        const undervaluedCount = filteredCombinations.reduce((count, combo) => {
+                            const cmp = parseFloat(niftyCMP);
+                            const buyPremium = getPremium(combo.buyStrike, strategyType);
+                            const sellPremium = getPremium(combo.sellStrike, strategyType);
+                            if (isOptionUndervalued(combo.buyStrike, strategyType, cmp, buyPremium)) count++;
+                            if (isOptionUndervalued(combo.sellStrike, strategyType, cmp, sellPremium)) count++;
                             return count;
                         }, 0);
                         
@@ -221,6 +305,68 @@ const TradeCombinationsTable = ({
                 </Box>
             </Box>
 
+            {/* Tabs for BUY Strike Prices */}
+            {buyStrikes.length > 0 && (
+                <Box sx={{ mb: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid', borderColor: 'grey.300' }}>
+                    <Tabs
+                        value={selectedTab}
+                        onChange={(event, newValue) => setSelectedTab(newValue)}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        sx={{
+                            '& .MuiTabs-indicator': {
+                                backgroundColor: 'primary.main',
+                            },
+                            '& .MuiTab-root': {
+                                minWidth: 100,
+                                fontWeight: 600,
+                                fontSize: '0.8rem',
+                            }
+                        }}
+                    >
+                        {buyStrikes.map((buyStrike, index) => {
+                            const combosCount = groupedCombinations[buyStrike]?.length || 0;
+                            const hasUndervalued = groupedCombinations[buyStrike]?.some(combo => {
+                                const cmp = parseFloat(niftyCMP);
+                                const buyPremium = getPremium(combo.buyStrike, strategyType);
+                                return isOptionUndervalued(combo.buyStrike, strategyType, cmp, buyPremium);
+                            });
+
+                            return (
+                                <Tab
+                                    key={buyStrike}
+                                    label={
+                                        <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                ₹{buyStrike.toLocaleString()}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'center' }}>
+                                                <Chip
+                                                    label={`${combosCount} trades`}
+                                                    size="small"
+                                                    color="primary"
+                                                    variant="outlined"
+                                                    sx={{ fontSize: '0.6rem', height: 16 }}
+                                                />
+                                                {hasUndervalued && (
+                                                    <Chip
+                                                        label="🔥"
+                                                        size="small"
+                                                        color="error"
+                                                        variant="filled"
+                                                        sx={{ fontSize: '0.6rem', height: 16, minWidth: 16 }}
+                                                    />
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    }
+                                />
+                            );
+                        })}
+                    </Tabs>
+                </Box>
+            )}
+
             <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
                 <Table stickyHeader size="small">
                     <TableHead>
@@ -239,7 +385,7 @@ const TradeCombinationsTable = ({
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {combinations.map((combo, index) => {
+                        {filteredCombinations.map((combo, index) => {
                             const cmp = parseFloat(niftyCMP);
                             const buyPremium = getPremium(combo.buyStrike, strategyType);
                             const sellPremium = getPremium(combo.sellStrike, strategyType);
