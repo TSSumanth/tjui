@@ -15,7 +15,18 @@ import {
     Grid,
     Divider,
     Tabs,
-    Tab
+    Tab,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    CircularProgress,
+    Alert,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import {
     TrendingUp as TrendingUpIcon,
@@ -30,6 +41,7 @@ import {
     calculateProfitPotential,
     getStrikeType
 } from './utils';
+import { placeRegularOrder, getOrderById } from '../../services/zerodha/api';
 
 /**
  * TradeCombinationsTable - Analyzes and displays trade combinations for options strategies
@@ -51,6 +63,19 @@ const TradeCombinationsTable = ({
 }) => {
     const [combinations, setCombinations] = useState([]);
     const [selectedTab, setSelectedTab] = useState(0);
+    
+    // Order confirmation modal state
+    const [orderModalOpen, setOrderModalOpen] = useState(false);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+    const [isPlacingOrders, setIsPlacingOrders] = useState(false);
+    const [selectedLotMultiplier, setSelectedLotMultiplier] = useState(1); // 1x, 2x, 3x lot size
+    const [orderProgress, setOrderProgress] = useState({
+        buyOrderPlaced: false,
+        buyOrderId: null,
+        sellOrderPlaced: false,
+        sellOrderId: null,
+        error: null
+    });
 
     // Group combinations by BUY strike price
     const groupedCombinations = useMemo(() => {
@@ -185,6 +210,145 @@ const TradeCombinationsTable = ({
         });
 
         return combinations;
+    };
+
+    // Handle taking a position (opening order confirmation modal)
+    const handleTakePosition = (orderDetails) => {
+        console.log('📈 Opening Order Confirmation:', orderDetails);
+        setSelectedOrderDetails(orderDetails);
+        setOrderModalOpen(true);
+        setSelectedLotMultiplier(1); // Reset to 1x lot size
+        // Reset order progress
+        setOrderProgress({
+            buyOrderPlaced: false,
+            buyOrderId: null,
+            sellOrderPlaced: false,
+            sellOrderId: null,
+            error: null
+        });
+    };
+
+    // Handle order confirmation and sequential placement
+    const handleConfirmOrders = async () => {
+        if (!selectedOrderDetails) return;
+        
+        setIsPlacingOrders(true);
+        
+        try {
+            // Step 1: Place BUY order first
+            console.log('🔵 Placing BUY order:', selectedOrderDetails.buyOrder);
+            
+            const buyOrderParams = {
+                exchange: selectedOrderDetails.buyOrder.exchange,
+                tradingsymbol: selectedOrderDetails.buyOrder.tradingsymbol,
+                transaction_type: 'BUY',
+                quantity: selectedOrderDetails.buyOrder.quantity * selectedLotMultiplier,
+                order_type: 'MARKET', // Always market orders
+                product: 'NRML', // Normal - can hold overnight
+                variety: 'regular'
+            };
+            
+            const buyOrderResponse = await placeRegularOrder(buyOrderParams);
+            console.log('✅ BUY order placed:', buyOrderResponse);
+            
+            setOrderProgress(prev => ({
+                ...prev,
+                buyOrderPlaced: true,
+                buyOrderId: buyOrderResponse.order_id
+            }));
+            
+            // Step 2: Wait for BUY order confirmation, then place SELL order
+            console.log('⏳ Waiting for BUY order execution...');
+            
+            // Poll for BUY order status
+            let buyOrderExecuted = false;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!buyOrderExecuted && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                
+                try {
+                    const buyOrderStatusResponse = await getOrderById(buyOrderResponse.order_id);
+                    console.log(`📊 BUY order response (attempt ${attempts + 1}):`, buyOrderStatusResponse);
+                    
+                    // getOrderById returns array of order history, get the latest status
+                    let buyOrderStatus;
+                    if (buyOrderStatusResponse.success && Array.isArray(buyOrderStatusResponse.data) && buyOrderStatusResponse.data.length > 0) {
+                        // Get the latest order status (last item in array)
+                        buyOrderStatus = buyOrderStatusResponse.data[buyOrderStatusResponse.data.length - 1];
+                    } else {
+                        throw new Error('Invalid order status response format');
+                    }
+                    
+                    console.log(`📊 BUY order status (attempt ${attempts + 1}):`, buyOrderStatus.status);
+                    
+                    if (buyOrderStatus.status === 'COMPLETE') {
+                        buyOrderExecuted = true;
+                        console.log('✅ BUY order executed successfully');
+                        console.log(`💰 Execution details: Qty: ${buyOrderStatus.filled_quantity}, Avg Price: ₹${buyOrderStatus.average_price}`);
+                        break;
+                    } else if (buyOrderStatus.status === 'REJECTED' || buyOrderStatus.status === 'CANCELLED') {
+                        throw new Error(`BUY order ${buyOrderStatus.status}: ${buyOrderStatus.status_message || 'No message'}`);
+                    }
+                } catch (error) {
+                    console.warn(`Failed to get BUY order status (attempt ${attempts + 1}):`, error);
+                }
+                
+                attempts++;
+            }
+            
+            if (!buyOrderExecuted) {
+                throw new Error('BUY order execution timeout - please check order status manually');
+            }
+            
+            // Step 3: Place SELL order after BUY order is executed
+            console.log('🟠 Placing SELL order:', selectedOrderDetails.sellOrder);
+            
+            const sellOrderParams = {
+                exchange: selectedOrderDetails.sellOrder.exchange,
+                tradingsymbol: selectedOrderDetails.sellOrder.tradingsymbol,
+                transaction_type: 'SELL',
+                quantity: selectedOrderDetails.sellOrder.quantity * selectedLotMultiplier,
+                order_type: 'MARKET', // Always market orders
+                product: 'NRML', // Normal - can hold overnight
+                variety: 'regular'
+            };
+            
+            const sellOrderResponse = await placeRegularOrder(sellOrderParams);
+            console.log('✅ SELL order placed:', sellOrderResponse);
+            
+            setOrderProgress(prev => ({
+                ...prev,
+                sellOrderPlaced: true,
+                sellOrderId: sellOrderResponse.order_id
+            }));
+            
+            // Success - both orders placed
+            alert(`✅ Orders placed successfully!\nBUY Order ID: ${buyOrderResponse.order_id}\nSELL Order ID: ${sellOrderResponse.order_id}`);
+            
+            // Close modal after success
+            setTimeout(() => {
+                setOrderModalOpen(false);
+                setIsPlacingOrders(false);
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Order placement failed:', error);
+            setOrderProgress(prev => ({
+                ...prev,
+                error: error.message
+            }));
+            setIsPlacingOrders(false);
+        }
+    };
+
+    // Handle modal close
+    const handleCloseOrderModal = () => {
+        if (!isPlacingOrders) {
+            setOrderModalOpen(false);
+            setSelectedOrderDetails(null);
+        }
     };
 
 
@@ -382,6 +546,7 @@ const TradeCombinationsTable = ({
                             <TableCell sx={{ fontWeight: 600 }}>Max Risk (per lot)</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>Profit Potential (per lot)</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>Risk-Reward Ratio</TableCell>
+                            <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Action</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -415,6 +580,46 @@ const TradeCombinationsTable = ({
                             const riskRewardRatio = (maxRisk && profitPotential && profitPotential > 0) 
                                 ? maxRisk / profitPotential 
                                 : null;
+
+                            // Prepare complete order details for direct order placement
+                            const orderDetails = {
+                                strategy: strategyType === 'PE' ? 'Bull Put Spread' : 'Bear Call Spread',
+                                strategyType,
+                                buyOrder: {
+                                    tradingsymbol: buyInstrument?.tradingsymbol || `NIFTY${combo.buyStrike}${strategyType}`,
+                                    instrument_token: buyInstrument?.instrument_token,
+                                    exchange: buyInstrument?.exchange || 'NFO',
+                                    transaction_type: 'BUY',
+                                    strike: combo.buyStrike,
+                                    quantity: strategyLotSize,
+                                    premium: buyPremium,
+                                    lot_size: buyLotSize,
+                                    instrument_type: strategyType,
+                                    expiry: buyInstrument?.expiry
+                                },
+                                sellOrder: {
+                                    tradingsymbol: sellInstrument?.tradingsymbol || `NIFTY${combo.sellStrike}${strategyType}`,
+                                    instrument_token: sellInstrument?.instrument_token,
+                                    exchange: sellInstrument?.exchange || 'NFO',
+                                    transaction_type: 'SELL',
+                                    strike: combo.sellStrike,
+                                    quantity: strategyLotSize,
+                                    premium: sellPremium,
+                                    lot_size: sellLotSize,
+                                    instrument_type: strategyType,
+                                    expiry: sellInstrument?.expiry
+                                },
+                                analysis: {
+                                    maxRisk,
+                                    profitPotential,
+                                    riskRewardRatio,
+                                    netPremium: (sellPremium - buyPremium) * strategyLotSize,
+                                    buyIntrinsicValue,
+                                    sellIntrinsicValue,
+                                    isBuyUndervalued,
+                                    isSellUndervalued
+                                }
+                            };
 
  
 
@@ -579,6 +784,22 @@ const TradeCombinationsTable = ({
                                             {riskRewardRatio !== null && riskRewardRatio <= 1 ? 'Good' : riskRewardRatio !== null ? 'High Risk' : ''}
                                         </Typography>
                                     </TableCell>
+                                    <TableCell sx={{ textAlign: 'center' }}>
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            color="primary"
+                                            onClick={() => handleTakePosition(orderDetails)}
+                                            sx={{ 
+                                                fontSize: '0.7rem',
+                                                minWidth: 80,
+                                                height: 28,
+                                                textTransform: 'none'
+                                            }}
+                                        >
+                                            📈 Order
+                                        </Button>
+                                    </TableCell>
 
                                 </TableRow>
                             );
@@ -594,6 +815,246 @@ const TradeCombinationsTable = ({
                     <strong>All values shown are per lot.</strong>
                 </Typography>
             </Box>
+
+            {/* Order Confirmation Modal */}
+            <Dialog
+                open={orderModalOpen}
+                onClose={handleCloseOrderModal}
+                maxWidth="md"
+                fullWidth
+                disableEscapeKeyDown={isPlacingOrders}
+            >
+                <DialogTitle>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        📈 Confirm {selectedOrderDetails?.strategy} Orders
+                    </Typography>
+                </DialogTitle>
+                
+                <DialogContent>
+                    {selectedOrderDetails && (
+                        <Box>
+                            {/* Strategy Summary */}
+                            <Card sx={{ mb: 2, bgcolor: 'primary.50' }}>
+                                <CardContent sx={{ py: 1.5 }}>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">Strategy</Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                                {selectedOrderDetails.strategy}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">Net Premium</Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, color: selectedOrderDetails.analysis.netPremium > 0 ? 'success.main' : 'error.main' }}>
+                                                ₹{selectedOrderDetails.analysis.netPremium?.toFixed(2)} 
+                                                ({selectedOrderDetails.analysis.netPremium > 0 ? 'Credit' : 'Debit'})
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">Max Risk</Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, color: 'error.main' }}>
+                                                ₹{selectedOrderDetails.analysis.maxRisk?.toFixed(2)}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">Profit Potential</Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
+                                                ₹{selectedOrderDetails.analysis.profitPotential?.toFixed(2)}
+                                            </Typography>
+                                        </Grid>
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+
+                            {/* Quantity Selector */}
+                            <Card sx={{ mb: 2, bgcolor: 'grey.50' }}>
+                                <CardContent sx={{ py: 1.5 }}>
+                                    <Grid container spacing={2} alignItems="center">
+                                        <Grid item xs={12} sm={6}>
+                                            <FormControl size="small" sx={{ minWidth: 200 }}>
+                                                <InputLabel>Lot Multiplier</InputLabel>
+                                                <Select
+                                                    value={selectedLotMultiplier}
+                                                    onChange={(e) => setSelectedLotMultiplier(e.target.value)}
+                                                    label="Lot Multiplier"
+                                                    disabled={isPlacingOrders}
+                                                >
+                                                    {[1, 2, 3, 4, 5, 10, 15, 20].map(multiplier => (
+                                                        <MenuItem key={multiplier} value={multiplier}>
+                                                            {multiplier}x Lots ({selectedOrderDetails.buyOrder.quantity * multiplier} shares)
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="body2" color="text.secondary">Total Position Value</Typography>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, color: selectedOrderDetails.analysis.netPremium > 0 ? 'success.main' : 'error.main' }}>
+                                                ₹{(selectedOrderDetails.analysis.netPremium * selectedLotMultiplier)?.toFixed(2)}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Max Risk: ₹{(selectedOrderDetails.analysis.maxRisk * selectedLotMultiplier)?.toFixed(2)} | 
+                                                Max Profit: ₹{(selectedOrderDetails.analysis.profitPotential * selectedLotMultiplier)?.toFixed(2)}
+                                            </Typography>
+                                        </Grid>
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+
+                            {/* Order Details */}
+                            <Grid container spacing={2}>
+                                {/* BUY Order */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ border: '2px solid', borderColor: 'primary.main' }}>
+                                        <CardContent>
+                                            <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+                                                🔵 BUY Order
+                                            </Typography>
+                                            <Grid container spacing={1}>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Symbol</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        {selectedOrderDetails.buyOrder.tradingsymbol}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Strike</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        ₹{selectedOrderDetails.buyOrder.strike}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Quantity</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        {selectedOrderDetails.buyOrder.quantity * selectedLotMultiplier}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ({selectedLotMultiplier}x lots)
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Premium</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        ₹{selectedOrderDetails.buyOrder.premium?.toFixed(2)}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">Order Type</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        MARKET (NRML)
+                                                    </Typography>
+                                                </Grid>
+                                            </Grid>
+                                            {/* Order Status */}
+                                            {orderProgress.buyOrderPlaced && (
+                                                <Box sx={{ mt: 1, p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
+                                                    <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                                                        ✅ Order Placed - ID: {orderProgress.buyOrderId}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+
+                                {/* SELL Order */}
+                                <Grid item xs={12} md={6}>
+                                    <Card sx={{ border: '2px solid', borderColor: 'secondary.main' }}>
+                                        <CardContent>
+                                            <Typography variant="h6" color="secondary.main" sx={{ fontWeight: 600, mb: 1 }}>
+                                                🟠 SELL Order
+                                            </Typography>
+                                            <Grid container spacing={1}>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Symbol</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        {selectedOrderDetails.sellOrder.tradingsymbol}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Strike</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        ₹{selectedOrderDetails.sellOrder.strike}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Quantity</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        {selectedOrderDetails.sellOrder.quantity * selectedLotMultiplier}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ({selectedLotMultiplier}x lots)
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography variant="caption" color="text.secondary">Premium</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        ₹{selectedOrderDetails.sellOrder.premium?.toFixed(2)}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">Order Type</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                        MARKET (NRML)
+                                                    </Typography>
+                                                </Grid>
+                                            </Grid>
+                                            {/* Order Status */}
+                                            {orderProgress.sellOrderPlaced && (
+                                                <Box sx={{ mt: 1, p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
+                                                    <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                                                        ✅ Order Placed - ID: {orderProgress.sellOrderId}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+
+                            {/* Order Progress */}
+                            {isPlacingOrders && (
+                                <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1, textAlign: 'center' }}>
+                                    <CircularProgress size={24} sx={{ mr: 1 }} />
+                                    <Typography variant="body2" color="info.main" sx={{ fontWeight: 600 }}>
+                                        {!orderProgress.buyOrderPlaced ? 'Placing BUY order...' : 
+                                         !orderProgress.sellOrderPlaced ? 'BUY order confirmed. Placing SELL order...' : 
+                                         'Both orders placed successfully!'}
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {/* Error Display */}
+                            {orderProgress.error && (
+                                <Alert severity="error" sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        Order Failed: {orderProgress.error}
+                                    </Typography>
+                                </Alert>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2 }}>
+                    <Button 
+                        onClick={handleCloseOrderModal} 
+                        disabled={isPlacingOrders}
+                        variant="outlined"
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleConfirmOrders} 
+                        disabled={isPlacingOrders}
+                        variant="contained"
+                        color="primary"
+                        startIcon={isPlacingOrders ? <CircularProgress size={16} /> : null}
+                    >
+                        {isPlacingOrders ? 'Placing Orders...' : 'Confirm Orders'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

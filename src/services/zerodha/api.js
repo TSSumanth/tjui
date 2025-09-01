@@ -197,7 +197,7 @@ export const logout = () => {
 // Regular Order APIs
 export const placeRegularOrder = async (orderParams) => {
     try {
-        const response = await api.post('/api/zerodha/orders/regular', orderParams);
+        const response = await api.post('/api/zerodha/order', orderParams);
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.error || 'Failed to place regular order');
@@ -206,7 +206,7 @@ export const placeRegularOrder = async (orderParams) => {
 
 export const cancelRegularOrder = async (orderId) => {
     try {
-        const response = await api.delete(`/api/zerodha/orders/regular/${orderId}`);
+        const response = await api.post(`/api/zerodha/order/${orderId}/cancel`);
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.error || 'Failed to cancel regular order');
@@ -215,7 +215,7 @@ export const cancelRegularOrder = async (orderId) => {
 
 export const modifyRegularOrder = async (orderId, data) => {
     try {
-        const response = await api.put(`/api/zerodha/orders/regular/${orderId}`, data);
+        const response = await api.post(`/api/zerodha/order/${orderId}/modify`, data);
         return response.data;
     } catch (error) {
         throw new Error(error.response?.data?.error || 'Failed to modify regular order');
@@ -286,7 +286,7 @@ export const cancelZerodhaOrder = async (orderId, orderType = 'regular') => {
 };
 
 export const getOrderById = async (orderId) => {
-    const response = await api.get(`/api/zerodha/orders/${orderId}`);
+    const response = await api.get(`/api/zerodha/order/${orderId}`);
     return response.data;
 };
 
