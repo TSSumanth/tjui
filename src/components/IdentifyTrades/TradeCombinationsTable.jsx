@@ -66,51 +66,43 @@ const TradeCombinationsTable = ({
             return Math.abs(strike - cmp) < Math.abs(nearest - cmp) ? strike : nearest;
         });
 
-        // Find ITM strikes (closer to current price than ATM)
+        // Find BUY positions: ATM + 3 nearest ITM options
+        let buyStrikes = [atmStrike]; // Start with ATM
+        
         let itmStrikes = [];
         if (strategyType === 'PE') {
-            // For Bull Put Spread: ITM strikes are HIGHER than current price
-            itmStrikes = strikes.filter(strike => strike > cmp).slice(0, 3);
+            // For PE: ITM strikes are HIGHER than current price
+            itmStrikes = strikes.filter(strike => strike > cmp).sort((a, b) => a - b).slice(0, 3);
         } else if (strategyType === 'CE') {
-            // For Bear Call Spread: ITM strikes are LOWER than current price
-            itmStrikes = strikes.filter(strike => strike < cmp).slice(0, 3);
+            // For CE: ITM strikes are LOWER than current price
+            itmStrikes = strikes.filter(strike => strike < cmp).sort((a, b) => b - a).slice(0, 3);
         }
+        
+        buyStrikes = [atmStrike, ...itmStrikes];
 
         // Create combinations
         const combinations = [];
-        const selectedStrikes = [atmStrike, ...itmStrikes];
 
-        selectedStrikes.forEach(buyStrike => {
-            strikes.forEach(sellStrike => {
-                // Skip same strike combinations
-                if (buyStrike === sellStrike) return;
-
-                // Strategy-specific logic
-                if (strategyType === 'PE') {
-                    // Bull Put Spread: BUY lower strike, SELL higher strike
-                    if (buyStrike < sellStrike) {
-                        combinations.push({
-                            buyStrike,
-                            sellStrike,
-                            buyType: 'BUY',
-                            sellType: 'SELL',
-                            buyStrikeType: getStrikeType(buyStrike, 'PE', cmp),
-                            sellStrikeType: getStrikeType(sellStrike, 'PE', cmp)
-                        });
-                    }
-                } else if (strategyType === 'CE') {
-                    // Bear Call Spread: BUY higher strike, SELL lower strike
-                    if (buyStrike > sellStrike) {
-                        combinations.push({
-                            buyStrike,
-                            sellStrike,
-                            buyType: 'BUY',
-                            sellType: 'SELL',
-                            buyStrikeType: getStrikeType(buyStrike, 'CE', cmp),
-                            sellStrikeType: getStrikeType(sellStrike, 'CE', cmp)
-                        });
-                    }
-                }
+        buyStrikes.forEach(buyStrike => {
+            // SELL positions: Strategy-specific filtering
+            let sellStrikes = [];
+            if (strategyType === 'PE') {
+                // Bull Put Spread: SELL strikes higher than BUY strike
+                sellStrikes = strikes.filter(sellStrike => sellStrike > buyStrike);
+            } else if (strategyType === 'CE') {
+                // Bear Call Spread: SELL strikes higher than BUY strike
+                sellStrikes = strikes.filter(sellStrike => sellStrike > buyStrike);
+            }
+            
+            sellStrikes.forEach(sellStrike => {
+                combinations.push({
+                    buyStrike,
+                    sellStrike,
+                    buyType: 'BUY',
+                    sellType: 'SELL',
+                    buyStrikeType: getStrikeType(buyStrike, strategyType, cmp),
+                    sellStrikeType: getStrikeType(sellStrike, strategyType, cmp)
+                });
             });
         });
 
