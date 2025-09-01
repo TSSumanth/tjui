@@ -128,16 +128,42 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
             const config = strategyConfig[selectedStrategy];
             setFormFields(config.fields);
             
+            // Try to load saved data from localStorage first
+            const savedData = localStorage.getItem('identifyTradesFormData');
+            let savedFormData = {};
+            if (savedData) {
+                try {
+                    savedFormData = JSON.parse(savedData);
+                    console.log('📦 Loaded saved form data from localStorage:', savedFormData);
+                } catch (error) {
+                    console.warn('⚠️ Failed to parse saved form data:', error);
+                }
+            }
+            
             // Initialize form data with default values, but preserve existing data
             const initialData = {};
             config.fields.forEach(field => {
                 if (field.type === 'readonly') {
                     initialData[field.key] = field.value;
                 } else {
-                    // Preserve existing value if it exists, otherwise set to empty
-                    initialData[field.key] = formData[field.key] || '';
+                    // Try saved data first, then existing form data, then empty
+                    const savedValue = savedFormData[field.key];
+                    const existingValue = formData[field.key];
+                    const finalValue = (savedValue && savedValue.toString().trim() !== '') || 
+                                     (existingValue && existingValue.toString().trim() !== '') ? 
+                                     (savedValue || existingValue) : '';
+                    
+                    initialData[field.key] = finalValue;
                 }
             });
+            
+            console.log('🔄 Form initialization:', {
+                strategy: selectedStrategy,
+                savedFormData,
+                existingFormData: formData,
+                newInitialData: initialData
+            });
+            
             setFormData(initialData);
             
             // Hide the strike grid when strategy changes
@@ -182,10 +208,18 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
         console.log('  - Form fields:', formFields);
         console.log('  - Required fields:', requiredFields);
         console.log('  - Form data:', formData);
+        console.log('  - Form data keys:', Object.keys(formData));
+        console.log('  - Form data values:', Object.values(formData));
         
         const isValid = requiredFields.every(field => {
-            const hasValue = formData[field.key] && formData[field.key].toString().trim() !== '';
-            console.log(`  - Field ${field.key} (${field.type}):`, formData[field.key], 'Valid:', hasValue);
+            const fieldValue = formData[field.key];
+            const hasValue = fieldValue && fieldValue.toString().trim() !== '';
+            console.log(`  - Field ${field.key} (${field.type}):`, {
+                value: fieldValue,
+                type: typeof fieldValue,
+                trimmed: fieldValue ? fieldValue.toString().trim() : 'undefined',
+                valid: hasValue
+            });
             return hasValue;
         });
         
@@ -233,14 +267,7 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
                 Strategy Parameters: {selectedStrategy}
             </Typography>
             
-            {/* Debug Info - Remove this later */}
-            <Box sx={{ mb: 1, p: 1, bgcolor: 'yellow.50', borderRadius: 1, fontSize: '0.75rem' }}>
-                <Typography variant="caption" color="text.secondary">
-                    Debug: Form Data: {JSON.stringify(formData)} | Valid: {isFormValid().toString()} | Strategy: {selectedStrategy} | Form Fields: {formFields.length} | Required Fields: {formFields.filter(f => f.required).map(f => f.key).join(', ')}
-                </Typography>
-            </Box>
-        
-        
+          
             <Grid container spacing={1.5} alignItems="center">
                 {formFields.map((field) => (
                     <Grid item xs={12} md={field.width} key={field.key}>
@@ -352,10 +379,12 @@ const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect 
                     </Box>
                     
                     <NiftySpreadStrikeGrid
+                        key={`${formData.niftyCMP}-${formData.expiry}-${formData.instrumentType}`}
                         niftyCMP={formData.niftyCMP}
                         expiry={formData.expiry}
                         type={formData.instrumentType}
                         onStrikeSelect={onStrikeSelect}
+                        autoFetchOnMount={true}
                     />
                 </Box>
             )}

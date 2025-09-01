@@ -33,6 +33,16 @@ const SmartCMPInput = ({
         // return () => clearInterval(intervalId);
     }, []);
 
+    // Handle external value changes (e.g., form reset, strategy change)
+    useEffect(() => {
+        if (value && value !== webSocketPrice) {
+            console.log(`🔄 External value change detected:`, value);
+            // If external value is provided and different from WebSocket price, 
+            // switch to manual input mode
+            setIsManualInput(true);
+        }
+    }, [value, webSocketPrice]);
+
     const fetchNiftyCMP = async () => {
         try {
             setIsLoading(true);
@@ -66,6 +76,13 @@ const SmartCMPInput = ({
                     })));
                     setError(`${assetName} not subscribed. Subscribe to ${assetName} instruments for live data.`);
                     setIsManualInput(true);
+                    
+                    // If we have a value prop, use it as fallback
+                    if (value) {
+                        console.log(`📝 Using existing value as fallback:`, value);
+                    } else {
+                        console.log(`⚠️ No value provided, user must enter manually`);
+                    }
                 }
             } else {
                 console.log('⚠️ No WebSocket subscriptions data available');
@@ -148,9 +165,9 @@ const SmartCMPInput = ({
                     <TextField
                         fullWidth
                         label={label || `${assetName} CMP`}
-                        value={value}
+                        value={value || ''}
                         onChange={handleManualInput}
-                        placeholder="Enter price"
+                        placeholder="Enter price manually"
                         type="number"
                         InputProps={{
                             endAdornment: (
@@ -173,6 +190,9 @@ const SmartCMPInput = ({
                         size="small"
                         sx={{ bgcolor: 'warning.50' }}
                     />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        💡 Enter {assetName} current market price manually
+                    </Typography>
                 </Box>
             )}
             

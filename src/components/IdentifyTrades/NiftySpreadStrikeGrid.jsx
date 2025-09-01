@@ -6,7 +6,6 @@ import {
     Card, 
     CardContent,
     Chip,
-    Divider,
     Button,
     CircularProgress
 } from '@mui/material';
@@ -16,7 +15,7 @@ import {
     Lock as LockIcon
 } from '@mui/icons-material';
 import { getNearestStrike } from './utils';
-import { getNiftyOptions } from '../../services/zerodha/api';
+import { getNiftyOptions, fetchLTPs } from '../../services/zerodha/api';
 
 /**
  * NiftySpreadStrikeGrid - Displays strike prices specifically for Nifty Bull Put Spread and Bear Call Spread strategies
@@ -24,17 +23,56 @@ import { getNiftyOptions } from '../../services/zerodha/api';
  * For Bull Put Spread (PE): Generates strikes from lower (OTM) to higher (ITM) for put options
  * For Bear Call Spread (CE): Generates strikes from lower (ITM) to higher (OTM) for call options
  */
-const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect }) => {
+const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFetchOnMount = false }) => {
     const [strikes, setStrikes] = useState([]);
     const [nearestStrike, setNearestStrike] = useState(null);
     const [realInstruments, setRealInstruments] = useState([]);
     const [isLoadingInstruments, setIsLoadingInstruments] = useState(false);
+    const [ltpData, setLtpData] = useState({});
+    const [isLoadingLTP, setIsLoadingLTP] = useState(false);
+    const [lastLTPUpdate, setLastLTPUpdate] = useState(null);
 
     useEffect(() => {
         if (niftyCMP && type) {
             calculateStrikes();
         }
     }, [niftyCMP, type]);
+
+    // Auto-refresh LTPs every 30 seconds when real instruments are loaded
+    useEffect(() => {
+        let intervalId;
+        
+        if (realInstruments.length > 0 && Object.keys(ltpData).length > 0) {
+            intervalId = setInterval(() => {
+                console.log('🔄 Auto-refreshing LTPs...');
+                refreshLTPs();
+            }, 30000); // 30 seconds
+        }
+        
+        return () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [realInstruments.length, Object.keys(ltpData).length]);
+
+    // Note: Data is only cleared when:
+    // 1. User explicitly clicks "Fetch Real Data" button
+    // 2. Strategy or type changes (which recalculates strikes)
+    // 3. NOT when typing in expiry field (to avoid premature clearing)
+
+    // Auto-fetch real data when component mounts (triggered by Identify button)
+    useEffect(() => {
+        if (autoFetchOnMount && niftyCMP && expiry && type && strikes.length > 0) {
+            console.log('🚀 Auto-fetching real data on mount (Identify button clicked)');
+            // Small delay to ensure component is fully rendered
+            const timer = setTimeout(() => {
+                fetchRealInstruments();
+            }, 100);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [autoFetchOnMount, niftyCMP, expiry, type, strikes.length]);
 
     const calculateStrikes = () => {
         const cmp = parseFloat(niftyCMP);
@@ -131,27 +169,108 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect }) => {
 
         try {
             setIsLoadingInstruments(true);
+            const isAutoFetch = autoFetchOnMount && realInstruments.length === 0;
+            console.log(`🔄 Fetching real instruments:`, { 
+                expiry, 
+                type, 
+                niftyCMP, 
+                autoFetch: isAutoFetch ? 'Yes (Identify button)' : 'No (Manual refresh)' 
+            });
+            
+            // Clear old data only when actually fetching new data
+            setRealInstruments([]);
+            setLtpData({});
+            setLastLTPUpdate(null);
+            
             const cmp = parseFloat(niftyCMP);
             const nearest = getNearestStrike(cmp);
-            
+            let strikeMin, strikeMax;
             // Get strikes in the range (nearest ± 500 points)
-            const strikeMin = nearest - 500;
-            const strikeMax = nearest + 500;
+            if(type === 'PE'){
+                 // For Bull Put Spread (PE): strikes going UPWARDS from nearest
+                 strikeMin = nearest;
+                 strikeMax = nearest + 550;
+            } else if(type === 'CE'){
+                // For Bear Call Spread (CE): strikes going DOWNWARDS from nearest
+                strikeMin = nearest - 550;
+                strikeMax = nearest;
+            }
+            
+            
+            // Ensure strike range is valid (min <= max)
+            if (strikeMin > strikeMax) {
+                console.error('❌ Invalid strike range:', { strikeMin, strikeMax, type });
+                // Swap if needed
+                [strikeMin, strikeMax] = [strikeMax, strikeMin];
+                console.log('🔄 Swapped strike range to:', { strikeMin, strikeMax });
+            }
             
             console.log(`🔍 Fetching real instruments: ${type} options, expiry: ${expiry}, strikes: ${strikeMin}-${strikeMax}`);
+            console.log(`📊 API call parameters:`, { expiry, type, strikeMin, strikeMax });
             
             const response = await getNiftyOptions(expiry, strikeMin, strikeMax, type);
             
             if (response && response.success && response.data) {
                 setRealInstruments(response.data);
                 console.log(`✅ Fetched ${response.data.length} real instruments:`, response.data);
+                
+                // Automatically fetch LTPs for the new instruments
+                await fetchLTPsForInstruments(response.data);
             } else {
                 console.log('⚠️ No real instruments data received');
+                console.log('📊 Response details:', response);
             }
         } catch (error) {
             console.error('❌ Error fetching real instruments:', error);
+            // Show error details to user
+            if (error.response) {
+                console.error('📊 Error response:', error.response.data);
+                console.error('📊 Error status:', error.response.status);
+            }
         } finally {
             setIsLoadingInstruments(false);
+        }
+    };
+
+    const fetchLTPsForInstruments = async (instruments) => {
+        if (!instruments || instruments.length === 0) {
+            console.log('No instruments to fetch LTPs for');
+            return;
+        }
+
+        try {
+            setIsLoadingLTP(true);
+            console.log(`🔍 Fetching LTPs for ${instruments.length} instruments`);
+            console.log('📊 Instruments to fetch:', instruments.map(instr => `${instr.exchange}:${instr.tradingsymbol}`));
+            
+            // Prepare instruments for LTP fetch (need exchange and tradingsymbol)
+            const ltpInstruments = instruments.map(instr => ({
+                exchange: instr.exchange || 'NFO',
+                tradingsymbol: instr.tradingsymbol
+            }));
+
+            console.log('🚀 Prepared LTP instruments:', ltpInstruments);
+            const ltpMap = await fetchLTPs(ltpInstruments);
+            console.log('📈 Raw LTP response:', ltpMap);
+            
+            setLtpData(ltpMap);
+            setLastLTPUpdate(new Date());
+            
+            console.log(`✅ Fetched LTPs for ${Object.keys(ltpMap).length} instruments:`, ltpMap);
+            
+            if (Object.keys(ltpMap).length === 0) {
+                console.warn('⚠️ No LTPs were fetched. This might indicate a backend issue or no market data available.');
+            }
+        } catch (error) {
+            console.error('❌ Error fetching LTPs:', error);
+        } finally {
+            setIsLoadingLTP(false);
+        }
+    };
+
+    const refreshLTPs = async () => {
+        if (realInstruments.length > 0) {
+            await fetchLTPsForInstruments(realInstruments);
         }
     };
 
@@ -224,19 +343,55 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect }) => {
                                 📊 Real data loaded for {realInstruments.length} strikes
                             </Typography>
                         )}
+                        {Object.keys(ltpData).length > 0 && (
+                            <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                                💰 LTP data: {Object.keys(ltpData).length} instruments | Last update: {lastLTPUpdate ? lastLTPUpdate.toLocaleTimeString() : 'N/A'}
+                                {isLoadingLTP && ' | 🔄 Refreshing...'}
+                            </Typography>
+                        )}
+                        {expiry && realInstruments.length === 0 && (
+                            <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                                ⚠️ Click "Fetch Real Data" to load market data for {expiry}
+                            </Typography>
+                        )}
+                        {isLoadingInstruments && (
+                            <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                                🔄 Loading market data for {expiry}...
+                                {autoFetchOnMount && ' (Auto-fetching...)'}
+                            </Typography>
+                        )}
                     </Box>
                     
-                    {/* Fetch Real Instruments Button */}
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={fetchRealInstruments}
-                        disabled={isLoadingInstruments || !expiry}
-                        startIcon={isLoadingInstruments ? <CircularProgress size={16} /> : null}
-                        sx={{ height: 32 }}
-                    >
-                        {isLoadingInstruments ? 'Fetching...' : 'Fetch Real Data'}
-                    </Button>
+                    {/* Action Buttons */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        {/* Fetch Real Instruments Button */}
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={fetchRealInstruments}
+                            disabled={isLoadingInstruments || !expiry}
+                            startIcon={isLoadingInstruments ? <CircularProgress size={16} /> : null}
+                            sx={{ height: 32 }}
+                            title="Manually refresh market data"
+                        >
+                            {isLoadingInstruments ? 'Fetching...' : '🔄 Refresh Data'}
+                        </Button>
+                        
+                        {/* Refresh LTP Button */}
+                        {realInstruments.length > 0 && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={refreshLTPs}
+                                disabled={isLoadingLTP}
+                                startIcon={isLoadingLTP ? <CircularProgress size={16} /> : null}
+                                sx={{ height: 32 }}
+                                title={`Refresh real-time LTP data${lastLTPUpdate ? ` (Last: ${lastLTPUpdate.toLocaleTimeString()})` : ''}`}
+                            >
+                                {isLoadingLTP ? 'Refreshing...' : '💰 Refresh LTP'}
+                            </Button>
+                        )}
+                    </Box>
                 </Box>
                 
                 {/* Strategy-specific explanation */}
@@ -287,9 +442,19 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect }) => {
                                     {/* Real Market Data */}
                                     {realInstrument ? (
                                         <Box sx={{ mt: 0.5, p: 0.5, bgcolor: 'blue.100', borderRadius: 1, border: '1px solid', borderColor: 'blue.200' }}>
-                                            <Typography variant="caption" color="blue.800" sx={{ display: 'block', fontWeight: 600, fontSize: '0.7rem' }}>
-                                                💰 LTP: ₹{realInstrument.last_price ? parseFloat(realInstrument.last_price).toFixed(2) : 'N/A'}
-                                            </Typography>
+                                            {/* Real-time LTP from fetchLTPs */}
+                                            {ltpData[realInstrument.tradingsymbol] ? (
+                                                <Box>
+                                                    <Typography variant="caption" color="green.800" sx={{ display: 'block', fontWeight: 700, fontSize: '0.75rem' }}>
+                                                        🚀 CMP: ₹{parseFloat(ltpData[realInstrument.tradingsymbol]).toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                            ) : (
+                                                <Typography variant="caption" color="blue.800" sx={{ display: 'block', fontWeight: 600, fontSize: '0.7rem' }}>
+                                                    💰 LTP: ₹{realInstrument.last_price ? parseFloat(realInstrument.last_price).toFixed(2) : 'N/A'}
+                                                </Typography>
+                                            )}
+                                            
                                             <Typography variant="caption" color="blue.700" sx={{ fontSize: '0.65rem', display: 'block' }}>
                                                 📊 {realInstrument.tradingsymbol}
                                             </Typography>

@@ -329,7 +329,8 @@ export const fetchLTPs = async (instruments) => {
             const response = await api.get('/api/zerodha/instruments/ltp', {
                 params: {
                     exchange,
-                    tradingsymbol: tradingsymbols.join(',')
+                    tradingsymbol: tradingsymbols.join(','),
+                    _t: Date.now() // Add timestamp to prevent caching
                 }
             });
             console.log(`Raw LTP response for ${exchange}:`, response.data);
@@ -360,7 +361,15 @@ export const fetchLTPs = async (instruments) => {
             }
         });
 
+        // Log detailed information for debugging
         console.log('Final LTP map:', ltpMap);
+        console.log('Total instruments processed:', instruments.length);
+        console.log('Total LTPs fetched:', Object.keys(ltpMap).length);
+        
+        if (Object.keys(ltpMap).length === 0) {
+            console.warn('⚠️ No LTPs were fetched successfully. This might indicate an issue with the backend response.');
+        }
+
         return ltpMap;
     } catch (error) {
         console.error('Error fetching LTPs:', error);
