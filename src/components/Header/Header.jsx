@@ -31,6 +31,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import MonthlyPerformanceTracker from './MonthlyPerformanceTracker';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
@@ -164,6 +165,9 @@ const Header = () => {
             </AppBar>
             {/* Spacer div to prevent content overlap */}
             <Box sx={{ height: "64px" }} />
+            
+            {/* Monthly Performance Tracker - Available on all pages */}
+            <MonthlyPerformanceTracker />
         </>
     );
 };
