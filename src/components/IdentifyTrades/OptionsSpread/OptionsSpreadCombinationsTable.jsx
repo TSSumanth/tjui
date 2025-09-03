@@ -41,10 +41,10 @@ import {
     calculateProfitPotential,
     getStrikeType
 } from './utils';
-import { placeRegularOrder, getOrderById } from '../../services/zerodha/api';
+import { placeRegularOrder, getOrderById } from '../../../services/zerodha/api';
 
 /**
- * TradeCombinationsTable - Analyzes and displays trade combinations for options strategies
+ * OptionsSpreadCombinationsTable - Analyzes and displays trade combinations for options strategies
  * 
  * For Bull Put Spread (PE):
  * - BUY lower strike (OTM) + SELL higher strike (ITM)
@@ -54,7 +54,7 @@ import { placeRegularOrder, getOrderById } from '../../services/zerodha/api';
  * - BUY higher strike (OTM) + SELL lower strike (ITM)
  * - Net Premium = SELL Premium - BUY Premium
  */
-const TradeCombinationsTable = ({ 
+const OptionsSpreadCombinationsTable = ({ 
     strategyType, // 'PE' or 'CE'
     niftyCMP, 
     strikes, 
@@ -1058,5 +1058,4 @@ const TradeCombinationsTable = ({
         </Box>
     );
 };
-
-export default TradeCombinationsTable;
+export default OptionsSpreadCombinationsTable;

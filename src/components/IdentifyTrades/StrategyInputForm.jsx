@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon, Lock as LockIcon } from '@mui/icons-material';
 import SmartCMPInput from './SmartCMPInput';
-import NiftySpreadStrikeGrid from './NiftySpreadStrikeGrid';
+import { NiftySpreadStrikeGrid } from './OptionsSpread';
 
 const StrategyInputForm = ({ selectedStrategy, onIdentifyTrades, onStrikeSelect }) => {
     const [formData, setFormData] = useState({});

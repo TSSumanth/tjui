@@ -20,8 +20,8 @@ import {
     isOptionUndervalued, 
     getDiscountPercentage 
 } from './utils';
-import { getNiftyOptions, fetchLTPs } from '../../services/zerodha/api';
-import TradeCombinationsTable from './TradeCombinationsTable';
+import { getNiftyOptions, fetchLTPs } from '../../../services/zerodha/api';
+import { OptionsSpreadCombinationsTable } from './';
 
 /**
  * NiftySpreadStrikeGrid - Displays strike prices specifically for Nifty Bull Put Spread and Bear Call Spread strategies
@@ -571,7 +571,7 @@ const NiftySpreadStrikeGrid = ({ niftyCMP, expiry, type, onStrikeSelect, autoFet
 
             {/* Trade Combinations Analysis */}
             {realInstruments.length > 0 && (
-                <TradeCombinationsTable
+                <OptionsSpreadCombinationsTable
                     strategyType={type}
                     niftyCMP={niftyCMP}
                     strikes={strikes}
