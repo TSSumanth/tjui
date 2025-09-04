@@ -239,6 +239,19 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     // Strategy Box Functions
     useEffect(() => {
+        // Debug logging for max loss check
+        if (strategyMaxLoss !== null) {
+            console.log('🔍 Max Loss Check:', {
+                strategyId: strategy.strategyid,
+                totalPL,
+                strategyMaxLoss,
+                maxLossTriggered,
+                isUpdatingTargets,
+                condition: `totalPL (${totalPL}) <= strategyMaxLoss (${strategyMaxLoss})`,
+                willTrigger: typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered && !isUpdatingTargets
+            });
+        }
+
         // Only run this effect if we have both strategyTarget and isTargetAchieved properly loaded
         if (!strategyTarget || isTargetAchieved === null || isTargetAchieved === true) {
             return;
@@ -298,9 +311,19 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
         // Check max loss triggered
         if (typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered && !isUpdatingTargets) {
+            console.log('🚨 MAX LOSS TRIGGERED!', {
+                strategyId: strategy.strategyid,
+                totalPL,
+                strategyMaxLoss,
+                maxLossTriggered,
+                isUpdatingTargets,
+                condition: `totalPL (${totalPL}) <= strategyMaxLoss (${strategyMaxLoss})`
+            });
+            
             // Mark max loss as triggered in database
             triggerMaxLoss(strategy.strategyid, strategyMaxLoss)
-                .then(() => {
+                .then((response) => {
+                    console.log('✅ Max loss trigger API response:', response);
                     setMaxLossTriggered(true);
 
                     // Create max loss note
@@ -322,7 +345,12 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     });
                 })
                 .catch(err => {
-                    console.error('Error triggering max loss:', err);
+                    console.error('❌ Error triggering max loss:', err);
+                    setSnackbar({
+                        open: true,
+                        message: `Failed to trigger max loss for strategy ${strategy.strategyid}`,
+                        severity: 'error'
+                    });
                 });
         }
     }, [totalPL, strategyTarget, strategyMaxLoss, isTargetAchieved, maxLossTriggered, strategy.strategyid]);

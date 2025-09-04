@@ -125,3 +125,28 @@ export const updateMonthlyPerformance = async (performanceData) => {
         throw error;
     }
 };
+
+/**
+ * Get last 6 months of performance data in descending order
+ * @returns {Promise<Array>} Array of monthly performance data
+ */
+export const getLast6MonthsPerformance = async () => {
+    try {
+        const response = await fetch(`${MONTHLY_PERFORMANCE_API}/last-6-months`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching last 6 months performance:', error);
+        throw error;
+    }
+};

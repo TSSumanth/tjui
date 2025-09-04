@@ -106,10 +106,11 @@ export const updateMaxLossValue = async (strategyId, maxLossValue) => {
 };
 
 // Trigger max loss for a strategy
-export const triggerMaxLoss = async (strategyId) => {
+export const triggerMaxLoss = async (strategyId, maxLossValue) => {
     try {
         const response = await axios.post(`${API_URLS.STRATEGY_TARGET_ACHIEVEMENTS}/max-loss/trigger`, {
-            strategy_id: strategyId
+            strategy_id: strategyId,
+            max_loss_value: maxLossValue
         });
         return response.data;
     } catch (error) {
