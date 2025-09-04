@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Box, 
+import {
+    Box,
     Typography, 
     Table, 
     TableBody, 
@@ -8,7 +8,7 @@ import {
     TableContainer, 
     TableHead, 
     TableRow, 
-    Paper, 
+    Paper,
     Chip,
     CircularProgress,
     Alert,
@@ -23,6 +23,7 @@ import { getStockTrades, getOptionTrades } from '../services/trades';
 import { fetchLTPs } from '../services/zerodha/api';
 import { getOpenStrategies } from '../services/strategies';
 import { getAlgoStrategies } from '../services/algoStrategies';
+import { getReportByDateRange } from '../services/profitlossreport';
 
 function Home() {
     const [monthlyHistory, setMonthlyHistory] = useState([]);
@@ -40,6 +41,11 @@ function Home() {
     const [winRateStats, setWinRateStats] = useState({ total: 0, profitable: 0, winRate: 0 });
     const [activeStrategies, setActiveStrategies] = useState([]);
     const [strategiesLoading, setStrategiesLoading] = useState(true);
+    
+    // P/L Report state
+    const [plReportData, setPlReportData] = useState([]);
+    const [plReportLoading, setPlReportLoading] = useState(true);
+    const [plReportError, setPlReportError] = useState(null);
 
     useEffect(() => {
         const fetchMonthlyHistory = async () => {
@@ -194,6 +200,37 @@ function Home() {
         fetchActiveStrategies();
     }, []);
 
+    // Fetch P/L Report for last 7 days (to get 5 trading days excluding weekends)
+    useEffect(() => {
+        const fetchPLReport = async () => {
+            try {
+                setPlReportLoading(true);
+                setPlReportError(null);
+                
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setDate(endDate.getDate() - 7);
+                
+                // Format dates for API
+                const formatDate = (date) => date.toISOString().split('T')[0];
+                
+                const response = await getReportByDateRange(
+                    formatDate(startDate), 
+                    formatDate(endDate)
+                );
+                
+                setPlReportData(response || []);
+            } catch (err) {
+                console.error('Error fetching P/L report:', err);
+                setPlReportError('Failed to load P/L report data');
+            } finally {
+                setPlReportLoading(false);
+            }
+        };
+
+        fetchPLReport();
+    }, []);
+
     const formatCurrency = (value) => {
         return `₹${parseFloat(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     };
@@ -304,7 +341,7 @@ function Home() {
                                     <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Typography variant="body2" color="text.secondary">
                                             Loading monthly data...
-                                        </Typography>
+                            </Typography>
                                     </Box>
                                 )}
                             </CardContent>
@@ -387,7 +424,7 @@ function Home() {
                                         {activeStrategies.length > 5 && (
                                             <Typography variant="caption" color="text.secondary">
                                                 +{activeStrategies.length - 5} more strategies
-                                            </Typography>
+                            </Typography>
                                         )}
                                     </Box>
                                 )}
@@ -478,6 +515,104 @@ function Home() {
 
                 <Divider sx={{ my: 3 }} />
 
+                {/* Last 5 Trading Days P/L Report */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                        Last 5 Trading Days P/L Report
+                    </Typography>
+                    
+                    {plReportLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                            <CircularProgress size={24} />
+                        </Box>
+                    ) : plReportError ? (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {plReportError}
+                        </Alert>
+                    ) : (
+                        <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                            <Table size="small" stickyHeader>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>Date</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>Stocks Realized</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>Stocks Unrealized</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>F&O Realized</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>F&O Unrealized</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}>Total P/L</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {plReportData.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                                                No P/L data available for the last 5 trading days
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        plReportData.map((day, index) => {
+                                            return (
+                                                <TableRow key={day.date || index} hover>
+                                                    <TableCell sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip 
+                                                            label={day.date || 'N/A'}
+                                                            size="small"
+                                                            color="primary"
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip
+                                                            label={formatCurrency(day.stocks_realised || 0)}
+                                                            size="small"
+                                                            color={parseFloat(day.stocks_realised || 0) >= 0 ? "success" : "error"}
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip
+                                                            label={formatCurrency(day.stocks_unrealised || 0)}
+                                                            size="small"
+                                                            color={parseFloat(day.stocks_unrealised || 0) >= 0 ? "success" : "error"}
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip
+                                                            label={formatCurrency(day.fo_realised || 0)}
+                                                            size="small"
+                                                            color={parseFloat(day.fo_realised || 0) >= 0 ? "success" : "error"}
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip
+                                                            label={formatCurrency(day.fo_unrealised || 0)}
+                                                            size="small"
+                                                            color={parseFloat(day.fo_unrealised || 0) >= 0 ? "success" : "error"}
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
+                                                        <Chip
+                                                            label={formatCurrency(day.total_pl || 0)}
+                                                            size="small"
+                                                            color={parseFloat(day.total_pl || 0) >= 0 ? "success" : "error"}
+                                                            variant="filled"
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+
                 {/* Open Trades Table */}
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -487,7 +622,7 @@ function Home() {
                     {tradesLoading ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                             <CircularProgress size={24} />
-                        </Box>
+                                        </Box>
                     ) : tradesError ? (
                         <Alert severity="error" sx={{ mb: 2 }}>
                             {tradesError}
@@ -556,9 +691,9 @@ function Home() {
                                                         {currentPrice > 0 ? formatCurrency(currentPrice) : 'N/A'}
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
-                                                        <Chip
+                                    <Chip
                                                             label={formatCurrency(pl)}
-                                                            size="small"
+                                        size="small"
                                                             color={getPLColor(pl)}
                                                             variant="outlined"
                                                         />
