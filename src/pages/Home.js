@@ -301,13 +301,21 @@ function Home() {
                                 <Typography variant="h6" gutterBottom>
                                     Monthly Target Progress
                                 </Typography>
+                                {currentMonthData && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                        {currentMonthData.month_name} {new Date().getFullYear()}
+                                    </Typography>
+                                )}
                                 {currentMonthData ? (
                                     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Typography variant="body2" color="text.secondary">
                                                 Expected: {formatCurrency(currentMonthData.expected_return)}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography 
+                                                variant="body2" 
+                                                color={currentMonthData.actual_return < 0 ? "error" : "text.secondary"}
+                                            >
                                                 Actual: {formatCurrency(currentMonthData.actual_return)}
                                             </Typography>
                                         </Box>
@@ -322,17 +330,25 @@ function Home() {
                                                 borderRadius: 4,
                                                 backgroundColor: 'rgba(0,0,0,0.1)',
                                                 '& .MuiLinearProgress-bar': {
-                                                    backgroundColor: currentMonthData.actual_return >= currentMonthData.expected_return 
-                                                        ? '#4caf50' 
-                                                        : currentMonthData.actual_return >= currentMonthData.expected_return * 0.5 
-                                                            ? '#ff9800' 
-                                                            : '#f44336'
+                                                    backgroundColor: currentMonthData.actual_return < 0 
+                                                        ? '#f44336'  // Red for negative actual return (losses)
+                                                        : currentMonthData.actual_return >= currentMonthData.expected_return 
+                                                            ? '#4caf50'  // Green for meeting/exceeding target
+                                                            : currentMonthData.actual_return >= currentMonthData.expected_return * 0.5 
+                                                                ? '#ff9800'  // Orange for partial progress
+                                                                : '#f44336'  // Red for poor performance
                                                 }
                                             }}
                                         />
-                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                        <Typography 
+                                            variant="caption" 
+                                            color={currentMonthData.actual_return < 0 ? "error" : "text.secondary"} 
+                                            sx={{ mt: 1, display: 'block' }}
+                                        >
                                             {currentMonthData.expected_return > 0 
-                                                ? `${((currentMonthData.actual_return / currentMonthData.expected_return) * 100).toFixed(1)}% of target achieved`
+                                                ? currentMonthData.actual_return < 0 
+                                                    ? `Loss: ${formatCurrency(Math.abs(currentMonthData.actual_return))}`
+                                                    : `${((currentMonthData.actual_return / currentMonthData.expected_return) * 100).toFixed(1)}% of target achieved`
                                                 : 'No target set'
                                             }
                                         </Typography>

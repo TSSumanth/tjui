@@ -98,8 +98,16 @@ const MonthlyPerformanceTracker = () => {
                 return;
             }
             
-            // Check if it's a valid number format (allows typing like "12.34")
-            const isValidNumberFormat = /^\d*\.?\d{0,2}$/.test(value);
+            // Check if it's a valid number format
+            let isValidNumberFormat;
+            if (field === 'actual_return') {
+                // Allow negative values for actual_return (for losses)
+                isValidNumberFormat = /^-?\d*\.?\d{0,2}$/.test(value);
+            } else {
+                // Only positive values for expected_return and account_balance
+                isValidNumberFormat = /^\d*\.?\d{0,2}$/.test(value);
+            }
+            
             if (isValidNumberFormat) {
                 setPerformanceData(prev => ({ ...prev, [field]: value }));
             }
@@ -294,8 +302,8 @@ const MonthlyPerformanceTracker = () => {
                             placeholder="0.00"
                             inputProps={{
                                 step: "0.01",
-                                min: "-100",
-                                max: "100",
+                                min: "-999999",
+                                max: "999999",
                                 style: { textAlign: 'center', fontSize: '0.75rem', padding: '4px 8px' }
                             }}
                             sx={{
@@ -327,7 +335,7 @@ const MonthlyPerformanceTracker = () => {
                     ) : (
                         <Chip
                             label={`${performanceData.actual_return}`}
-                            color={performanceData.actual_return >= performanceData.expected_return ? "success" : "warning"}
+                            color={performanceData.actual_return >= performanceData.expected_return ? "success" : performanceData.actual_return < 0 ? "error" : "warning"}
                             variant="outlined"
                             size="small"
                             sx={{ fontWeight: 600, height: 24, fontSize: '0.75rem', minWidth: 70 }}
