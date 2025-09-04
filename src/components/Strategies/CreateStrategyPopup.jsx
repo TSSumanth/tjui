@@ -14,7 +14,8 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
         description: "",
         created_at: dayjs(),
         symbol: "",
-        symbol_ltp: ""
+        symbol_ltp: "",
+        expenses: 0.00
     });
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -80,6 +81,15 @@ function CreateStrategy({ title, onCancel, onSubmit, updateStrategydetails }) {
                         type="number"
                         fullWidth
                         value={strategydetails.symbol_ltp}
+                        onChange={handleChange}
+                        inputProps={{ step: "0.01", min: "0" }}
+                    />
+                    <TextField
+                        label="Expenses (₹)"
+                        name="expenses"
+                        type="number"
+                        fullWidth
+                        value={strategydetails.expenses}
                         onChange={handleChange}
                         inputProps={{ step: "0.01", min: "0" }}
                     />

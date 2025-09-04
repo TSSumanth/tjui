@@ -18,12 +18,12 @@ import {
     DialogActions,
     TableContainer,
     Table,
+    TextField,
     TableHead,
     TableBody,
     TableRow,
     TableCell,
     Chip,
-    TextField,
     FormControl,
     InputLabel,
     Select,
@@ -115,6 +115,7 @@ function UpdateStrategy({ id }) {
     const [plSummary, setPlSummary] = useState({
         realizedPL: 0,
         unrealizedPL: 0,
+        expenses: 0,
         hasAllLTP: true
     });
     const [snackbar, setSnackbar] = useState({
@@ -351,6 +352,13 @@ function UpdateStrategy({ id }) {
         }));
     };
 
+    const handleExpensesChange = (event) => {
+        setStrategy((prev) => ({
+            ...prev,
+            expenses: parseFloat(event.target.value) || 0,
+        }));
+    };
+
     const handleUpdateStrategy = async () => {
         try {
             // Include P/L values in the strategy update
@@ -358,6 +366,7 @@ function UpdateStrategy({ id }) {
                 ...strategy,
                 realized_pl: plSummary.realizedPL,
                 unrealized_pl: plSummary.unrealizedPL,
+                expenses: strategy.expenses || 0,
                 symbol_ltp: strategy.symbol_ltp !== undefined ? strategy.symbol_ltp : ''
             };
 
@@ -415,6 +424,7 @@ function UpdateStrategy({ id }) {
         let realizedPL = 0;
         let unrealizedPL = 0;
         const hasAllLTP = checkAllTradesHaveLTP();
+        const expenses = parseFloat(strategy?.expenses || 0);
 
         // Realized P/L: sum of overallreturn for all trades (open and closed)
         stockTrades.forEach(trade => {
@@ -440,6 +450,7 @@ function UpdateStrategy({ id }) {
         setPlSummary({
             realizedPL,
             unrealizedPL,
+            expenses,
             hasAllLTP
         });
 
@@ -799,6 +810,7 @@ function UpdateStrategy({ id }) {
         calculatePLSummary();
     }, [calculatePLSummary]);
 
+
     useEffect(() => {
         const fetchAllTradeActionItems = async () => {
             if (!stockTrades.length && !optionTrades.length) return;
@@ -900,23 +912,23 @@ function UpdateStrategy({ id }) {
 
                         <Grid item xs={12} md={4}>
                             <Typography variant="subtitle2" color="text.secondary">
-                                Total P/L
+                                Total P/L (After Expenses)
                             </Typography>
                             <Typography
                                 variant="h6"
                                 sx={{
-                                    color: (plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? 'success.main' : 'error.main',
+                                    color: (plSummary.realizedPL + plSummary.unrealizedPL - plSummary.expenses) >= 0 ? 'success.main' : 'error.main',
                                     fontWeight: 'bold'
                                 }}
                             >
                                 {plSummary.hasAllLTP && !hasOpenTradesWithZeroLTP ? (
                                     <span>
-                                        {(plSummary.realizedPL + plSummary.unrealizedPL) >= 0 ? '+' : ''}
-                                        ₹{(plSummary.realizedPL + plSummary.unrealizedPL).toFixed(2)}
+                                        {(plSummary.realizedPL + plSummary.unrealizedPL - plSummary.expenses) >= 0 ? '+' : ''}
+                                        ₹{(plSummary.realizedPL + plSummary.unrealizedPL - plSummary.expenses).toFixed(2)}
                                     </span>
                                 ) : (
                                     <span>
-                                        ₹{plSummary.realizedPL.toFixed(2)}
+                                        ₹{(plSummary.realizedPL - plSummary.expenses).toFixed(2)}
                                         {hasOpenTrades && !hasOpenTradesWithZeroLTP && <span style={{ color: 'text.secondary' }}> (+ Unrealized P/L)</span>}
                                     </span>
                                 )}
@@ -1253,6 +1265,18 @@ function UpdateStrategy({ id }) {
                                         onChange={e => setStrategy(prev => ({ ...prev, symbol_ltp: e.target.value }))}
                                         inputProps={{ step: "0.01", min: "0" }}
                                         sx={{ mb: 2 }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <TextField
+                                        label="Expenses (₹)"
+                                        name="expenses"
+                                        type="number"
+                                        fullWidth
+                                        value={strategy?.expenses || 0}
+                                        onChange={handleExpensesChange}
+                                        inputProps={{ step: "0.01", min: "0" }}
+                                        size="small"
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={6}>

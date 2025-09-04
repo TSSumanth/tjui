@@ -481,7 +481,7 @@ const StrategyCard = ({ strategy, setStrategy }) => {
 
                         <Box sx={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
                             gap: 1,
                             p: 1,
                             bgcolor: 'background.paper',
@@ -523,18 +523,34 @@ const StrategyCard = ({ strategy, setStrategy }) => {
 
                             <Box sx={{ textAlign: 'center' }}>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    <TrendingDownIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
+                                    Expenses
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="error.main"
+                                >
+                                    {new Intl.NumberFormat('en-IN', {
+                                        style: 'currency',
+                                        currency: 'INR'
+                                    }).format(Number(strategy.expenses || 0))}
+                                </Typography>
+                            </Box>
+
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                     <AccountBalanceWalletIcon sx={{ fontSize: '1rem', verticalAlign: 'middle', mr: 0.5 }} />
                                     Overall
                                 </Typography>
                                 <Typography
                                     variant="body2"
-                                    color={(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0)) >= 0 ? 'success.main' : 'error.main'}
+                                    color={(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0) - Number(strategy.expenses || 0)) >= 0 ? 'success.main' : 'error.main'}
                                     sx={{ fontWeight: 'bold' }}
                                 >
                                     {new Intl.NumberFormat('en-IN', {
                                         style: 'currency',
                                         currency: 'INR'
-                                    }).format(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0))}
+                                    }).format(Number(strategy.realized_pl || 0) + Number(strategy.unrealized_pl || 0) - Number(strategy.expenses || 0))}
                                 </Typography>
                             </Box>
                         </Box>
