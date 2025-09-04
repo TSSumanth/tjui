@@ -536,9 +536,31 @@ function UpdateStrategy({ id }) {
         handleActionMenuClose();
     };
 
+    const fetchAllTradeActionItems = useCallback(async () => {
+        if (!stockTrades.length && !optionTrades.length) return;
+        const actionItemsByTrade = {};
+        // Fetch for stock trades
+        for (const trade of stockTrades) {
+            const items = await getActionItems({ stock_trade_id: trade.tradeid });
+            if (items && items.length > 0) {
+                actionItemsByTrade[trade.tradeid] = items;
+            }
+        }
+        // Fetch for option trades
+        for (const trade of optionTrades) {
+            const items = await getActionItems({ option_trade_id: trade.tradeid });
+            if (items && items.length > 0) {
+                actionItemsByTrade[trade.tradeid] = items;
+            }
+        }
+        setTradeActionItems(actionItemsByTrade);
+    }, [stockTrades, optionTrades]);
+
     const handleSaveActionItem = async (actionItem) => {
         try {
             await addActionItem(actionItem);
+            // Refresh action items after successful creation
+            await fetchAllTradeActionItems();
             setSnackbar({
                 open: true,
                 message: 'Action item created successfully',
@@ -812,27 +834,8 @@ function UpdateStrategy({ id }) {
 
 
     useEffect(() => {
-        const fetchAllTradeActionItems = async () => {
-            if (!stockTrades.length && !optionTrades.length) return;
-            const actionItemsByTrade = {};
-            // Fetch for stock trades
-            for (const trade of stockTrades) {
-                const items = await getActionItems({ stock_trade_id: trade.tradeid });
-                if (items && items.length > 0) {
-                    actionItemsByTrade[trade.tradeid] = items;
-                }
-            }
-            // Fetch for option trades
-            for (const trade of optionTrades) {
-                const items = await getActionItems({ option_trade_id: trade.tradeid });
-                if (items && items.length > 0) {
-                    actionItemsByTrade[trade.tradeid] = items;
-                }
-            }
-            setTradeActionItems(actionItemsByTrade);
-        };
         fetchAllTradeActionItems();
-    }, [stockTrades, optionTrades]);
+    }, [fetchAllTradeActionItems]);
 
     useEffect(() => {
         const fetchOpenStrategies = async () => {

@@ -1,9 +1,10 @@
 import axios from "axios";
 import { API_URLS } from '../config/api';
 
-export const getTags = async () => {
+export const getTags = async (searchName = "") => {
     try {
-        const response = await axios.get(API_URLS.TAG_MANAGEMENT);
+        const params = searchName ? { name: searchName } : {};
+        const response = await axios.get(API_URLS.TAG_MANAGEMENT, { params });
         if (response.status === 200) {
             return response.data;
         }
@@ -22,11 +23,9 @@ export const getTag = async (e) => {
     return response.data;
 };
 
-export const deleteTag = async (id) => {
+export const deleteTag = async (name) => {
     try {
-        const response = await axios.delete(API_URLS.TAG_MANAGEMENT, {
-            params: { id }
-        });
+        const response = await axios.delete(`${API_URLS.TAG_MANAGEMENT}/${name}`);
         return response.status === 204;
     } catch (e) {
         console.error(e);
@@ -47,11 +46,9 @@ export const addTag = async (tag) => {
     }
 };
 
-export const updateTag = async (id, tag) => {
+export const updateTag = async (name, tag) => {
     try {
-        const response = await axios.patch(API_URLS.TAG_MANAGEMENT, tag, {
-            params: { id }
-        });
+        const response = await axios.patch(`${API_URLS.TAG_MANAGEMENT}/${name}`, tag);
         return response.status === 200;
     } catch (e) {
         console.error(e);
