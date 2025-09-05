@@ -19,7 +19,8 @@ const isMarketOpen = () => {
     const currentTime = hours * 100 + minutes;
     const isMarketTime = day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
     
-     return isMarketTime; // Temporarily disabled for debugging
+     return isMarketTime; 
+    // return true;
 };
 
 

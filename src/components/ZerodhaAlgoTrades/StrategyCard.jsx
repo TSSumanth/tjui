@@ -34,8 +34,6 @@ import { getAutomatedOrderById, updateAutomatedOrder } from '../../services/auto
 import { getOrders, getPositions } from '../../services/zerodha/api';
 import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue, checkMaxLossTriggered, updateMaxLossValue, triggerMaxLoss, getStrategyTargetAndMaxLoss } from '../../services/strategyTargetAchievements';
 import { isMarketOpen } from '../../services/zerodha/utils';
-import plTrackingService from '../../services/plTrackingService';
-import PlHistoryChart from './PlHistoryChart';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 
@@ -112,8 +110,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         // The riskLevel is already a percentage, so we use it directly
         const absoluteRisk = Math.abs(riskLevel);
 
-        // Debug logging
-        console.log('Risk Level:', riskLevel, 'Absolute Risk:', absoluteRisk);
 
         if (absoluteRisk >= 45) return 'error.main';         // Red for high risk (45% to 100%)
         if (absoluteRisk >= 1) return 'warning.main';        // Orange for moderate risk (1% to 45%)
@@ -192,16 +188,12 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         const fetchAchievementStatus = async () => {
             try {
                 if (strategy.strategyid && strategyTarget) {
-                    console.log('🔍 Fetching achievement status for strategy:', strategy.strategyid, 'target:', strategyTarget);
                     const result = await checkTargetAchievement(strategy.strategyid, strategyTarget);
-                    console.log('📊 Achievement result:', result);
                     
                     if (result.success && result.data) {
                         const hasAchieved = result.data.hasAchieved;
                         setIsTargetAchieved(hasAchieved);
-                        console.log(`✅ Target achievement status loaded: ${hasAchieved ? 'ACHIEVED' : 'PENDING'}`);
                     } else {
-                        console.log('⚠️ No achievement data found');
                         setIsTargetAchieved(false);
                     }
                 }
@@ -243,15 +235,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
     useEffect(() => {
         // Debug logging for max loss check
         if (strategyMaxLoss !== null) {
-            console.log('🔍 Max Loss Check:', {
-                strategyId: strategy.strategyid,
-                totalPL,
-                strategyMaxLoss,
-                maxLossTriggered,
-                isUpdatingTargets,
-                condition: `totalPL (${totalPL}) <= strategyMaxLoss (${strategyMaxLoss})`,
-                willTrigger: typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered && !isUpdatingTargets
-            });
+            // Max loss check logic
         }
 
         // Only run this effect if we have both strategyTarget and isTargetAchieved properly loaded
@@ -259,15 +243,8 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             return;
         }
 
-        // Debug logging
-        console.log('Target Achievement Check:', {
-            strategyTarget,
-            totalPL,
-            isTargetAchieved
-        });
 
         if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL > strategyTarget && !isTargetAchieved && !isUpdatingTargets) {
-            console.log('🎯 Creating target achievement...');
             
             // Create achievement record in database
             createTargetAchievement(strategy.strategyid, strategyTarget)
@@ -300,7 +277,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
         // Reset achievement if P/L falls below target
         if (typeof strategyTarget === 'number' && strategyTarget > 0 && totalPL <= strategyTarget && isTargetAchieved && !isUpdatingTargets) {
-            console.log('🔄 Resetting target achievement...');
             
             resetTargetAchievement(strategy.strategyid, strategyTarget)
                 .then(() => {
@@ -313,19 +289,11 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
         // Check max loss triggered
         if (typeof strategyMaxLoss === 'number' && strategyMaxLoss < 0 && totalPL <= strategyMaxLoss && !maxLossTriggered && !isUpdatingTargets) {
-            console.log('🚨 MAX LOSS TRIGGERED!', {
-                strategyId: strategy.strategyid,
-                totalPL,
-                strategyMaxLoss,
-                maxLossTriggered,
-                isUpdatingTargets,
-                condition: `totalPL (${totalPL}) <= strategyMaxLoss (${strategyMaxLoss})`
-            });
+            // Max loss triggered logic
             
             // Mark max loss as triggered in database
             triggerMaxLoss(strategy.strategyid, strategyMaxLoss)
                 .then((response) => {
-                    console.log('✅ Max loss trigger API response:', response);
                     setMaxLossTriggered(true);
 
                     // Create max loss note
@@ -355,7 +323,7 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     });
                 });
         }
-    }, [totalPL, strategyTarget, strategyMaxLoss, isTargetAchieved, maxLossTriggered, strategy.strategyid]);
+    }, [totalPL, strategyTarget, strategyMaxLoss, isTargetAchieved, maxLossTriggered, strategy?.strategyid]);
 
     // Calculate total P/L for the strategy
     useEffect(() => {
@@ -450,12 +418,10 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             }
 
             setCheckingOrderStatuses(true);
-            console.log(`Checking status for ${sentOrders.length} sent orders...`);
 
             // Get all orders from Zerodha
             const zerodhaOrders = await getOrders();
             if (!zerodhaOrders || !zerodhaOrders.data) {
-                console.log('No Zerodha orders data received');
                 return;
             }
 
@@ -493,7 +459,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                         try {
                             await updateAutomatedOrder(sentOrder.id, { status: newStatus });
                             statusUpdates++;
-                            console.log(`Order ${sentOrder.id} status updated from ${sentOrder.status} to ${newStatus}`);
                         } catch (err) {
                             console.error(`Failed to update order ${sentOrder.id} status:`, err);
                         }
@@ -503,7 +468,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
             // Refresh orders if any statuses were updated
             if (statusUpdates > 0) {
-                console.log(`${statusUpdates} order statuses updated, refreshing orders...`);
                 await fetchOrders();
 
                 // Show notification only if requested
@@ -542,8 +506,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         setUnderlyingInstrumentToken(underlyingInstrumentToken);
 
         // Debug logging
-        console.log('Strategy underlying_instrument:', strategy.underlying_instrument);
-        console.log('WebSocket data keys:', Object.keys(zerodhaWebSocketData || {}));
     }, [strategy, zerodhaWebSocketData]);
 
     // Set up order status polling
@@ -555,7 +517,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
             return; // No need to poll
         }
 
-        console.log('Starting order status polling...');
 
         // Initial check
         checkOrderStatuses(false); // Don't show notification for background checks
@@ -565,62 +526,11 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
         // Cleanup function
         return () => {
-            console.log('Cleaning up order status polling...');
             clearInterval(intervalId);
         };
     }, [orders]); // Re-run when orders change
 
-    // P/L Tracking - Start/Stop tracking based on strategy status
-    useEffect(() => {
-        console.log(`[STRATEGY CARD] P/L tracking effect triggered for strategy:`, {
-            strategyId: strategy?.id,
-            status: strategy?.status,
-            hasStrategy: !!strategy,
-            hasWebSocketData: !!zerodhaWebSocketData,
-            strategyKeys: strategy ? Object.keys(strategy) : [],
-            fullStrategy: strategy
-        });
-        
-        if (strategy && strategy.id) {
-            if (strategy.status === 'Open') {
-                // Start P/L tracking for open strategies
-                console.log(`[STRATEGY CARD] Starting P/L tracking for strategy ${strategy.id} (status: ${strategy.status})`);
-                plTrackingService.startTracking(strategy.id, strategy, zerodhaWebSocketData);
-                console.log(`[STRATEGY CARD] Started P/L tracking for strategy ${strategy.id}`);
-            } else {
-                // Stop P/L tracking for closed strategies
-                console.log(`[STRATEGY CARD] Stopping P/L tracking for strategy ${strategy.id} (status: ${strategy.status})`);
-                plTrackingService.stopTracking(strategy.id);
-                console.log(`[STRATEGY CARD] Stopped P/L tracking for strategy ${strategy.id}`);
-            }
-        } else {
-            console.log(`[STRATEGY CARD] No strategy or strategy ID found:`, { strategy, strategyId: strategy?.id });
-        }
 
-        // Cleanup on unmount
-        return () => {
-            if (strategy && strategy.id) {
-                console.log(`[STRATEGY CARD] Cleaning up P/L tracking for strategy ${strategy.id}`);
-                plTrackingService.stopTracking(strategy.id);
-                console.log(`[STRATEGY CARD] Cleaned up P/L tracking for strategy ${strategy.id}`);
-            }
-        };
-    }, [strategy?.id, strategy?.status]);
-
-    // Update P/L tracking data when WebSocket data changes
-    useEffect(() => {
-        console.log(`[STRATEGY CARD] WebSocket data update effect triggered:`, {
-            strategyId: strategy?.id,
-            status: strategy?.status,
-            hasWebSocketData: !!zerodhaWebSocketData,
-            webSocketDataKeys: zerodhaWebSocketData ? Object.keys(zerodhaWebSocketData) : []
-        });
-        
-        if (strategy && strategy.id && strategy.status === 'Open') {
-            console.log(`[STRATEGY CARD] Updating P/L tracking data for strategy ${strategy.id}`);
-            plTrackingService.updateStrategyData(strategy.id, strategy, zerodhaWebSocketData);
-        }
-    }, [strategy, zerodhaWebSocketData]);
 
     const handleEditChange = (field, value) => {
         setEditState(prev => ({
@@ -705,7 +615,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             if (isTargetAchieved) {
                                 await resetTargetAchievement(strategy.strategyid, newTargetValue);
                                 setIsTargetAchieved(false);
-                                console.log('🔄 Target value changed, resetting achievement status');
                             }
                         } else {
                             // Create new target
@@ -740,7 +649,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                             // We need to reset the max loss triggered status in the database
                             // This will be handled by the backend when updating the max loss value
                             setMaxLossTriggered(false);
-                            console.log('🔄 Max loss value changed, resetting triggered status');
                         }
                         
                         updateMessages.push('Max loss updated');
@@ -1405,11 +1313,6 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                                     >
                                         ₹{totalPL?.toFixed(2)}
                                     </Typography>
-                                    <PlHistoryChart 
-                                        strategyId={strategy.strategyid} 
-                                        strategyName={strategy.strategy_name || `Strategy ${strategy.strategyid}`}
-                                        isOpen={strategy.status === 'Open'}
-                                    />
                                 </Box>
                                 <Typography
                                     variant="caption"
