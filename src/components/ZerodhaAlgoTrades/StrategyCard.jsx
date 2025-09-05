@@ -572,30 +572,52 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
     // P/L Tracking - Start/Stop tracking based on strategy status
     useEffect(() => {
+        console.log(`[STRATEGY CARD] P/L tracking effect triggered for strategy:`, {
+            strategyId: strategy?.id,
+            status: strategy?.status,
+            hasStrategy: !!strategy,
+            hasWebSocketData: !!zerodhaWebSocketData,
+            strategyKeys: strategy ? Object.keys(strategy) : [],
+            fullStrategy: strategy
+        });
+        
         if (strategy && strategy.id) {
             if (strategy.status === 'Open') {
                 // Start P/L tracking for open strategies
+                console.log(`[STRATEGY CARD] Starting P/L tracking for strategy ${strategy.id} (status: ${strategy.status})`);
                 plTrackingService.startTracking(strategy.id, strategy, zerodhaWebSocketData);
-                console.log(`Started P/L tracking for strategy ${strategy.id}`);
+                console.log(`[STRATEGY CARD] Started P/L tracking for strategy ${strategy.id}`);
             } else {
                 // Stop P/L tracking for closed strategies
+                console.log(`[STRATEGY CARD] Stopping P/L tracking for strategy ${strategy.id} (status: ${strategy.status})`);
                 plTrackingService.stopTracking(strategy.id);
-                console.log(`Stopped P/L tracking for strategy ${strategy.id}`);
+                console.log(`[STRATEGY CARD] Stopped P/L tracking for strategy ${strategy.id}`);
             }
+        } else {
+            console.log(`[STRATEGY CARD] No strategy or strategy ID found:`, { strategy, strategyId: strategy?.id });
         }
 
         // Cleanup on unmount
         return () => {
             if (strategy && strategy.id) {
+                console.log(`[STRATEGY CARD] Cleaning up P/L tracking for strategy ${strategy.id}`);
                 plTrackingService.stopTracking(strategy.id);
-                console.log(`Cleaned up P/L tracking for strategy ${strategy.id}`);
+                console.log(`[STRATEGY CARD] Cleaned up P/L tracking for strategy ${strategy.id}`);
             }
         };
     }, [strategy?.id, strategy?.status]);
 
     // Update P/L tracking data when WebSocket data changes
     useEffect(() => {
+        console.log(`[STRATEGY CARD] WebSocket data update effect triggered:`, {
+            strategyId: strategy?.id,
+            status: strategy?.status,
+            hasWebSocketData: !!zerodhaWebSocketData,
+            webSocketDataKeys: zerodhaWebSocketData ? Object.keys(zerodhaWebSocketData) : []
+        });
+        
         if (strategy && strategy.id && strategy.status === 'Open') {
+            console.log(`[STRATEGY CARD] Updating P/L tracking data for strategy ${strategy.id}`);
             plTrackingService.updateStrategyData(strategy.id, strategy, zerodhaWebSocketData);
         }
     }, [strategy, zerodhaWebSocketData]);

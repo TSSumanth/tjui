@@ -19,9 +19,7 @@ const isMarketOpen = () => {
     const currentTime = hours * 100 + minutes;
     const isMarketTime = day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
     
-    // Temporarily always return true for debugging
-    console.log(`[MARKET HOURS DEBUG] Current time: ${now.toLocaleString()}, Day: ${day}, Time: ${currentTime}, Is market time: ${isMarketTime}`);
-    return true; // Temporarily disabled for debugging
+     return isMarketTime; // Temporarily disabled for debugging
 };
 
 

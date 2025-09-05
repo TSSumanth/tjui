@@ -23,6 +23,12 @@ class PlTrackingService {
     }
 
     console.log(`[ALGO STRATEGY ${strategyId}] Starting P/L tracking - will track every 5 minutes`);
+    console.log(`[ALGO STRATEGY ${strategyId}] Strategy data:`, {
+      status: strategyData?.status,
+      hasInstruments: !!strategyData?.instruments_details,
+      instrumentsCount: strategyData?.instruments_details?.length || 0,
+      hasWebSocketData: !!zerodhaWebSocketData
+    });
     
     // Store strategy data and WebSocket data
     this.trackingStrategies.set(strategyId, {
@@ -110,12 +116,16 @@ class PlTrackingService {
       const totalPl = strategyData.instruments_details.reduce((total, inst) => {
         const ltp = zerodhaWebSocketData?.[inst.instrument_token]?.ltp;
         const price = inst.price;
-        if (!ltp || !price) return total;
+        if (!ltp || !price) {
+          console.log(`[ALGO STRATEGY ${strategyId}] Missing data for instrument ${inst.instrument_token}:`, { ltp, price });
+          return total;
+        }
 
         const pl = inst.quantity > 0
           ? (ltp - price) * inst.quantity
           : (ltp - price) * inst.quantity;
 
+        console.log(`[ALGO STRATEGY ${strategyId}] Instrument ${inst.instrument_token} P/L:`, { ltp, price, quantity: inst.quantity, pl });
         return total + pl;
       }, 0);
 
@@ -159,6 +169,13 @@ class PlTrackingService {
         marketHours: marketHours
       };
 
+      console.log(`[ALGO STRATEGY ${strategyId}] Final P/L calculation:`, {
+        totalPl: totalPl.toFixed(2),
+        totalPlMp: totalPlMp.toFixed(2),
+        marketPrice: marketPrice,
+        instrumentsCount: strategyData.instruments_details.length
+      });
+      
       console.log(`[ALGO STRATEGY ${strategyId}] Attempting to save P/L data:`, plData);
       
       const saveResult = await saveStrategyPlHistory(plData);
@@ -178,6 +195,25 @@ class PlTrackingService {
       trackingStrategies: Array.from(this.trackingStrategies.keys()),
       totalStrategies: this.trackingStrategies.size
     };
+  }
+
+  // Debug function to check tracking status
+  debugTrackingStatus() {
+    console.log('=== ALGO P/L TRACKING DEBUG ===');
+    console.log('Is tracking active:', this.isTracking);
+    console.log('Number of strategies being tracked:', this.trackingStrategies.size);
+    console.log('Strategy IDs being tracked:', Array.from(this.trackingStrategies.keys()));
+    
+    this.trackingStrategies.forEach((data, strategyId) => {
+      console.log(`Strategy ${strategyId}:`, {
+        status: data.strategyData?.status,
+        hasInstruments: !!data.strategyData?.instruments_details,
+        instrumentsCount: data.strategyData?.instruments_details?.length || 0,
+        hasWebSocketData: !!data.zerodhaWebSocketData,
+        lastUpdate: new Date(data.lastUpdate).toLocaleString()
+      });
+    });
+    console.log('=== END DEBUG ===');
   }
 
   // Stop all tracking
@@ -213,4 +249,28 @@ class PlTrackingService {
 
 // Create and export a single instance
 const plTrackingService = new PlTrackingService();
+
+// Make debug function available globally for debugging
+if (typeof window !== 'undefined') {
+  try {
+    window.debugAlgoPlTracking = () => {
+      console.log('=== DEBUG FUNCTION CALLED ===');
+      plTrackingService.debugTrackingStatus();
+    };
+    window.plTrackingService = plTrackingService; // Also expose the service itself
+    window.getAlgoTrackingStatus = () => plTrackingService.getTrackingStatus();
+    console.log('Algo P/L tracking debug functions available:');
+    console.log('- debugAlgoPlTracking() - Check tracking status');
+    console.log('- plTrackingService - Access the service directly');
+    console.log('- getAlgoTrackingStatus() - Get simple tracking status');
+    console.log('Functions registered successfully:', {
+      debugAlgoPlTracking: typeof window.debugAlgoPlTracking,
+      plTrackingService: typeof window.plTrackingService,
+      getAlgoTrackingStatus: typeof window.getAlgoTrackingStatus
+    });
+  } catch (error) {
+    console.error('Error registering debug functions:', error);
+  }
+}
+
 export default plTrackingService;
