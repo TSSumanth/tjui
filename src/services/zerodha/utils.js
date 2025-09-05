@@ -7,8 +7,8 @@ const isMarketHours = () => {
     const currentTime = hours * 100 + minutes;
 
     // Check if it's a weekday (Monday-Friday) and between 9:00 AM and 3:30 PM
-    // return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
-    return true;
+    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
+    // return true;
 };
 
 const isMarketOpen = () => {
@@ -17,7 +17,11 @@ const isMarketOpen = () => {
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const currentTime = hours * 100 + minutes;
-    return day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
+    const isMarketTime = day !== 0 && day !== 6 && currentTime >= 900 && currentTime <= 1530;
+    
+    // Temporarily always return true for debugging
+    console.log(`[MARKET HOURS DEBUG] Current time: ${now.toLocaleString()}, Day: ${day}, Time: ${currentTime}, Is market time: ${isMarketTime}`);
+    return true; // Temporarily disabled for debugging
 };
 
 

@@ -34,6 +34,8 @@ import { getAutomatedOrderById, updateAutomatedOrder } from '../../services/auto
 import { getOrders, getPositions } from '../../services/zerodha/api';
 import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue, checkMaxLossTriggered, updateMaxLossValue, triggerMaxLoss, getStrategyTargetAndMaxLoss } from '../../services/strategyTargetAchievements';
 import { isMarketOpen } from '../../services/zerodha/utils';
+import plTrackingService from '../../services/plTrackingService';
+import PlHistoryChart from './PlHistoryChart';
 import AutomatedOrdersTable from './AutomatedOrdersTable';
 import CreateAutomatedOrderPopup from './CreateAutomatedOrderPopup';
 
@@ -568,7 +570,35 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
         };
     }, [orders]); // Re-run when orders change
 
+    // P/L Tracking - Start/Stop tracking based on strategy status
+    useEffect(() => {
+        if (strategy && strategy.id) {
+            if (strategy.status === 'Open') {
+                // Start P/L tracking for open strategies
+                plTrackingService.startTracking(strategy.id, strategy, zerodhaWebSocketData);
+                console.log(`Started P/L tracking for strategy ${strategy.id}`);
+            } else {
+                // Stop P/L tracking for closed strategies
+                plTrackingService.stopTracking(strategy.id);
+                console.log(`Stopped P/L tracking for strategy ${strategy.id}`);
+            }
+        }
 
+        // Cleanup on unmount
+        return () => {
+            if (strategy && strategy.id) {
+                plTrackingService.stopTracking(strategy.id);
+                console.log(`Cleaned up P/L tracking for strategy ${strategy.id}`);
+            }
+        };
+    }, [strategy?.id, strategy?.status]);
+
+    // Update P/L tracking data when WebSocket data changes
+    useEffect(() => {
+        if (strategy && strategy.id && strategy.status === 'Open') {
+            plTrackingService.updateStrategyData(strategy.id, strategy, zerodhaWebSocketData);
+        }
+    }, [strategy, zerodhaWebSocketData]);
 
     const handleEditChange = (field, value) => {
         setEditState(prev => ({
@@ -1342,16 +1372,23 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
 
                             {/* Current P/L Display */}
                             <Box sx={{ textAlign: 'right', minWidth: 100 }}>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        fontWeight: 900,
-                                        color: isTargetAchieved === null ? 'text.secondary' : isTargetAchieved ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
-                                        lineHeight: 1
-                                    }}
-                                >
-                                    ₹{totalPL?.toFixed(2)}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
+                                            fontWeight: 900,
+                                            color: isTargetAchieved === null ? 'text.secondary' : isTargetAchieved ? 'success.main' : totalPL < 0 ? 'error.main' : 'warning.main',
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        ₹{totalPL?.toFixed(2)}
+                                    </Typography>
+                                    <PlHistoryChart 
+                                        strategyId={strategy.strategyid} 
+                                        strategyName={strategy.strategy_name || `Strategy ${strategy.strategyid}`}
+                                        isOpen={strategy.status === 'Open'}
+                                    />
+                                </Box>
                                 <Typography
                                     variant="caption"
                                     sx={{

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import regularStrategyPlTrackingService from '../../services/regularStrategyPlTrackingService';
+import RegularStrategyPlHistoryChart from './RegularStrategyPlHistoryChart';
 import {
     Box,
     Button,
@@ -125,6 +127,29 @@ function UpdateStrategy({ id }) {
     });
     const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState(null);
     const [selectedTradeForMenu, setSelectedTradeForMenu] = useState(null);
+
+    // P/L Tracking for regular strategies
+    useEffect(() => {
+        if (strategy && strategy.id) {
+            if (strategy.status === 'OPEN') {
+                regularStrategyPlTrackingService.startTracking(strategy.id, strategy);
+            } else {
+                regularStrategyPlTrackingService.stopTracking(strategy.id);
+            }
+        }
+        return () => {
+            if (strategy && strategy.id) {
+                regularStrategyPlTrackingService.stopTracking(strategy.id);
+            }
+        };
+    }, [strategy?.id, strategy?.status]);
+
+    // Update strategy data in tracking service when strategy changes
+    useEffect(() => {
+        if (strategy && strategy.id && strategy.status === 'OPEN') {
+            regularStrategyPlTrackingService.updateStrategyData(strategy.id, strategy);
+        }
+    }, [strategy]);
     const [showActionItemPopup, setShowActionItemPopup] = useState(false);
     const [selectedTradeForAction, setSelectedTradeForAction] = useState(null);
     const [tradeActionItems, setTradeActionItems] = useState({});
@@ -577,20 +602,9 @@ function UpdateStrategy({ id }) {
         }
     };
 
-    // const handleGetLTPFromZerodha = async () => {
-    //     if (!sessionActive) {
-    //         setSnackbar({
-    //             open: true,
-    //             message: 'No active session available for Zerodha. Please connect to Zerodha and try again.',
-    //             severity: 'error'
-    //         });
-    //         return;
-    //     }
+  
 
-    //     setShowZerodhaConfirmDialog(true);
-    // };
-
-    const handleConfirmZerodhaSync = async () => {
+    const handleConfirmZerodhaSync = useCallback(async () => {
         setShowZerodhaConfirmDialog(false);
         setIsFetchingZerodhaLTP(true);
         setSyncProgress({ total: 0, current: 0, status: 'syncing' });
@@ -733,7 +747,38 @@ function UpdateStrategy({ id }) {
             setIsFetchingZerodhaLTP(false);
             setSyncProgress({ total: 0, current: 0, status: 'complete' });
         }
-    };
+    }, [strategy, stockTrades, optionTrades, calculateUnrealizedPL, updateStrategy, updateStockTrade, updateOptionTrade, fetchTrades, calculatePLSummary]);
+
+    // Auto sync LTP every 5 minutes (only for open trades)
+    useEffect(() => {
+        // Check if there are open trades before starting auto sync
+        const hasOpenTrades = () => {
+            const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
+            const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
+            return openStockTrades.length > 0 || openOptionTrades.length > 0;
+        };
+
+        // Don't start auto sync if no open trades
+        if (!hasOpenTrades()) {
+            return;
+        }
+
+        // Auto sync every 5 minutes
+        const interval = setInterval(async () => {
+            try {
+                // Check again if there are still open trades and not already syncing
+                if (hasOpenTrades() && !isFetchingZerodhaLTP) {
+                    console.log('Auto syncing LTP from Zerodha...');
+                    await handleConfirmZerodhaSync();
+                }
+            } catch (error) {
+                console.error('Auto sync error:', error);
+                // Don't break the interval on error, just log it
+            }
+        }, 5 * 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, [stockTrades, optionTrades, handleConfirmZerodhaSync, isFetchingZerodhaLTP]); // Depend on trades data and sync function
 
     const handleDeleteStrategy = async () => {
         try {
@@ -938,6 +983,17 @@ function UpdateStrategy({ id }) {
                             </Typography>
                         </Grid>
                     </Grid>
+
+                    {/* P/L History Chart */}
+                    {strategy && strategy.status === 'OPEN' && (
+                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                            <RegularStrategyPlHistoryChart
+                                strategyId={strategy.id}
+                                strategyName={strategy.name}
+                                isOpen={strategy.status === 'OPEN'}
+                            />
+                        </Box>
+                    )}
                 </CardContent>
             </Card>
         );
