@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Button, ButtonGroup, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions, IconButton
 } from '@mui/material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ComposedChart } from 'recharts';
 import CloseIcon from '@mui/icons-material/Close';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -76,7 +76,6 @@ const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => 
       });
       const formattedData = formatPlHistoryForChart(response.data);
       const stats = getPlStatistics(response.data);
-      console.log('Statistics calculated:', stats);
       setChartData(formattedData);
       setStatistics(stats);
     } catch (err) {
@@ -231,7 +230,7 @@ const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => 
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart 
                     data={chartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    margin={{ top: 20, right: 80, left: 20, bottom: 20 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
@@ -241,33 +240,46 @@ const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => 
                       type="category"
                     />
                     <YAxis 
+                      yAxisId="pl"
                       tickFormatter={(value) => `₹${value?.toFixed(0) || '0'}`}
                       tick={{ fontSize: 12 }}
                       domain={['dataMin - 1000', 'dataMax + 1000']}
+                      label={{ value: 'P/L (₹)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis 
+                      yAxisId="price"
+                      orientation="right"
+                      tickFormatter={(value) => `₹${value?.toFixed(0) || '0'}`}
+                      tick={{ fontSize: 12 }}
+                      domain={['dataMin - 100', 'dataMax + 100']}
+                      label={{ value: 'Market Price (₹)', angle: 90, position: 'insideRight' }}
                     />
                     <Tooltip 
                       formatter={formatTooltipValue}
                       labelFormatter={(label) => moment(label).format('MMM DD, YYYY HH:mm')}
                     />
                     <Legend />
-                    <ReferenceLine y={0} stroke="#666" strokeDasharray="2 2" />
+                    <ReferenceLine yAxisId="pl" y={0} stroke="#666" strokeDasharray="2 2" />
                     <Line
+                      yAxisId="pl"
                       type="monotone"
-                      dataKey="P/L (LTP)"
+                      dataKey="P/L"
                       stroke="#1976d2"
                       strokeWidth={3}
                       dot={{ r: 4, fill: "#1976d2" }}
-                      name="P/L (LTP)"
+                      name="P/L"
                       connectNulls={false}
                     />
                     <Line
+                      yAxisId="price"
                       type="monotone"
-                      dataKey="P/L (MP)"
-                      stroke="#dc004e"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: "#dc004e" }}
-                      name="P/L (MP)"
+                      dataKey="Market Price"
+                      stroke="#ff9800"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#ff9800" }}
+                      name="Market Price"
                       connectNulls={false}
+                      strokeDasharray="5 5"
                     />
                   </LineChart>
                 </ResponsiveContainer>

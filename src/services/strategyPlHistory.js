@@ -85,8 +85,8 @@ export const formatPlHistoryForChart = (plHistoryData) => {
   // Format for Recharts - array of objects with timestamp and values
   return sortedData.map(item => ({
     timestamp: new Date(item.timestamp),
-    'P/L (LTP)': parseFloat(item.total_pl),
-    'P/L (MP)': parseFloat(item.total_pl_mp)
+    'P/L': parseFloat(item.total_pl),
+    'Market Price': parseFloat(item.market_price)
   }));
 };
 
