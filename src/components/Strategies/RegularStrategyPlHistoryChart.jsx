@@ -10,7 +10,7 @@ import TrendingUp from '@mui/icons-material/TrendingUp';
 import { getStrategyPlHistory, formatPlHistoryForChart, getPlStatistics } from '../../services/strategyPlHistory';
 import moment from 'moment';
 
-const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => {
+const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen, showDirectly = false }) => {
   const [showChart, setShowChart] = useState(false);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -94,6 +94,13 @@ const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => 
     }
   }, [showChart, strategyId, isOpen, timeRange, fetchPlHistory]);
 
+  // Separate useEffect for when showDirectly is true
+  useEffect(() => {
+    if (showDirectly && strategyId && isOpen) {
+      fetchPlHistory();
+    }
+  }, [showDirectly, strategyId, isOpen, timeRange, fetchPlHistory]);
+
   const handleRefresh = () => {
     fetchPlHistory();
   };
@@ -108,6 +115,180 @@ const RegularStrategyPlHistoryChart = ({ strategyId, strategyName, isOpen }) => 
 
   if (!isOpen) {
     return null;
+  }
+
+  // If showDirectly is true, render the chart content directly without the icon button and dialog wrapper
+  if (showDirectly) {
+    return (
+      <Box>
+        {/* Time Range Selector */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 2
+        }}>
+          <Typography variant="h6" component="div">
+            P/L History Chart
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ButtonGroup size="small" variant="outlined">
+              {timeRangeOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={timeRange === option.value ? 'contained' : 'outlined'}
+                  onClick={() => setTimeRange(option.value)}
+                  size="small"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </ButtonGroup>
+            <IconButton onClick={handleRefresh} disabled={loading} size="small">
+              <RefreshIcon />
+            </IconButton>
+          </Box>
+        </Box>
+
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {!loading && !error && chartData && chartData.length > 0 && (
+          <Box>
+            {/* Statistics */}
+            {statistics && (
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                mb: 3, 
+                flexWrap: 'wrap',
+                justifyContent: 'center'
+              }}>
+                <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Current
+                  </Typography>
+                  <Typography variant="h6" color={statistics.currentPl >= 0 ? 'success.main' : 'error.main'}>
+                    ₹{statistics.currentPl?.toFixed(2) || '0.00'}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Max
+                  </Typography>
+                  <Typography variant="h6" color="success.main">
+                    ₹{statistics.maxPl?.toFixed(2) || '0.00'}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Min
+                  </Typography>
+                  <Typography variant="h6" color="error.main">
+                    ₹{statistics.minPl?.toFixed(2) || '0.00'}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Average
+                  </Typography>
+                  <Typography variant="h6" color="text.primary">
+                    ₹{statistics.avgPl?.toFixed(2) || '0.00'}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
+            {/* Chart */}
+            <Box sx={{ height: 400, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={chartData}
+                  margin={{ top: 20, right: 80, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={formatXAxisLabel}
+                    tick={{ fontSize: 12 }}
+                    type="category"
+                  />
+                  <YAxis 
+                    yAxisId="pl"
+                    tickFormatter={(value) => `₹${value?.toFixed(0) || '0'}`}
+                    tick={{ fontSize: 12 }}
+                    domain={['dataMin - 1000', 'dataMax + 1000']}
+                    label={{ value: 'P/L (₹)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <YAxis 
+                    yAxisId="price"
+                    orientation="right"
+                    tickFormatter={(value) => `₹${value?.toFixed(0) || '0'}`}
+                    tick={{ fontSize: 12 }}
+                    domain={['dataMin - 100', 'dataMax + 100']}
+                    label={{ value: 'Market Price (₹)', angle: 90, position: 'insideRight' }}
+                  />
+                  <Tooltip 
+                    formatter={formatTooltipValue}
+                    labelFormatter={(label) => moment(label).format('MMM DD, YYYY HH:mm')}
+                  />
+                  <Legend />
+                  <ReferenceLine yAxisId="pl" y={0} stroke="#666" strokeDasharray="2 2" />
+                  <Line
+                    yAxisId="pl"
+                    type="monotone"
+                    dataKey="P/L"
+                    stroke="#1976d2"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#1976d2" }}
+                    name="P/L"
+                    connectNulls={false}
+                  />
+                  <Line
+                    yAxisId="price"
+                    type="monotone"
+                    dataKey="Market Price"
+                    stroke="#ff9800"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#ff9800" }}
+                    name="Market Price"
+                    connectNulls={false}
+                    strokeDasharray="5 5"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          </Box>
+        )}
+
+        {!loading && !error && (!chartData || chartData.length === 0) && (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            py: 4,
+            textAlign: 'center'
+          }}>
+            <TrendingUp sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No P/L History Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              P/L data will be collected every 5 minutes during market hours.
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    );
   }
 
   return (

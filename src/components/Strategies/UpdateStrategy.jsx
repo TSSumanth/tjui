@@ -49,6 +49,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -168,6 +169,7 @@ function UpdateStrategy({ id }) {
     const [breakEvenPoints, setBreakEvenPoints] = React.useState(null);
     const [showAddNoteDialog, setShowAddNoteDialog] = useState(false);
     const [newNoteContent, setNewNoteContent] = useState('');
+    const [showPlHistoryChart, setShowPlHistoryChart] = useState(false);
 
     const hasOpenTradesWithZeroLTP = React.useMemo(() => {
         const openTrades = [...stockTrades, ...optionTrades].filter(trade => trade.status === 'OPEN');
@@ -984,14 +986,27 @@ function UpdateStrategy({ id }) {
                         </Grid>
                     </Grid>
 
-                    {/* P/L History Chart */}
+                    {/* P/L History Chart Button */}
                     {strategy && strategy.status === 'OPEN' && (
                         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                            <RegularStrategyPlHistoryChart
-                                strategyId={strategy.id}
-                                strategyName={strategy.name}
-                                isOpen={strategy.status === 'OPEN'}
-                            />
+                            <Button
+                                variant="outlined"
+                                startIcon={<BarChartIcon />}
+                                onClick={() => setShowPlHistoryChart(true)}
+                                sx={{
+                                    minWidth: 200,
+                                    fontWeight: 'bold',
+                                    textTransform: 'none',
+                                    borderColor: 'primary.main',
+                                    color: 'primary.main',
+                                    '&:hover': {
+                                        backgroundColor: 'primary.light',
+                                        color: 'primary.contrastText'
+                                    }
+                                }}
+                            >
+                                View P/L History Chart
+                            </Button>
                         </Box>
                     )}
                 </CardContent>
@@ -1660,8 +1675,8 @@ function UpdateStrategy({ id }) {
                                                                 size="small"
                                                             />
                                                         </TableCell>
-                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
                                                         <TableCell>{moment(trade.exitdate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
                                                         <TableCell>{trade.asset}</TableCell>
                                                         <TableCell>{trade.quantity}</TableCell>
                                                         <TableCell>
@@ -1732,8 +1747,8 @@ function UpdateStrategy({ id }) {
                                                                 size="small"
                                                             />
                                                         </TableCell>
-                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
                                                         <TableCell>{moment(trade.exitdate).format('YYYY-MM-DD')}</TableCell>
+                                                        <TableCell>{moment(trade.entrydate).format('YYYY-MM-DD')}</TableCell>
                                                         <TableCell>{trade.asset}</TableCell>
                                                         <TableCell>{trade.strikeprize}</TableCell>
                                                         <TableCell>{trade.openquantity / trade.lotsize}</TableCell>
@@ -2097,6 +2112,33 @@ function UpdateStrategy({ id }) {
                         disabled={!newNoteContent.trim()}
                     >
                         Add
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* P/L History Chart Dialog */}
+            <Dialog
+                open={showPlHistoryChart}
+                onClose={() => setShowPlHistoryChart(false)}
+                maxWidth="lg"
+                fullWidth
+            >
+                <DialogTitle>
+                    P/L History Chart - {strategy?.name}
+                </DialogTitle>
+                <DialogContent>
+                    {strategy && (
+                        <RegularStrategyPlHistoryChart
+                            strategyId={strategy.id}
+                            strategyName={strategy.name}
+                            isOpen={strategy.status === 'OPEN'}
+                            showDirectly={true}
+                        />
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowPlHistoryChart(false)}>
+                        Close
                     </Button>
                 </DialogActions>
             </Dialog>
