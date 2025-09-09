@@ -63,6 +63,7 @@ import SyncIcon from '@mui/icons-material/Sync';
 import EditIcon from '@mui/icons-material/Edit';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 import { fetchLTPs } from '../../services/zerodha/api';
+import { isMarketHours } from '../../services/zerodha/utils';
 
 const TABLE_STYLES = {
     container: {
@@ -765,13 +766,15 @@ function UpdateStrategy({ id }) {
             return;
         }
 
-        // Auto sync every 5 minutes
+        // Auto sync every 5 minutes (only during market hours)
         const interval = setInterval(async () => {
             try {
-                // Check again if there are still open trades and not already syncing
-                if (hasOpenTrades() && !isFetchingZerodhaLTP) {
-                    console.log('Auto syncing LTP from Zerodha...');
+                // Check if it's market hours, has open trades, and not already syncing
+                if (isMarketHours() && hasOpenTrades() && !isFetchingZerodhaLTP) {
+                    console.log('Auto syncing LTP from Zerodha (market hours)...');
                     await handleConfirmZerodhaSync();
+                } else if (!isMarketHours()) {
+                    console.log('Skipping auto sync - market is closed (outside 9:00 AM - 3:30 PM on weekdays)');
                 }
             } catch (error) {
                 console.error('Auto sync error:', error);

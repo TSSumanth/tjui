@@ -10,6 +10,9 @@ import {
     Badge,
     ListItemIcon,
     ListItemText,
+    Snackbar,
+    Alert,
+    CircularProgress,
 } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -27,16 +30,20 @@ import EventIcon from '@mui/icons-material/Event';
 import { CreateStrategy } from '../Strategies/CreateStrategyPopup';
 import { getActionItems } from '../../services/actionitems';
 import { useZerodha } from '../../context/ZerodhaContext';
+import { sendDailySummary } from '../../services/slackService';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SummarizeIcon from '@mui/icons-material/Summarize';
 import MonthlyPerformanceTracker from './MonthlyPerformanceTracker';
 
 const Header = () => {
     const [actionItemsCount, setActionItemsCount] = useState(0);
     const { sessionActive, isAuth } = useZerodha();
     const [loading, setLoading] = useState(false);
+    const [dailySummaryLoading, setDailySummaryLoading] = useState(false);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -51,6 +58,30 @@ const Header = () => {
         } else {
             navigate('/zerodha/login');
         }
+    };
+
+    const handleDailySummaryClick = async () => {
+        setDailySummaryLoading(true);
+        try {
+            const response = await sendDailySummary();
+            setSnackbar({
+                open: true,
+                message: response.message || 'Daily summary sent successfully!',
+                severity: 'success'
+            });
+        } catch (error) {
+            setSnackbar({
+                open: true,
+                message: error.response?.data?.error || 'Failed to send daily summary',
+                severity: 'error'
+            });
+        } finally {
+            setDailySummaryLoading(false);
+        }
+    };
+
+    const handleSnackbarClose = () => {
+        setSnackbar({ ...snackbar, open: false });
     };
 
     useEffect(() => {
@@ -112,8 +143,38 @@ const Header = () => {
                         <ButtonGroup />
                     </Box>
 
-                    {/* Actions: Zerodha button and notifications */}
+                    {/* Actions: Daily Summary, Zerodha button and notifications */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 4 }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={dailySummaryLoading ? <CircularProgress size={16} /> : <SummarizeIcon />}
+                            onClick={handleDailySummaryClick}
+                            disabled={dailySummaryLoading}
+                            sx={{
+                                backgroundColor: "transparent",
+                                color: "white",
+                                borderColor: "rgba(255, 255, 255, 0.5)",
+                                minWidth: "140px",
+                                padding: "8px 24px",
+                                textTransform: 'none',
+                                fontSize: '0.9rem',
+                                fontWeight: 500,
+                                borderRadius: '999px',
+                                letterSpacing: 0.5,
+                                transition: 'all 0.2s',
+                                "&:hover": {
+                                    backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                    borderColor: "white",
+                                    color: "white"
+                                },
+                                "&:disabled": {
+                                    color: "rgba(255, 255, 255, 0.5)",
+                                    borderColor: "rgba(255, 255, 255, 0.3)"
+                                }
+                            }}
+                        >
+                            {dailySummaryLoading ? 'Sending...' : 'Daily Summary'}
+                        </Button>
                         <Button
                             variant="contained"
                             startIcon={<AccountBalanceIcon />}
@@ -163,6 +224,23 @@ const Header = () => {
                     </Box>
                 </Toolbar>
             </AppBar>
+            
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert 
+                    onClose={handleSnackbarClose} 
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+            
             {/* Spacer div to prevent content overlap */}
             <Box sx={{ height: "64px" }} />
             
