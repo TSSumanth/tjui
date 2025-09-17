@@ -29,7 +29,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
-import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote } from '../../services/algoStrategies';
+import { updateAlgoStrategy, getStrategyNoteById, deleteStrategyNote, createStrategyNote, sendAlert } from '../../services/algoStrategies';
 import { getAutomatedOrderById, updateAutomatedOrder } from '../../services/automatedOrders';
 import { getOrders, getPositions } from '../../services/zerodha/api';
 import { checkTargetAchievement, createTargetAchievement, resetTargetAchievement, getStrategyTarget, updateTargetValue, checkMaxLossTriggered, updateMaxLossValue, triggerMaxLoss, getStrategyTargetAndMaxLoss } from '../../services/strategyTargetAchievements';
@@ -253,14 +253,25 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     setIsTargetAchieved(true);
 
                     // Create achievement note
+                    const achievementMessage = `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})`;
                     createStrategyNote({
                         strategyid: strategy.strategyid,
-                        notes: `🎯 TARGET ACHIEVED! Total P/L (${totalPL.toFixed(2)}) exceeded expected return (${strategyTarget.toFixed(2)})`
+                        notes: achievementMessage
                     }).then(() => {
                         // Refresh notes to show the new achievement note
                         fetchNotes();
                     }).catch(err => {
                         console.error('Error creating achievement note:', err);
+                    });
+
+                    // Send alert notification
+                    sendAlert({
+                        strategyName: strategy.strategyid, // Using strategy ID as name since we don't have a separate name field
+                        strategyId: strategy.strategyid,
+                        message: achievementMessage,
+                        alertType: 'TARGET ACHIEVED'
+                    }).catch(err => {
+                        console.error('Error sending target achievement alert:', err);
                     });
 
                     // Show success notification
@@ -297,14 +308,25 @@ const StrategyCard = ({ strategy, onStrategyUpdate, zerodhaWebSocketData }) => {
                     setMaxLossTriggered(true);
 
                     // Create max loss note
+                    const maxLossMessage = `🚨 MAX LOSS TRIGGERED! Total P/L (${totalPL.toFixed(2)}) reached max loss limit (${strategyMaxLoss.toFixed(2)})`;
                     createStrategyNote({
                         strategyid: strategy.strategyid,
-                        notes: `🚨 MAX LOSS TRIGGERED! Total P/L (${totalPL.toFixed(2)}) reached max loss limit (${strategyMaxLoss.toFixed(2)})`
+                        notes: maxLossMessage
                     }).then(() => {
                         // Refresh notes to show the new max loss note
                         fetchNotes();
                     }).catch(err => {
                         console.error('Error creating max loss note:', err);
+                    });
+
+                    // Send alert notification
+                    sendAlert({
+                        strategyName: strategy.strategyid, // Using strategy ID as name since we don't have a separate name field
+                        strategyId: strategy.strategyid,
+                        message: maxLossMessage,
+                        alertType: 'MAX LOSS TRIGGERED'
+                    }).catch(err => {
+                        console.error('Error sending max loss alert:', err);
                     });
 
                     // Show warning notification

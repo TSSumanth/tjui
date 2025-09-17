@@ -51,3 +51,9 @@ export const deleteStrategyNote = async (id) => {
     const response = await axios.delete(`${API_URL}/notes/${id}`);
     return response.data;
 };
+
+// Send alert notification
+export const sendAlert = async (alertData) => {
+    const response = await axios.post(`${API_URLS.BASE_URL}/api/slack/alert`, alertData);
+    return response.data;
+};

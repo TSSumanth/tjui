@@ -338,7 +338,7 @@ function UpdateStrategy({ id }) {
                 };
 
                 // Update the strategy in the database
-                const updateResponse = await updateStrategy(updatedStrategy);
+                const updateResponse = await updateStrategy(updatedStrategy.id, updatedStrategy);
 
                 if (updateResponse) {
                     // Fetch the updated strategy to ensure we have the latest data
@@ -398,7 +398,7 @@ function UpdateStrategy({ id }) {
                 symbol_ltp: strategy.symbol_ltp !== undefined ? strategy.symbol_ltp : ''
             };
 
-            await updateStrategy(updatedStrategy);
+            await updateStrategy(updatedStrategy.id, updatedStrategy);
             await fetchTrades();
             setSnackbar({
                 open: true,
@@ -420,22 +420,39 @@ function UpdateStrategy({ id }) {
     };
 
     const calculateUnrealizedPL = useCallback((trade) => {
-        if (!trade || trade.status !== 'OPEN' || !trade.ltp || !trade.openquantity) return 0;
+        console.log('calculateUnrealizedPL called with trade:', trade);
+        if (!trade || trade.status !== 'OPEN' || !trade.ltp || !trade.openquantity) {
+            console.log('calculateUnrealizedPL returning 0 - trade not valid for calculation:', {
+                trade: !!trade,
+                status: trade?.status,
+                ltp: trade?.ltp,
+                openquantity: trade?.openquantity
+            });
+            return 0;
+        }
 
         const ltp = parseFloat(trade.ltp);
+        console.log('LTP parsed as:', ltp);
         // Return 0 if LTP is 0 or 0.00
-        if (ltp === 0 || ltp === 0.00) return 0;
+        if (ltp === 0 || ltp === 0.00) {
+            console.log('calculateUnrealizedPL returning 0 - LTP is 0');
+            return 0;
+        }
 
         const quantity = parseInt(trade.openquantity);
         const entryPrice = parseFloat(trade.entryprice);
+        console.log('Quantity:', quantity, 'Entry Price:', entryPrice);
 
         // For options, quantity is already adjusted with lot size in the database
         // So we don't need to multiply by lot size here
+        let result;
         if (trade.tradetype === 'LONG') {
-            return quantity * (ltp - entryPrice);
+            result = quantity * (ltp - entryPrice);
         } else {
-            return quantity * (entryPrice - ltp);
+            result = quantity * (entryPrice - ltp);
         }
+        console.log('calculateUnrealizedPL result:', result);
+        return result;
     }, []);
 
     const checkAllTradesHaveLTP = useCallback(() => {
@@ -627,28 +644,37 @@ function UpdateStrategy({ id }) {
             const updatedOptionTrades = [];
 
             // Process stock trades one by one
+            console.log('Processing open stock trades:', openStockTrades);
             for (const trade of openStockTrades) {
-                if (trade.symbol) {
+                console.log('Processing stock trade:', trade);
+                if (trade.asset) {
                     const instrument = {
                         exchange: 'NSE',
-                        tradingsymbol: trade.symbol
+                        tradingsymbol: trade.asset
                     };
 
                     try {
                         const ltpMap = await fetchLTPs([instrument]);
+                        console.log(`LTP Map for ${trade.asset}:`, ltpMap);
 
-                        const ltp = ltpMap[trade.symbol];
-                        if (ltp) {
+                        const ltp = ltpMap[trade.asset];
+                        console.log(`LTP for ${trade.asset}:`, ltp);
+                        
+                        if (ltp !== undefined && ltp !== null) {
                             const updatedTrade = {
                                 ...trade,
                                 ltp: ltp.toString()
                             };
                             const unrealizedPL = calculateUnrealizedPL(updatedTrade);
+                            console.log(`Calculated unrealized PL for ${trade.asset}:`, unrealizedPL);
                             updatedTrade.unrealizedpl = unrealizedPL;
+                            console.log(`Updated stock trade:`, updatedTrade);
                             updatedStockTrades.push(updatedTrade);
+                        } else {
+                            console.log(`No LTP found for ${trade.asset}`);
                         }
                     } catch (err) {
-                        console.error('Error fetching LTP for stock:', trade.symbol, err);
+                        console.error('Error fetching LTP for stock:', trade.asset, err);
                     }
                 }
                 setSyncProgress(prev => ({ ...prev, current: prev.current + 1 }));
@@ -696,7 +722,7 @@ function UpdateStrategy({ id }) {
                             ...strategy,
                             symbol_ltp: symbolLTP.toString()
                         };
-                        await updateStrategy(updatedStrategy);
+                        await updateStrategy(updatedStrategy.id, updatedStrategy);
 
                         // Update local state
                         setStrategy(updatedStrategy);
@@ -713,11 +739,69 @@ function UpdateStrategy({ id }) {
             }
 
             // Update all trades in database
-            await Promise.all([
-                ...updatedStockTrades.map(trade => updateStockTrade(trade)),
-                ...updatedOptionTrades.map(trade => updateOptionTrade(trade))
-            ]);
+            console.log('Updating stock trades in database:', updatedStockTrades);
+            console.log('Updating option trades in database:', updatedOptionTrades);
+            
+            const stockUpdateResults = await Promise.all(
+                updatedStockTrades.map(async (trade) => {
+                    console.log(`Updating stock trade ${trade.tradeid} with LTP ${trade.ltp}`);
+                    console.log(`Full trade object being sent to API:`, trade);
+                    try {
+                        const result = await updateStockTrade(trade);
+                        console.log(`Stock trade update result:`, result);
+                        if (!result || !result.created) {
+                            console.error(`Stock trade update failed for ${trade.tradeid}:`, result);
+                        }
+                        return result;
+                    } catch (error) {
+                        console.error(`Error updating stock trade ${trade.tradeid}:`, error);
+                        return { created: false, error: error.message };
+                    }
+                })
+            );
+            
+            const optionUpdateResults = await Promise.all(
+                updatedOptionTrades.map(async (trade) => {
+                    console.log(`Updating option trade ${trade.tradeid} with LTP ${trade.ltp}`);
+                    const result = await updateOptionTrade(trade);
+                    console.log(`Option trade update result:`, result);
+                    return result;
+                })
+            );
 
+            // Update local state immediately with the new LTP values
+            if (updatedStockTrades.length > 0) {
+                console.log('Updating local stock trades state with:', updatedStockTrades);
+                setStockTrades(prevTrades => {
+                    console.log('Previous stock trades state:', prevTrades);
+                    const updatedTrades = [...prevTrades];
+                    updatedStockTrades.forEach(updatedTrade => {
+                        const index = updatedTrades.findIndex(trade => trade.tradeid === updatedTrade.tradeid);
+                        console.log(`Looking for trade ${updatedTrade.tradeid}, found at index:`, index);
+                        if (index !== -1) {
+                            updatedTrades[index] = updatedTrade;
+                            console.log(`Updated trade at index ${index}:`, updatedTrades[index]);
+                        }
+                    });
+                    console.log('New stock trades state:', updatedTrades);
+                    return updatedTrades;
+                });
+            }
+
+            if (updatedOptionTrades.length > 0) {
+                setOptionTrades(prevTrades => {
+                    const updatedTrades = [...prevTrades];
+                    updatedOptionTrades.forEach(updatedTrade => {
+                        const index = updatedTrades.findIndex(trade => trade.tradeid === updatedTrade.tradeid);
+                        if (index !== -1) {
+                            updatedTrades[index] = updatedTrade;
+                        }
+                    });
+                    return updatedTrades;
+                });
+            }
+
+            // Also fetch trades to ensure we have the latest data from database
             await fetchTrades();
             calculatePLSummary();
 
@@ -819,7 +903,7 @@ function UpdateStrategy({ id }) {
                 updatedStrategy.stock_trades = updatedStrategy.stock_trades.filter(id => id !== tradeToRemove.tradeid);
             }
 
-            await updateStrategy(updatedStrategy);
+            await updateStrategy(updatedStrategy.id, updatedStrategy);
             setStrategy(updatedStrategy);
             await fetchTrades(); // Refresh the trades list
             setSnackbar({

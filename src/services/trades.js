@@ -17,17 +17,21 @@ export const addNewStockTrade = async (tradeDetails) => {
 
 export const updateStockTrade = async (e) => {
     try {
+        console.log('updateStockTrade called with:', e);
         const response = await axios.patch(`${API_URLS.TRADES}/stock`, e, {
             params: {
                 id: e.tradeid
             }
         });
+        console.log('updateStockTrade response:', response);
         if (!(response.status === 200)) {
-            return { "created": false }
+            console.error('updateStockTrade failed - non-200 status:', response.status);
+            return { "created": false, error: `HTTP ${response.status}` }
         }
         return { "created": true, ...response.data };
     } catch (e) {
-        return { "created": false }
+        console.error('updateStockTrade error:', e);
+        return { "created": false, error: e.message }
     }
 };
 
@@ -168,16 +172,20 @@ export const deleteOptionTrade = async (tradeid) => {
 
 export const updateOptionTrade = async (e) => {
     try {
+        console.log('updateOptionTrade called with:', e);
         const response = await axios.patch(`${API_URLS.TRADES}/option`, e, {
             params: {
                 id: e.tradeid
             }
         });
+        console.log('updateOptionTrade response:', response);
         if (!(response.status === 200)) {
-            return { "created": false }
+            console.error('updateOptionTrade failed - non-200 status:', response.status);
+            return { "created": false, error: `HTTP ${response.status}` }
         }
         return { "created": true, ...response.data };
     } catch (e) {
-        return { "created": false }
+        console.error('updateOptionTrade error:', e);
+        return { "created": false, error: e.message }
     }
 };
