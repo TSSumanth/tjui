@@ -22,18 +22,22 @@ export const getOrders = async (filter = {}) => {
         const { type, ...rest } = filter;
         if (type === 'stock') {
             const res = await axios.get(API_URL + '/stock', { params: rest });
-            return res.status === 200 ? res.data : [];
+            const orders = res.status === 200 ? res.data : [];
+            // Add type field to distinguish from option orders
+            return orders.map(order => ({ ...order, type: 'STOCK' }));
         } else if (type === 'option') {
             const res = await axios.get(API_URL + '/option', { params: rest });
-            return res.status === 200 ? res.data : [];
+            const orders = res.status === 200 ? res.data : [];
+            // Add type field to distinguish from stock orders
+            return orders.map(order => ({ ...order, type: 'OPTION' }));
         } else {
             // fallback: query both
             const [stockRes, optionRes] = await Promise.all([
                 axios.get(API_URL + '/stock', { params: rest }),
                 axios.get(API_URL + '/option', { params: rest })
             ]);
-            const stockOrders = stockRes.status === 200 ? stockRes.data : [];
-            const optionOrders = optionRes.status === 200 ? optionRes.data : [];
+            const stockOrders = stockRes.status === 200 ? stockRes.data.map(order => ({ ...order, type: 'STOCK' })) : [];
+            const optionOrders = optionRes.status === 200 ? optionRes.data.map(order => ({ ...order, type: 'OPTION' })) : [];
             return [...stockOrders, ...optionOrders];
         }
     } catch (e) {

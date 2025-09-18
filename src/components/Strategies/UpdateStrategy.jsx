@@ -61,9 +61,13 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import SyncIcon from '@mui/icons-material/Sync';
 import EditIcon from '@mui/icons-material/Edit';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { calculateBreakEven } from '../../utils/breakEvenCalculator';
 import { fetchLTPs } from '../../services/zerodha/api';
 import { isMarketHours } from '../../services/zerodha/utils';
+import { getOrders } from '../../services/orders';
+import { generateStrategyPDF } from './pdfExportUtils';
+
 
 const TABLE_STYLES = {
     container: {
@@ -109,6 +113,7 @@ function UpdateStrategy({ id }) {
     const [stockTrades, setStockTrades] = useState([]);
     const [optionTrades, setOptionTrades] = useState([]);
     const [notes, setNotes] = useState([]);
+    const [orders, setOrders] = useState([]);
     const [activeTab, setActiveTab] = useState(0);
     const [showCreateStockTrade, setShowCreateStockTrade] = useState(false);
     const [showCreateOptionTrade, setShowCreateOptionTrade] = useState(false);
@@ -186,6 +191,40 @@ function UpdateStrategy({ id }) {
             setError("Failed to load notes data.");
         }
     }, []);
+
+    const fetchOrders = useCallback(async () => {
+        try {
+            console.log('Fetching orders for strategy ID:', strategy?.id);
+            
+            // Get all trade IDs for this strategy
+            const allTrades = [...stockTrades, ...optionTrades];
+            const tradeIds = allTrades.map(trade => trade.tradeid).filter(Boolean);
+            
+            console.log('Trade IDs for this strategy:', tradeIds);
+            
+            if (tradeIds.length === 0) {
+                setOrders([]);
+                return;
+            }
+            
+            // Fetch orders for each trade ID
+            const ordersPromises = tradeIds.map(tradeId => getOrders({ tradeid: tradeId }));
+            const ordersResults = await Promise.all(ordersPromises);
+            
+            // Flatten and deduplicate orders
+            const allOrders = ordersResults.flat();
+            const uniqueOrders = allOrders.filter((order, index, self) => 
+                index === self.findIndex(o => o.id === order.id)
+            );
+            
+            console.log('Fetched orders for strategy:', uniqueOrders);
+            console.log('Sample order structure:', uniqueOrders[0]);
+            setOrders(uniqueOrders);
+        } catch (error) {
+            console.error("Error fetching orders:", error);
+            setError("Failed to load orders data.");
+        }
+    }, [strategy?.id, stockTrades, optionTrades]);
 
     const fetchTrades = useCallback(async () => {
         if (!strategy) {
@@ -962,6 +1001,13 @@ function UpdateStrategy({ id }) {
         }
     }, [strategy, fetchTrades, fetchNotes]);
 
+    // Fetch orders after trades are loaded
+    useEffect(() => {
+        if (strategy && strategy.id && (stockTrades.length > 0 || optionTrades.length > 0)) {
+            fetchOrders();
+        }
+    }, [strategy, stockTrades, optionTrades, fetchOrders]);
+
     useEffect(() => {
         calculatePLSummary();
     }, [calculatePLSummary]);
@@ -1329,6 +1375,38 @@ function UpdateStrategy({ id }) {
         );
     };
 
+    // PDF Export Function
+    const handleExportToPDF = async () => {
+        try {
+            const result = generateStrategyPDF(
+                strategy,
+                plSummary,
+                stockTrades,
+                optionTrades,
+                orders,
+                notes,
+                tradeActionItems
+            );
+
+            if (result.success) {
+                setSnackbar({
+                    open: true,
+                    message: 'Strategy exported to PDF successfully!',
+                    severity: 'success'
+                });
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error exporting to PDF:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to export strategy to PDF',
+                severity: 'error'
+            });
+        }
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
@@ -1484,6 +1562,14 @@ function UpdateStrategy({ id }) {
                                     onClick={() => setShowLTPDialog(true)}
                                 >
                                     Update LTP Manually
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<PictureAsPdfIcon />}
+                                    onClick={handleExportToPDF}
+                                    sx={{ ml: 1 }}
+                                >
+                                    EXPORT to PDF
                                 </Button>
                                 <Button
                                     variant="contained"
