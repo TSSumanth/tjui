@@ -24,6 +24,7 @@ import { fetchLTPs } from '../services/zerodha/api';
 import { getOpenStrategies } from '../services/strategies';
 import { getAlgoStrategies } from '../services/algoStrategies';
 import { getReportByDateRange } from '../services/profitlossreport';
+import { getOrders } from '../services/orders';
 
 function Home() {
     const [monthlyHistory, setMonthlyHistory] = useState([]);
@@ -46,6 +47,15 @@ function Home() {
     const [plReportData, setPlReportData] = useState([]);
     const [plReportLoading, setPlReportLoading] = useState(true);
     const [plReportError, setPlReportError] = useState(null);
+    
+    // Orders state
+    const [currentMonthOrdersCount, setCurrentMonthOrdersCount] = useState(0);
+    const [ordersLoading, setOrdersLoading] = useState(true);
+    
+    // Trades state
+    const [totalTradesCount, setTotalTradesCount] = useState(0);
+    const [tradesCountLoading, setTradesCountLoading] = useState(true);
+    const [currentMonthOpenTradesCount, setCurrentMonthOpenTradesCount] = useState(0);
 
     useEffect(() => {
         const fetchMonthlyHistory = async () => {
@@ -76,10 +86,30 @@ function Home() {
                 setTradesLoading(true);
                 setTradesError(null);
 
-                // Fetch both stock and option trades
+                // Get current month start and end dates for filtering
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1; // JavaScript months are 0-indexed
+                
+                // First day of current month
+                const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+                
+                // Last day of current month
+                const lastDay = new Date(year, month, 0).getDate();
+                const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+
+                // Fetch both stock and option trades created in current month
                 const [stockTrades, optionTrades] = await Promise.all([
-                    getStockTrades({ status: 'OPEN' }),
-                    getOptionTrades({ status: 'OPEN' })
+                    getStockTrades({ 
+                        status: 'OPEN',
+                        createdafter: startDate,
+                        createdbefore: endDate
+                    }),
+                    getOptionTrades({ 
+                        status: 'OPEN',
+                        createdafter: startDate,
+                        createdbefore: endDate
+                    })
                 ]);
 
                 // Combine all open trades
@@ -231,6 +261,95 @@ function Home() {
         fetchPLReport();
     }, []);
 
+    // Fetch current month orders count
+    useEffect(() => {
+        const fetchCurrentMonthOrders = async () => {
+            try {
+                setOrdersLoading(true);
+                
+                // Get current month start and end dates
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1; // JavaScript months are 0-indexed
+                
+                // First day of current month
+                const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+                
+                // Last day of current month
+                const lastDay = new Date(year, month, 0).getDate();
+                const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+                
+                // Fetch both stock and option orders for current month
+                const [stockOrders, optionOrders] = await Promise.all([
+                    getOrders({ type: 'stock', startDate, endDate }),
+                    getOrders({ type: 'option', startDate, endDate })
+                ]);
+                
+                const totalOrders = (stockOrders || []).length + (optionOrders || []).length;
+                setCurrentMonthOrdersCount(totalOrders);
+            } catch (err) {
+                console.error('Error fetching current month orders:', err);
+                setCurrentMonthOrdersCount(0);
+            } finally {
+                setOrdersLoading(false);
+            }
+        };
+
+        fetchCurrentMonthOrders();
+    }, []);
+
+    // Fetch current month trades count
+    useEffect(() => {
+        const fetchCurrentMonthTrades = async () => {
+            try {
+                setTradesCountLoading(true);
+                
+                // Get current month start and end dates
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1; // JavaScript months are 0-indexed
+                
+                // First day of current month
+                const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+                
+                // Last day of current month
+                const lastDay = new Date(year, month, 0).getDate();
+                const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+                
+                // Fetch trades created in current month (both stock and option)
+                const [stockTrades, optionTrades] = await Promise.all([
+                    getStockTrades({ 
+                        createdafter: startDate,
+                        createdbefore: endDate
+                    }),
+                    getOptionTrades({ 
+                        createdafter: startDate,
+                        createdbefore: endDate
+                    })
+                ]);
+                
+                const stockCount = Array.isArray(stockTrades) ? stockTrades.length : 0;
+                const optionCount = Array.isArray(optionTrades) ? optionTrades.length : 0;
+                const totalTrades = stockCount + optionCount;
+                
+                // Count open trades in current month
+                const openStockTrades = stockTrades.filter(trade => trade.status === 'OPEN');
+                const openOptionTrades = optionTrades.filter(trade => trade.status === 'OPEN');
+                const openTradesCount = openStockTrades.length + openOptionTrades.length;
+                
+                setTotalTradesCount(totalTrades);
+                setCurrentMonthOpenTradesCount(openTradesCount);
+            } catch (err) {
+                console.error('Error fetching current month trades:', err);
+                setTotalTradesCount(0);
+            } finally {
+                setTradesCountLoading(false);
+            }
+        };
+
+        fetchCurrentMonthTrades();
+    }, []);
+
     const formatCurrency = (value) => {
         return `₹${parseFloat(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     };
@@ -294,70 +413,253 @@ function Home() {
             <Box sx={{ p: 3 }}>
                 {/* Dashboard Overview Cards */}
                 <Grid container spacing={3} sx={{ mb: 3 }}>
-                    {/* Monthly Target Progress */}
+                    {/* Monthly Performance & Activity */}
                     <Grid item xs={12} md={4}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                                <Typography variant="h6" gutterBottom>
-                                    Monthly Target Progress
-                                </Typography>
-                                {currentMonthData && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                        {currentMonthData.month_name} {new Date().getFullYear()}
+                        <Card sx={{ 
+                            height: '100%', 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            background: 'white',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                            border: '1px solid rgba(0,0,0,0.05)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}>
+                            {/* Decorative accent */}
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: 4,
+                                background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                                zIndex: 1
+                            }} />
+                            
+                            <CardContent sx={{ 
+                                flexGrow: 1, 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                position: 'relative',
+                                zIndex: 1,
+                                p: 1
+                            }}>
+                                {/* Header */}
+                                <Box sx={{ mb: 1 }}>
+                                    <Typography variant="h6" sx={{ 
+                                        fontWeight: 700, 
+                                        color: 'text.primary',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                        fontSize: '0.9rem'
+                                    }}>
+                                        📊 Monthly Performance & Activity
                                     </Typography>
-                                )}
+                                    {currentMonthData && (
+                                        <Typography variant="body2" sx={{ 
+                                            color: 'text.secondary',
+                                            mt: 0.25,
+                                            fontWeight: 500,
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            {currentMonthData.month_name} {new Date().getFullYear()}
+                                        </Typography>
+                                    )}
+                                </Box>
+                                
+                                {/* Activity Metrics Grid */}
+                                <Box sx={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: '1fr 1fr', 
+                                    gap: 1, 
+                                    mb: 1
+                                }}>
+                                    {/* Orders Card */}
+                                    <Box sx={{
+                                        background: 'white',
+                                        borderRadius: 1,
+                                        p: 1,
+                                        textAlign: 'center',
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                    }}>
+                                        <Typography variant="body2" sx={{ 
+                                            color: 'text.secondary',
+                                            mb: 0.25,
+                                            fontWeight: 600,
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            📋 Orders
+                                        </Typography>
+                                        {ordersLoading ? (
+                                            <CircularProgress size={14} sx={{ color: 'primary.main' }} />
+                                        ) : (
+                                            <Typography variant="h6" sx={{ 
+                                                fontWeight: 800, 
+                                                color: 'primary.main',
+                                                lineHeight: 1,
+                                                fontSize: '1.1rem'
+                                            }}>
+                                                {currentMonthOrdersCount}
+                                            </Typography>
+                                        )}
+                                    </Box>
+
+                                    {/* Trades Card */}
+                                    <Box sx={{
+                                        background: 'white',
+                                        borderRadius: 1,
+                                        p: 1,
+                                        textAlign: 'center',
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                    }}>
+                                        <Typography variant="body2" sx={{ 
+                                            color: 'text.secondary',
+                                            mb: 0.25,
+                                            fontWeight: 600,
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            💼 Trades
+                                        </Typography>
+                                        {tradesCountLoading ? (
+                                            <CircularProgress size={14} sx={{ color: 'secondary.main' }} />
+                                        ) : (
+                                            <Box>
+                                                <Typography variant="h6" sx={{ 
+                                                    fontWeight: 800, 
+                                                    color: 'secondary.main',
+                                                    lineHeight: 1,
+                                                    fontSize: '1.1rem'
+                                                }}>
+                                                    {totalTradesCount}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ 
+                                                    color: 'text.secondary',
+                                                    fontSize: '0.65rem',
+                                                    mt: 0.1
+                                                }}>
+                                                    ({currentMonthOpenTradesCount} open)
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </Box>
+                                {/* Performance Section */}
                                 {currentMonthData ? (
-                                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Expected: {formatCurrency(currentMonthData.expected_return)}
-                                            </Typography>
-                                            <Typography 
-                                                variant="body2" 
-                                                color={currentMonthData.actual_return < 0 ? "error" : "text.secondary"}
-                                            >
-                                                Actual: {formatCurrency(currentMonthData.actual_return)}
-                                            </Typography>
+                                    <Box sx={{
+                                        background: 'white',
+                                        borderRadius: 1,
+                                        p: 1,
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                    }}>
+                                        <Typography variant="body2" sx={{ 
+                                            color: 'text.primary',
+                                            mb: 0.75,
+                                            fontWeight: 600,
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            💰 Performance
+                                        </Typography>
+                                        
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ 
+                                                    color: 'text.secondary',
+                                                    fontSize: '0.65rem',
+                                                    mb: 0.1
+                                                }}>
+                                                    Expected
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ 
+                                                    color: 'text.primary',
+                                                    fontWeight: 700,
+                                                    lineHeight: 1,
+                                                    fontSize: '0.8rem'
+                                                }}>
+                                                    {formatCurrency(currentMonthData.expected_return)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body2" sx={{ 
+                                                    color: 'text.secondary',
+                                                    fontSize: '0.65rem',
+                                                    mb: 0.1
+                                                }}>
+                                                    Actual
+                                                </Typography>
+                                                <Typography 
+                                                    variant="body2" 
+                                                    sx={{ 
+                                                        color: currentMonthData.actual_return < 0 ? 'error.main' : 'success.main',
+                                                        fontWeight: 700,
+                                                        lineHeight: 1,
+                                                        fontSize: '0.8rem'
+                                                    }}
+                                                >
+                                                    {formatCurrency(currentMonthData.actual_return)}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                        <LinearProgress 
-                                            variant="determinate" 
-                                            value={currentMonthData.expected_return > 0 
-                                                ? Math.min((currentMonthData.actual_return / currentMonthData.expected_return) * 100, 100)
-                                                : 0
-                                            }
-                                            sx={{ 
-                                                height: 8, 
-                                                borderRadius: 4,
-                                                backgroundColor: 'rgba(0,0,0,0.1)',
-                                                '& .MuiLinearProgress-bar': {
-                                                    backgroundColor: currentMonthData.actual_return < 0 
-                                                        ? '#f44336'  // Red for negative actual return (losses)
-                                                        : currentMonthData.actual_return >= currentMonthData.expected_return 
-                                                            ? '#4caf50'  // Green for meeting/exceeding target
-                                                            : currentMonthData.actual_return >= currentMonthData.expected_return * 0.5 
-                                                                ? '#ff9800'  // Orange for partial progress
-                                                                : '#f44336'  // Red for poor performance
+                                        
+                                        <Box sx={{ mb: 0.75 }}>
+                                            <LinearProgress 
+                                                variant="determinate" 
+                                                value={currentMonthData.expected_return > 0 
+                                                    ? Math.min((currentMonthData.actual_return / currentMonthData.expected_return) * 100, 100)
+                                                    : 0
                                                 }
-                                            }}
-                                        />
+                                                sx={{ 
+                                                    height: 3, 
+                                                    borderRadius: 1.5,
+                                                    backgroundColor: 'grey.200',
+                                                    '& .MuiLinearProgress-bar': {
+                                                        backgroundColor: currentMonthData.actual_return < 0 
+                                                            ? 'error.main'
+                                                            : currentMonthData.actual_return >= currentMonthData.expected_return 
+                                                                ? 'success.main'
+                                                                : currentMonthData.actual_return >= currentMonthData.expected_return * 0.5 
+                                                                    ? 'warning.main'
+                                                                    : 'error.main',
+                                                        borderRadius: 1.5
+                                                    }
+                                                }}
+                                            />
+                                        </Box>
+                                        
                                         <Typography 
-                                            variant="caption" 
-                                            color={currentMonthData.actual_return < 0 ? "error" : "text.secondary"} 
-                                            sx={{ mt: 1, display: 'block' }}
+                                            variant="body2" 
+                                            sx={{ 
+                                                color: currentMonthData.actual_return < 0 ? 'error.main' : 'success.main',
+                                                fontWeight: 600,
+                                                fontSize: '0.65rem',
+                                                textAlign: 'center'
+                                            }}
                                         >
                                             {currentMonthData.expected_return > 0 
                                                 ? currentMonthData.actual_return < 0 
-                                                    ? `Loss: ${formatCurrency(Math.abs(currentMonthData.actual_return))}`
-                                                    : `${((currentMonthData.actual_return / currentMonthData.expected_return) * 100).toFixed(1)}% of target achieved`
-                                                : 'No target set'
+                                                    ? `📉 Loss: ${formatCurrency(Math.abs(currentMonthData.actual_return))}`
+                                                    : `📈 ${((currentMonthData.actual_return / currentMonthData.expected_return) * 100).toFixed(1)}% of target`
+                                                : '🎯 No target set'
                                             }
                                         </Typography>
                                     </Box>
                                 ) : (
-                                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Loading monthly data...
-                            </Typography>
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        background: 'white',
+                                        borderRadius: 1,
+                                        p: 1,
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                                    }}>
+                                        <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>
+                                            ⏳ Loading monthly data...
+                                        </Typography>
                                     </Box>
                                 )}
                             </CardContent>

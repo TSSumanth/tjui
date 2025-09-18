@@ -43,7 +43,9 @@ export const getStockTrades = async (params = {}) => {
                 minimumreturn: params.minimumreturn,
                 maximumreturn: params.maximumreturn,
                 tradeid: params.id,
-                id: params.id
+                id: params.id,
+                createdafter: params.createdafter,
+                createdbefore: params.createdbefore
             }
         });
 
@@ -125,7 +127,9 @@ export const getOptionTrades = async (e) => {
             params: {
                 status: e.status,
                 minimumreturn: e.minimumreturn,
-                maximumreturn: e.maximumreturn
+                maximumreturn: e.maximumreturn,
+                createdafter: e.createdafter,
+                createdbefore: e.createdbefore
             }
         });
         if (response.status === 200) {
