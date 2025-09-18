@@ -20,6 +20,7 @@ import TagManagement from './pages/TagManagement';
 import PairedOrdersPage from './pages/PairedOrdersPage';
 import Holidays from './pages/Holidays';
 import SubscribeLiveDataPage from './pages/SubscribeLiveData';
+import TradingNotes from './pages/TradingNotes';
 import marketHoursService from './services/zerodha/marketHours';
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
                     <Route path="/zerodha/paired-orders" element={<PairedOrdersPage />} />
                     <Route path="/tags" element={<TagManagement />} />
                     <Route path="/holidays" element={<Holidays />} />
+                    <Route path="/trading-notes" element={<TradingNotes />} />
                     <Route path="/zerodha/subscribe-live-data" element={<SubscribeLiveDataPage />} />
                     <Route path="*" element={<Home />} />
                 </Routes>

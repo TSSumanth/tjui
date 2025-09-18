@@ -36,6 +36,7 @@ import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import NoteIcon from '@mui/icons-material/Note';
 import MonthlyPerformanceTracker from './MonthlyPerformanceTracker';
 
 const Header = () => {
@@ -284,7 +285,8 @@ const ButtonGroup = () => {
             items: {
                 "Tag Management": { path: "/tags", icon: <LocalOfferIcon /> },
                 "Dashboard": { path: "/dashboard", icon: <DashboardIcon /> },
-                "Holidays": { path: "/holidays", icon: <EventIcon /> }
+                "Holidays": { path: "/holidays", icon: <EventIcon /> },
+                "Trading Notes": { path: "/trading-notes", icon: <NoteIcon /> }
             }
         }
     };

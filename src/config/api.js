@@ -19,5 +19,6 @@ export const API_URLS = {
     ALGO_STRATEGIES: `${BASE_URL}/algo-strategies`,
     AUTOMATED_ORDERS: `${BASE_URL}/automated-orders`,
     STRATEGY_TARGET_ACHIEVEMENTS: `${BASE_URL}/strategy-target-achievements`,
-    MONTHLY_PERFORMANCE: `${BASE_URL}/monthly-performance`
+    MONTHLY_PERFORMANCE: `${BASE_URL}/monthly-performance`,
+    TRADING_NOTES: `${BASE_URL}/trading-notes`
 }; 
